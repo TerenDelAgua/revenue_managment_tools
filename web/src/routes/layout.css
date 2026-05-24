@@ -1,5 +1,18 @@
 @import 'tailwindcss';
 
+@theme {
+	--color-teren-background-base: #F5F4F1;
+	--color-teren-surface-base: #FCFBFA;
+	--color-teren-primary: #FF8C42;
+	--color-teren-primary-hover: #E06B20;
+	--color-teren-primary-subtle: #FFF7ED;
+	--color-teren-text-main: #1C1917;
+	--color-teren-text-muted: #57534E;
+	--color-teren-border-subtle: #E7E5E4;
+
+	--font-sans: 'Inter', 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
+}
+
 @layer base {
 	body {
 		@apply bg-teren-background-base text-teren-text-main font-sans min-h-screen p-6;
