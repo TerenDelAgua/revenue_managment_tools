@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+
+@layer base {
+	body {
+		@apply bg-teren-background-base text-teren-text-main font-sans min-h-screen p-6;
+	}
+}

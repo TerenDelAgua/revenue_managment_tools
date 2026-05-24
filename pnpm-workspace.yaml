@@ -1,2 +1,5 @@
 packages:
   - "itinera-web"
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - esbuild
