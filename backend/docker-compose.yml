@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
     container_name: teren-hotels-db
     environment:
@@ -11,13 +9,14 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U teren -d teren_hotels"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
+  pgdata:

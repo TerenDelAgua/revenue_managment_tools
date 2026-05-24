@@ -8,6 +8,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	internalapi "github.com/terendelagua/teren-hotels-backend/internal/api"
+	"github.com/terendelagua/teren-hotels-backend/internal/repository"
 	"github.com/terendelagua/teren-hotels-backend/pkg/config"
 	"github.com/terendelagua/teren-hotels-backend/pkg/database"
 )
@@ -23,6 +25,14 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	propertyRepo := repository.NewPropertyRepository(db.Pool)
+	floorRepo := repository.NewFloorRepository(db.Pool)
+	roomRepo := repository.NewRoomRepository(db.Pool)
+
+	propertyHandler := internalapi.NewPropertyHandler(propertyRepo)
+	floorHandler := internalapi.NewFloorHandler(floorRepo)
+	roomHandler := internalapi.NewRoomHandler(roomRepo)
 
 	r := chi.NewRouter()
 
@@ -44,6 +54,33 @@ func main() {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Route("/properties", func(r chi.Router) {
+			r.Get("/", propertyHandler.List)
+			r.Post("/", propertyHandler.Create)
+			r.Get("/{id}", propertyHandler.GetByID)
+		})
+
+		r.Route("/properties/{propertyID}/floors", func(r chi.Router) {
+			r.Get("/", floorHandler.ListByProperty)
+		})
+
+		r.Route("/floors", func(r chi.Router) {
+			r.Post("/", floorHandler.Create)
+			r.Get("/{id}", floorHandler.GetByID)
+		})
+
+		r.Route("/floors/{floorID}/rooms", func(r chi.Router) {
+			r.Get("/", roomHandler.ListByFloor)
+		})
+
+		r.Route("/rooms", func(r chi.Router) {
+			r.Post("/", roomHandler.Create)
+			r.Get("/{id}", roomHandler.GetByID)
+			r.Put("/{id}/position", roomHandler.UpdatePosition)
+		})
 	})
 
 	log.Printf("Server starting on :%s...", cfg.Port)
