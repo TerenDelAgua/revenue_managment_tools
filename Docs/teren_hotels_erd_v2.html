@@ -1,0 +1,247 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagrama ERD - Teren Hotels</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 24px;
+      background: #F5F4F1;
+      min-height: 100vh;
+    }
+    h1 {
+      text-align: center;
+      color: #1C1917;
+      margin-bottom: 32px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    #erd2 {
+      width: 100%;
+      max-width: 1600px;
+      margin: 0 auto;
+      background: #FCFBFA;
+      border-radius: 12px;
+      padding: 32px;
+      border: 1px solid #E7E5E4;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    }
+    #erd2 svg { 
+      width: 100%;
+      height: auto;
+    }
+    #erd2 svg.erDiagram .divider path { 
+      stroke-opacity: 0.5; 
+    }
+    #erd2 svg.erDiagram .row-rect-odd path,
+    #erd2 svg.erDiagram .row-rect-odd rect,
+    #erd2 svg.erDiagram .row-rect-even path,
+    #erd2 svg.erDiagram .row-rect-even rect { 
+      stroke: none !important; 
+    }
+    #erd2 svg text {
+      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    }
+  </style>
+</head>
+<body>
+  <h1>Diagrama de Entidad-Relación - Teren Hotels</h1>
+  <div id="erd2"></div>
+  <script type="module">
+    import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    await document.fonts.ready;
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      fontFamily: 'Inter, Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+      themeVariables: {
+        darkMode: false,
+        fontSize: '16px',
+        fontFamily: 'Inter, Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+        lineColor: '#57534E',
+        textColor: '#1C1917',
+        primaryColor: '#FF8C42',
+        primaryTextColor: '#1C1917',
+        primaryBorderColor: '#FF7A1A',
+        secondaryColor: '#FFF7ED',
+        secondaryTextColor: '#1C1917',
+        tertiaryColor: '#FCFBFA',
+        borderColor: '#E7E5E4',
+        background: '#FCFBFA',
+        mainBkg: '#FFFFFF',
+        nodeBorder: '#FF7A1A',
+        clusterBkg: '#F5F4F1',
+        clusterBorder: '#E7E5E4',
+        titleColor: '#1C1917',
+        edgeLabelBackground: '#FFFFFF',
+      },
+    });
+
+    const { svg } = await mermaid.render('erd2-svg', `erDiagram
+  PROPERTY {
+    uuid id PK
+    string name
+    string slug
+    string currency
+    string timezone
+    jsonb settings
+  }
+  USER {
+    uuid id PK
+    uuid property_id FK
+    string name
+    string email
+    enum role
+    bool is_active
+  }
+  FLOOR {
+    uuid id PK
+    uuid property_id FK
+    int floor_number
+    string label
+    int sort_order
+  }
+  ROOM_TYPE {
+    uuid id PK
+    uuid property_id FK
+    string name
+    int max_occupancy
+  }
+  ROOM {
+    uuid id PK
+    uuid floor_id FK
+    uuid room_type_id FK
+    string number
+    enum status
+    int pos_x
+    int pos_y
+  }
+  RATE_RULE {
+    uuid id PK
+    uuid room_type_id FK
+    decimal base_rate
+    decimal weekend_rate
+    decimal high_season_rate
+    date season_start
+    date season_end
+    int min_stay_nights
+  }
+  ROOM_BLOCK {
+    uuid id PK
+    uuid room_id FK
+    uuid created_by FK
+    date start_date
+    date end_date
+    enum reason
+    text notes
+  }
+  GUEST {
+    uuid id PK
+    uuid property_id FK
+    string full_name
+    string id_number
+    string phone
+    string nationality
+  }
+  BOOKING {
+    uuid id PK
+    uuid property_id FK
+    uuid room_id FK
+    uuid guest_id FK
+    uuid created_by FK
+    date check_in
+    date check_out
+    decimal total_amount
+    enum source
+    enum status
+    text notes
+  }
+  INVOICE {
+    uuid id PK
+    uuid booking_id FK
+    string invoice_number
+    decimal subtotal
+    decimal tax_amount
+    decimal total
+    enum payment_method
+    enum payment_status
+    timestamp issued_at
+    timestamp paid_at
+  }
+  PROPERTY ||--o{ USER : has
+  PROPERTY ||--o{ FLOOR : has
+  PROPERTY ||--o{ ROOM_TYPE : has
+  FLOOR ||--o{ ROOM : contains
+  ROOM_TYPE ||--o{ ROOM : typed_as
+  ROOM_TYPE ||--o{ RATE_RULE : priced_by
+  ROOM ||--o{ ROOM_BLOCK : blocked_by
+  ROOM ||--o{ BOOKING : assigned_to
+  GUEST ||--o{ BOOKING : makes
+  BOOKING ||--|| INVOICE : generates
+  USER ||--o{ ROOM_BLOCK : creates
+  USER ||--o{ BOOKING : creates
+`);
+
+    document.getElementById('erd2').innerHTML = svg;
+
+    const svgElement = document.querySelector('#erd2 svg');
+    
+    document.querySelectorAll('#erd2 svg.erDiagram .node').forEach(node => {
+      const firstPath = node.querySelector('path[d]');
+      if (!firstPath) return;
+      const d = firstPath.getAttribute('d');
+      const nums = d.match(/-?[\d.]+/g)?.map(Number);
+      if (!nums || nums.length < 8) return;
+      const xs = [nums[0], nums[2], nums[4], nums[6]];
+      const ys = [nums[1], nums[3], nums[5], nums[7]];
+      const x = Math.min(...xs), y = Math.min(...ys);
+      const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+      rect.setAttribute('width', w); rect.setAttribute('height', h);
+      rect.setAttribute('rx', '8');
+      for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+        if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+      }
+      firstPath.replaceWith(rect);
+    });
+
+    document.querySelectorAll('#erd2 svg.erDiagram .row-rect-odd path, #erd2 svg.erDiagram .row-rect-even path').forEach(p => {
+      p.setAttribute('stroke', 'none');
+    });
+
+    document.querySelectorAll('#erd2 svg text').forEach(text => {
+      text.setAttribute('fill', '#1C1917');
+      text.setAttribute('font-family', 'Inter, Segoe UI, Tahoma, Geneva, Verdana, sans-serif');
+      text.setAttribute('font-size', '16px');
+      text.setAttribute('font-weight', '500');
+    });
+
+    document.querySelectorAll('#erd2 svg .node rect').forEach(rect => {
+      rect.setAttribute('stroke', '#FF7A1A');
+      rect.setAttribute('stroke-width', '2');
+    });
+
+    document.querySelectorAll('#erd2 svg .node path').forEach(path => {
+      const fill = path.getAttribute('fill');
+      if (fill && fill.toLowerCase() !== 'none') {
+        if (fill === '#f5f5f5' || fill.includes('f5') || fill.includes('F5')) {
+          path.setAttribute('fill', '#FFFFFF');
+        } else if (fill === '#e8e8e8' || fill.includes('e8') || fill.includes('E8')) {
+          path.setAttribute('fill', '#FFF7ED');
+        }
+      }
+    });
+  </script>
+</body>
+</html>
