@@ -8,9 +8,9 @@
 		onRoomMove?: (roomId: string, x: number, y: number) => void;
 	} = $props();
 
-	let draggedRoom: Room | null = null;
-	let dragOffsetX = 0;
-	let dragOffsetY = 0;
+	let draggedRoom = $state<Room | null>(null);
+	let dragOffsetX = $state(0);
+	let dragOffsetY = $state(0);
 
 	function startDrag(room: Room, e: MouseEvent) {
 		draggedRoom = room;
@@ -19,11 +19,11 @@
 		dragOffsetY = e.clientY - rect.top;
 	}
 
-	function onDrag(e: MouseEvent) {
+	function handleDrag(e: MouseEvent) {
 		if (!draggedRoom) return;
 	}
 
-	function endDrag(e: MouseEvent) {
+	function handleEndDrag(e: MouseEvent) {
 		if (!draggedRoom) return;
 
 		const mapElement = document.getElementById('floor-map');
@@ -43,9 +43,9 @@
 
 <div id="floor-map" 
 	class="relative w-full h-[600px] bg-teren-surface-base border border-teren-border-subtle rounded-xl overflow-hidden"
-	on:mousemove={onDrag}
-	on:mouseup={endDrag}
-	on:mouseleave={endDrag}>
+	onmousemove={handleDrag}
+	onmouseup={handleEndDrag}
+	onmouseleave={handleEndDrag}>
 	<div class="absolute inset-0 opacity-20" style="
 		background-image: linear-gradient(#E7E5E4 1px, transparent 1px),
 		                  linear-gradient(90deg, #E7E5E4 1px, transparent 1px);
@@ -54,9 +54,10 @@
 
 	{#each rooms as room (room.id)}
 		<div 
+			role="button"
 			class="absolute cursor-grab select-none bg-teren-primary-subtle border-2 border-teren-primary rounded-lg p-3 shadow-md transition-shadow hover:shadow-lg"
 			style="left: {room.pos_x}px; top: {room.pos_y}px; min-width: 100px;"
-			on:mousedown={(e) => startDrag(room, e)}
+			onmousedown={(e) => startDrag(room, e)}
 			class:dragging={draggedRoom?.id === room.id}>
 			<div class="font-semibold text-teren-text-main">{room.number}</div>
 			<div class="text-xs text-teren-text-muted mt-1">{room.status}</div>

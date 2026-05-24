@@ -4,13 +4,13 @@
 	import { api, type Floor, type Property, type Room } from '$lib/api/client';
 	import FloorMap from '$lib/components/FloorMap.svelte';
 
-	let properties: Property[] = [];
-	let floors: Floor[] = [];
-	let rooms: Room[] = [];
-	let selectedProperty: Property | null = null;
-	let selectedFloor: Floor | null = null;
-	let loading = false;
-	let error: string | null = null;
+	let properties = $state<Property[]>([]);
+	let floors = $state<Floor[]>([]);
+	let rooms = $state<Room[]>([]);
+	let selectedProperty = $state<Property | null>(null);
+	let selectedFloor = $state<Floor | null>(null);
+	let loading = $state(false);
+	let error = $state<string | null>(null);
 
 	async function loadProperties() {
 		loading = true;
@@ -105,7 +105,7 @@
 					<div class="space-y-2">
 						{#each properties as property (property.id)}
 							<button
-								on:click={() => selectProperty(property)}
+								onclick={() => selectProperty(property)}
 								class="w-full text-left px-4 py-3 rounded-lg transition-colors {selectedProperty?.id === property.id ? 'bg-teren-primary-subtle border border-teren-primary' : 'hover:bg-teren-background-base border border-transparent'}">
 								<div class="font-medium text-teren-text-main">{property.name}</div>
 								<div class="text-xs text-teren-text-muted mt-1">{property.currency}</div>
@@ -120,7 +120,7 @@
 						<div class="space-y-2">
 							{#each floors as floor (floor.id)}
 								<button
-									on:click={() => selectFloor(floor)}
+									onclick={() => selectFloor(floor)}
 									class="w-full text-left px-4 py-3 rounded-lg transition-colors {selectedFloor?.id === floor.id ? 'bg-teren-primary-subtle border border-teren-primary' : 'hover:bg-teren-background-base border border-transparent'}">
 									<div class="font-medium text-teren-text-main">
 										Floor {floor.floor_number}
