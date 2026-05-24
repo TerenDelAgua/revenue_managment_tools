@@ -1,32 +1,68 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# ═══════════════════════════════════════════════════════════
+# TEREN .gitignore (Go / Svelte / Flutter / DevOps)
+# ═══════════════════════════════════════════════════════════
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Env & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Go
+bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+vendor/
 
-# Test binary, built with `go test -c`
-*.test
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+dist/
+.build/
+.eslintcache
+.npmrc
 
-# Code coverage profiles and other test artifacts
-*.out
-coverage.*
-*.coverprofile
-profile.cov
+# Flutter / Dart
+.dart_tool/
+.packages
+pubspec.lock
+build/
+.ios/
+.android/
+*.iml
+xcuserdata/
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Docker
+docker-compose.override.yml
 
-# Go workspace file
-go.work
-go.work.sum
+# Logs & Temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+temp/
+tmp/
+coverage/
 
-# env file
-.env
+# DB / Migrations (optional: keep schema, ignore local dumps)
+*.sql.bak
+*.dump
 
-# Editor/IDE
-# .idea/
-# .vscode/
+#playwright
+playwright-report/
