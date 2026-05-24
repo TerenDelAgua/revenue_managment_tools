@@ -2,9 +2,11 @@
 	import type { Floor, Room } from '$lib/api/client';
 	import { api } from '$lib/api/client';
 
-	export let floor: Floor;
-	export let rooms: Room[] = [];
-	export let onRoomMove?: (roomId: string, x: number, y: number) => void;
+	let { floor, rooms = [], onRoomMove }: {
+		floor: Floor;
+		rooms?: Room[];
+		onRoomMove?: (roomId: string, x: number, y: number) => void;
+	} = $props();
 
 	let draggedRoom: Room | null = null;
 	let dragOffsetX = 0;
