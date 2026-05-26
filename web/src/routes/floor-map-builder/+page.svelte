@@ -127,6 +127,13 @@
 		drawerOpen = true;
 	}
 
+	function closeDrawer() {
+		drawerOpen = false;
+		setTimeout(() => {
+			selectedRoom = null;
+		}, 500);
+	}
+
 	function getStatusColor(status: string) {
 		switch (status?.toLowerCase()) {
 			case 'available':
@@ -395,13 +402,13 @@
 	</main>
 
 	<!-- Room Detail Drawer -->
-	{#if drawerOpen || selectedRoom}
+	{#if selectedRoom}
 		<div class="fixed inset-0 z-50">
 			<!-- Backdrop -->
 			<div 
 				class="absolute inset-0 bg-black/20 transition-all duration-500 ease-out"
 				style:opacity={drawerOpen ? '1' : '0'}
-				onclick={() => drawerOpen = false} />
+				onclick={closeDrawer} />
 			
 			<!-- Drawer -->
 			<div class="absolute right-0 top-0 h-full w-96 bg-teren-surface-base border-l border-teren-border-subtle shadow-xl flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)"
@@ -413,69 +420,67 @@
 						<p class="text-teren-text-muted mt-1">{selectedRoom ? getRoomTypeName(selectedRoom.number) : ''}</p>
 					</div>
 					<button 
-						onclick={() => drawerOpen = false}
+						onclick={closeDrawer}
 						class="p-2 rounded-lg hover:bg-teren-background-base transition-colors border border-teren-border-subtle">
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
 					</button>
 				</div>
 
 				<!-- Drawer Content -->
-				{#if selectedRoom}
-					<div class="flex-1 overflow-auto p-6 space-y-6">
-						<!-- Status Badge -->
-						<div class="flex items-center gap-3">
-							<span class={`inline-flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border {getStatusColor(selectedRoom.status)}`}>
-								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-								{getStatusText(selectedRoom.status)}
+				<div class="flex-1 overflow-auto p-6 space-y-6">
+					<!-- Status Badge -->
+					<div class="flex items-center gap-3">
+						<span class={`inline-flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border {getStatusColor(selectedRoom.status)}`}>
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+							{getStatusText(selectedRoom.status)}
+						</span>
+					</div>
+
+					<!-- Room Info -->
+					<div class="space-y-4">
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Rate / night</span>
+							<span class="font-semibold text-xl text-teren-text-main">IDR 950,000</span>
+						</div>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Guest</span>
+							<span class="font-medium text-teren-text-main">
+								{selectedRoom.status === 'occupied' ? 'Smith, J.' : '—'}
 							</span>
 						</div>
-
-						<!-- Room Info -->
-						<div class="space-y-4">
-							<div class="flex justify-between py-2 border-b border-teren-border-subtle">
-								<span class="text-teren-text-muted">Rate / night</span>
-								<span class="font-semibold text-xl text-teren-text-main">IDR 950,000</span>
-							</div>
-							<div class="flex justify-between py-2 border-b border-teren-border-subtle">
-								<span class="text-teren-text-muted">Guest</span>
-								<span class="font-medium text-teren-text-main">
-									{selectedRoom.status === 'occupied' ? 'Smith, J.' : '—'}
-								</span>
-							</div>
-							<div class="flex justify-between py-2 border-b border-teren-border-subtle">
-								<span class="text-teren-text-muted">Nights</span>
-								<span class="font-medium text-teren-text-main">
-									{selectedRoom.status === 'occupied' ? '2 nights' : '—'}
-									{selectedRoom.status === 'pending' || selectedRoom.status === 'pending check-in' ? 'Today 15:00' : ''}
-								</span>
-							</div>
-							<div class="flex justify-between py-2 border-b border-teren-border-subtle">
-								<span class="text-teren-text-muted">Note</span>
-								<span class="font-medium text-teren-text-main">
-									{selectedRoom.status === 'maintenance' || selectedRoom.status === 'blocked' ? 'AC Repair' : '—'}
-								</span>
-							</div>
-							<div class="flex justify-between py-2 border-b border-teren-border-subtle">
-								<span class="text-teren-text-muted">Floor</span>
-								<span class="font-medium text-teren-text-main">Ground floor</span>
-							</div>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Nights</span>
+							<span class="font-medium text-teren-text-main">
+								{selectedRoom.status === 'occupied' ? '2 nights' : '—'}
+								{selectedRoom.status === 'pending' || selectedRoom.status === 'pending check-in' ? 'Today 15:00' : ''}
+							</span>
+						</div>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Note</span>
+							<span class="font-medium text-teren-text-main">
+								{selectedRoom.status === 'maintenance' || selectedRoom.status === 'blocked' ? 'AC Repair' : '—'}
+							</span>
+						</div>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Floor</span>
+							<span class="font-medium text-teren-text-main">Ground floor</span>
 						</div>
 					</div>
+				</div>
 
-					<!-- Drawer Footer -->
-					<div class="p-6 border-t border-teren-border-subtle space-y-3">
-						{#each getDrawerActions(selectedRoom.status) as action, idx (idx)}
-							<button 
-								class="{idx === 0 && !action.danger ? 'bg-teren-primary text-white' : ''} 
-									   {action.danger ? 'border-red-600 text-red-700 bg-red-50 hover:bg-red-100' : ''}
-									   {idx > 0 && !action.danger ? 'border border-teren-border-subtle text-teren-text-main hover:bg-teren-background-base' : ''}
-									   w-full py-4 px-4 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2">
-								<span>{action.icon}</span>
-								{action.label}
-							</button>
-						{/each}
-					</div>
-				{/if}
+				<!-- Drawer Footer -->
+				<div class="p-6 border-t border-teren-border-subtle space-y-3">
+					{#each getDrawerActions(selectedRoom.status) as action, idx (idx)}
+						<button 
+							class="{idx === 0 && !action.danger ? 'bg-teren-primary text-white' : ''} 
+								   {action.danger ? 'border-red-600 text-red-700 bg-red-50 hover:bg-red-100' : ''}
+								   {idx > 0 && !action.danger ? 'border border-teren-border-subtle text-teren-text-main hover:bg-teren-background-base' : ''}
+								   w-full py-4 px-4 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2">
+							<span>{action.icon}</span>
+							{action.label}
+						</button>
+					{/each}
+				</div>
 			</div>
 		</div>
 	{/if}
