@@ -275,18 +275,18 @@
 			{#if selectedProperty}
 				<div class="flex items-center gap-8 mt-4 pt-4 border-t border-teren-border-subtle">
 					<div class="flex items-center gap-2">
-						<span class="text-2xl font-bold text-teren-text-main">{rooms.filter(r => r.status === 'occupied').length}</span>
-						<span class="text-teren-text-muted">/ {rooms.length} occupied</span>
+						<span class="text-2xl font-bold text-teren-text-main">{rooms().filter(r => r.status === 'occupied').length}</span>
+						<span class="text-teren-text-muted">/ {rooms().length} occupied</span>
 					</div>
 					<div class="flex items-center gap-2">
 						<span class="text-teren-text-muted">Occupancy</span>
 					</div>
 					<div class="flex items-center gap-2">
-						<span class="text-2xl font-bold text-teren-primary">{rooms.filter(r => r.status === 'pending').length}</span>
+						<span class="text-2xl font-bold text-teren-primary">{rooms().filter(r => r.status === 'pending').length}</span>
 						<span class="text-teren-text-muted">pending check-in</span>
 					</div>
 					<div class="flex items-center gap-2">
-						<span class="text-2xl font-bold text-teren-text-main">{rooms.filter(r => r.status === 'maintenance' || r.status === 'blocked').length}</span>
+						<span class="text-2xl font-bold text-teren-text-main">{rooms().filter(r => r.status === 'maintenance' || r.status === 'blocked').length}</span>
 						<span class="text-teren-text-muted">blocked</span>
 					</div>
 					<div class="flex items-center gap-2">
@@ -347,7 +347,7 @@
 						</h2>
 						<FloorMap 
 							floor={selectedFloor} 
-							rooms={rooms}
+							rooms={rooms()}
 							onRoomMove={handleRoomMove}
 							onRoomClick={selectRoom} />
 					</section>
