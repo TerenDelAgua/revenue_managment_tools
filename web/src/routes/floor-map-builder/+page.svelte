@@ -5,6 +5,7 @@
 
 	let properties = $state<Property[]>([]);
 	let floors = $state<Floor[]>([]);
+	let roomsByFloor = $state<Map<string, Room[]>>(new Map());
 	let selectedProperty = $state<Property | null>(null);
 	let selectedFloor = $state<Floor | null>(null);
 	let selectedRoom = $state<Room | null>(null);
@@ -14,6 +15,11 @@
 	let selectedDate = $state<string>(new Date().toISOString().split('T')[0]);
 	let drawerOpen = $state(false);
 	let showAllFloors = $state(false);
+
+	let rooms = $derived(() => {
+		if (!selectedFloor) return [];
+		return roomsByFloor.get(selectedFloor.id) || [];
+	});
 
 	async function loadProperties() {
 		loading = true;
@@ -54,27 +60,43 @@
 		error = null;
 		try {
 			const result = await api.rooms.listByFloor(floorId);
-			rooms = result || [];
+			roomsByFloor.set(floorId, result || []);
 		} catch (e) {
 			error = 'Failed to load rooms';
-			rooms = [];
+			roomsByFloor.set(floorId, []);
 		} finally {
 			loading = false;
 		}
 	}
 
-	function getAllRooms() {
-		const allRooms: Room[] = [];
-		// En un futuro, aquí cargaríamos todas las habitaciones de todos los pisos
-		return allRooms;
+	async function loadAllRooms() {
+		loading = true;
+		error = null;
+		try {
+			for (const floor of floors) {
+				const result = await api.rooms.listByFloor(floor.id);
+				roomsByFloor.set(floor.id, result || []);
+			}
+		} catch (e) {
+			error = 'Failed to load rooms';
+		} finally {
+			loading = false;
+		}
 	}
 
 	async function handleRoomMove(roomId: string, x: number, y: number) {
 		try {
 			await api.rooms.updatePosition(roomId, { pos_x: x, pos_y: y });
-			const index = rooms.findIndex(r => r.id === roomId);
-			if (index !== -1) {
-				rooms[index] = { ...rooms[index], pos_x: x, pos_y: y };
+			
+			// Update roomsByFloor for all floors
+			for (const [floorId, floorRooms] of roomsByFloor.entries()) {
+				const index = floorRooms.findIndex(r => r.id === roomId);
+				if (index !== -1) {
+					const newRooms = [...floorRooms];
+					newRooms[index] = { ...newRooms[index], pos_x: x, pos_y: y };
+					roomsByFloor.set(floorId, newRooms);
+					break;
+				}
 			}
 		} catch (e) {
 			console.error('Failed to update room position:', e);
@@ -92,9 +114,10 @@
 		loadRooms(floor.id);
 	}
 
-	function selectAllFloors() {
+	async function selectAllFloors() {
 		showAllFloors = true;
 		selectedFloor = null;
+		await loadAllRooms();
 	}
 
 	function selectRoom(room: Room) {
@@ -310,7 +333,7 @@
 							</h2>
 							<FloorMap 
 								floor={floor} 
-								rooms={[]}
+								rooms={roomsByFloor.get(floor.id) || []}
 								onRoomClick={selectRoom} />
 						</section>
 					{/each}
