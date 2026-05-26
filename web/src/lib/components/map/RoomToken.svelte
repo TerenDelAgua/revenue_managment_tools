@@ -3,85 +3,54 @@
 
 	interface Props {
 		room: RoomMap;
-		availState: RoomAvailability;
+		state: RoomAvailability;
 		mode?: 'setup' | 'ops';
 		onSelect: (room: RoomMap) => void;
 		onDragStart?: (e: DragEvent, room: RoomMap) => void;
-		onUpdateName?: (id: string, newName: string) => void;
 	}
 
-	let { room, availState, mode = 'ops', onSelect, onDragStart, onUpdateName }: Props = $props();
+	let { room, state, mode = 'ops', onSelect, onDragStart }: Props = $props();
 
-	let isEditing = $state(false);
-	let localName = $state(room.number);
-
-	$effect(() => {
-		localName = room.number;
-	});
-
-	// Paleta TEREN · WCAG AA sobre #F5F4F1
-	const styles = {
-		available: 'bg-[#16A34A] text-white',
-		occupied: 'bg-[#DC2626] text-white',
-		pending: 'bg-[#D97706] text-white',
-		blocked:
-			'bg-[#44403C] text-[#FCFBFA] bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(255,255,255,0.15)_4px,rgba(255,255,255,0.15)_8px)]',
-		inactive: 'bg-[#A8A29E] text-[#1C1917]'
+	const styles: Record<RoomAvailability, string> = {
+		available: 'bg-[#16A34A] border-[#059669] text-white',
+		occupied: 'bg-[#DC2626] border-[#B91C1C] text-white',
+		pending: 'bg-[#D97706] border-[#B45309] text-white',
+		blocked: 'bg-[#44403C] border-[#292524] text-[#FCFBFA]',
+		inactive: 'bg-[#A8A29E] border-[#78716C] text-[#1C1917] opacity-60'
 	};
 
-	function handleClick() {
-		if (mode === 'setup') {
-			isEditing = true;
-		} else {
-			onSelect(room);
-		}
-	}
-
-	function commitEdit() {
-		isEditing = false;
-		if (localName.trim() && localName !== room.number) {
-			onUpdateName?.(room.id, localName.trim());
-		} else {
-			localName = room.number; // Revert
-		}
-	}
-
-	function handleDragStart(e: DragEvent) {
-		if (mode === 'setup' && onDragStart) {
-			e.dataTransfer!.setData('text/plain', room.id);
-			e.dataTransfer!.effectAllowed = 'move';
-			onDragStart(e, room);
-		}
-	}
+	const icons: Record<string, string> = {
+		occupied: '🛏️',
+		pending: '⏳',
+		blocked: '',
+		inactive: ''
+	};
 </script>
 
 <div
-	class="room-token relative flex h-14 w-14 cursor-pointer flex-col items-center justify-center rounded-lg transition-all duration-200 ease-out select-none hover:brightness-110 active:scale-95 {styles[
-		availState
-	]}"
-	style="--pos-x: {room.pos_x}; --pos-y: {room.pos_y}; grid-column: calc(var(--pos-x) + 1); grid-row: calc(var(--pos-y) + 1);"
+	class="room-token group relative flex h-full w-full cursor-pointer flex-col items-center justify-center rounded-lg transition-all duration-200 ease-out select-none
+  {styles[state] as string}
+  border-t-0 border-r-0 border-b-2 border-l-0 hover:-translate-y-1
+  hover:shadow-lg hover:brightness-110 active:scale-95 active:shadow-md"
+	style="grid-column: calc(var(--pos-x) + 1); grid-row: calc(var(--pos-y) + 1);"
 	role="button"
 	tabindex="0"
 	draggable={mode === 'setup'}
-	ondragstart={handleDragStart}
-	onclick={handleClick}
-	onkeydown={(e) => e.key === 'Enter' && handleClick()}
+	ondragstart={(e) => onDragStart?.(e, room)}
+	onclick={() => onSelect(room)}
 >
-	{#if isEditing}
-		<input
-			bind:value={localName}
-			onblur={commitEdit}
-			onkeydown={(e) => e.key === 'Enter' && commitEdit()}
-			class="h-full w-full border-none bg-transparent text-center text-sm font-bold text-white placeholder-white/70 focus:outline-none"
-			placeholder="101"
-		/>
-	{:else}
-		<span class="text-sm leading-tight font-semibold tabular-nums">{room.number}</span>
-		{#if availState !== 'available'}
-			<span
-				class="mt-0.5 max-w-[90%] truncate text-[9px] font-medium tracking-wider uppercase opacity-80"
-				>{availState}</span
-			>
-		{/if}
+	<span class="text-sm leading-tight font-bold tabular-nums drop-shadow-sm">{room.number}</span>
+
+	{#if state !== 'available' && state !== 'inactive'}
+		<span class="mt-1 text-[10px] opacity-90">{icons[state]}</span>
 	{/if}
+
+	<!-- Tooltip en hover (solo desktop) -->
+	<div
+		class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-32 -translate-x-1/2 rounded-lg bg-[#1C1917] px-3 py-2 text-center text-xs text-white opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100"
+	>
+		<p class="font-semibold">{room.number}</p>
+		<p class="text-[#A8A29E]">{room.room_type.name}</p>
+		<p class="mt-1 text-[#FF8C42] capitalize">{state}</p>
+	</div>
 </div>

@@ -47,7 +47,7 @@
 	ondrop={handleDrop}
 >
 	{#each rooms as room (room.id)}
-		<RoomToken {room} availState={room.availability} {mode} {onSelect} {onUpdateName} />
+		<RoomToken {room} state={room.availability} {mode} {onSelect} />
 	{/each}
 
 	{#if mode === 'setup' && rooms.length === 0}
