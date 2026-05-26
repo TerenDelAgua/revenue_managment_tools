@@ -5,7 +5,7 @@
 
 	let properties = $state<Property[]>([]);
 	let floors = $state<Floor[]>([]);
-	let roomsByFloor = $state<Map<string, Room[]>>(new Map());
+	let roomsByFloor = $state<Record<string, Room[]>>({});
 	let selectedProperty = $state<Property | null>(null);
 	let selectedFloor = $state<Floor | null>(null);
 	let selectedRoom = $state<Room | null>(null);
@@ -18,7 +18,7 @@
 
 	let rooms = $derived(() => {
 		if (!selectedFloor) return [];
-		return roomsByFloor.get(selectedFloor.id) || [];
+		return roomsByFloor[selectedFloor.id] || [];
 	});
 
 	async function loadProperties() {
@@ -60,10 +60,10 @@
 		error = null;
 		try {
 			const result = await api.rooms.listByFloor(floorId);
-			roomsByFloor.set(floorId, result || []);
+			roomsByFloor[floorId] = result || [];
 		} catch (e) {
 			error = 'Failed to load rooms';
-			roomsByFloor.set(floorId, []);
+			roomsByFloor[floorId] = [];
 		} finally {
 			loading = false;
 		}
@@ -75,7 +75,7 @@
 		try {
 			for (const floor of floors) {
 				const result = await api.rooms.listByFloor(floor.id);
-				roomsByFloor.set(floor.id, result || []);
+				roomsByFloor[floor.id] = result || [];
 			}
 		} catch (e) {
 			error = 'Failed to load rooms';
@@ -86,18 +86,20 @@
 
 	async function handleRoomMove(roomId: string, x: number, y: number) {
 		try {
-			await api.rooms.updatePosition(roomId, { pos_x: x, pos_y: y });
-			
-			// Update roomsByFloor for all floors
-			for (const [floorId, floorRooms] of roomsByFloor.entries()) {
+			// Optimistic update first for immediate feedback
+			for (const floorId in roomsByFloor) {
+				const floorRooms = roomsByFloor[floorId];
 				const index = floorRooms.findIndex(r => r.id === roomId);
 				if (index !== -1) {
-					const newRooms = [...floorRooms];
-					newRooms[index] = { ...newRooms[index], pos_x: x, pos_y: y };
-					roomsByFloor.set(floorId, newRooms);
+					roomsByFloor[floorId] = floorRooms.map((room, i) => 
+						i === index ? { ...room, pos_x: x, pos_y: y } : room
+					);
 					break;
 				}
 			}
+			
+			// Then save to API
+			await api.rooms.updatePosition(roomId, { pos_x: x, pos_y: y });
 		} catch (e) {
 			console.error('Failed to update room position:', e);
 		}
@@ -345,7 +347,7 @@
 							</h2>
 							<FloorMap 
 								floor={floor} 
-								rooms={roomsByFloor.get(floor.id) || []}
+								rooms={roomsByFloor[floor.id] || []}
 								onRoomClick={selectRoom} />
 						</section>
 					{/each}
