@@ -65,6 +65,38 @@ func (h *RoomHandler) Create(w http.ResponseWriter, r *http.Request) {
 	api.JSON(w, http.StatusCreated, room)
 }
 
+func (h *RoomHandler) ListByFloor(w http.ResponseWriter, r *http.Request) {
+	floorID, err := uuid.Parse(chi.URLParam(r, "floorID"))
+	if err != nil {
+		api.BadRequest(w, "Invalid floor ID")
+		return
+	}
+	rooms, err := h.repo.ListByFloor(r.Context(), floorID)
+	if err != nil {
+		api.InternalServerError(w, "Failed to list rooms")
+		return
+	}
+	api.JSON(w, http.StatusOK, rooms)
+}
+
+func (h *RoomHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		api.BadRequest(w, "Invalid room ID")
+		return
+	}
+	room, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		api.InternalServerError(w, "Failed to get room")
+		return
+	}
+	if room == nil {
+		api.NotFound(w, "Room not found")
+		return
+	}
+	api.JSON(w, http.StatusOK, room)
+}
+
 func (h *RoomHandler) UpdatePosition(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {

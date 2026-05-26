@@ -10,6 +10,7 @@ import (
 
 	internalapi "github.com/terendelagua/teren-hotels-backend/internal/api"
 	"github.com/terendelagua/teren-hotels-backend/internal/repository"
+	"github.com/terendelagua/teren-hotels-backend/internal/service"
 	"github.com/terendelagua/teren-hotels-backend/pkg/config"
 	"github.com/terendelagua/teren-hotels-backend/pkg/database"
 )
@@ -29,10 +30,14 @@ func main() {
 	propertyRepo := repository.NewPropertyRepository(db.Pool)
 	floorRepo := repository.NewFloorRepository(db.Pool)
 	roomRepo := repository.NewRoomRepository(db.Pool)
+	roomBlockRepo := repository.NewRoomBlockRepository(db.Pool)
 
 	propertyHandler := internalapi.NewPropertyHandler(propertyRepo)
 	floorHandler := internalapi.NewFloorHandler(floorRepo)
 	roomHandler := internalapi.NewRoomHandler(roomRepo)
+
+	inventoryService := service.NewInventoryService(db.Pool, roomRepo, roomBlockRepo)
+	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
 
 	r := chi.NewRouter()
 
@@ -80,6 +85,7 @@ func main() {
 			r.Post("/", roomHandler.Create)
 			r.Get("/{id}", roomHandler.GetByID)
 			r.Put("/{id}/position", roomHandler.UpdatePosition)
+			r.Get("/map", inventoryHandler.GetMap)
 		})
 	})
 

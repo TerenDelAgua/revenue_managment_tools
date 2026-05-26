@@ -23,8 +23,8 @@ type FloorMap struct {
 	ID          uuid.UUID `json:"id"`
 	Label       string    `json:"label"`
 	FloorNumber int       `json:"floor_number"`
-	SortOrder   int       `json:"sort_order"`
-	Rooms       []RoomMap `json:"rooms"`
+	SortOrder   int        `json:"sort_order"`
+	Rooms       []*RoomMap `json:"rooms"`
 }
 
 type RoomMap struct {
