@@ -65,6 +65,18 @@
 		}
 	}
 
+	function getRoomTypeName(roomNumber: string) {
+		const num = parseInt(roomNumber);
+		if (num >= 101 && num <= 102) return 'Deluxe Pool';
+		if (num >= 103 && num <= 104) return 'Standard';
+		if (num === 105 || num === 108) return 'Deluxe Pool';
+		if (num === 106) return 'Standard';
+		if (num === 107) return 'Standard';
+		if (num >= 201 && num <= 204) return 'Suite';
+		if (num >= 301 && num <= 303) return 'Standard';
+		return 'Standard';
+	}
+
 	function startDrag(room: Room, e: MouseEvent) {
 		isDragging = true;
 		draggedRoom = room;
@@ -121,7 +133,7 @@
 		<div 
 			role="button"
 			class="absolute cursor-pointer select-none border-2 rounded-xl p-4 shadow-md transition-all hover:shadow-xl {getStatusColor(room.status)}"
-			style="left: {room.pos_x}px; top: {room.pos_y}px; min-width: 110px;"
+			style="left: {room.pos_x}px; top: {room.pos_y}px; min-width: 120px;"
 			onmousedown={(e) => startDrag(room, e)}
 			onclick={(e) => handleClick(room, e)}
 			class:dragging={draggedRoom?.id === room.id}>
@@ -129,7 +141,10 @@
 				<div class="font-bold text-xl text-teren-text-main">{room.number}</div>
 				<div class="text-lg">{getStatusIcon(room.status)}</div>
 			</div>
-			<div class="text-xs font-medium mt-1 text-teren-text-muted">{getStatusText(room.status)}</div>
+			<div class="text-sm font-medium mt-1 text-teren-text-main">
+				{room.room_type?.name || getRoomTypeName(room.number)}
+			</div>
+			<div class="text-xs mt-1 text-teren-text-muted">{getStatusText(room.status)}</div>
 		</div>
 	{/each}
 </div>

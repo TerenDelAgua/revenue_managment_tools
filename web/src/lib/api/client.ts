@@ -37,6 +37,15 @@ export interface Floor {
 	updated_at: string;
 }
 
+export interface RoomType {
+	id: string;
+	property_id: string;
+	name: string;
+	max_occupancy: number;
+	created_at: string;
+	updated_at: string;
+}
+
 export interface Room {
 	id: string;
 	floor_id: string;
@@ -47,6 +56,7 @@ export interface Room {
 	pos_y: number;
 	created_at: string;
 	updated_at: string;
+	room_type?: RoomType;
 }
 
 export interface CreatePropertyRequest {
