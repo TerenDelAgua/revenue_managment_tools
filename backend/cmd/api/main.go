@@ -38,6 +38,7 @@ func main() {
 
 	inventoryService := service.NewInventoryService(db.Pool, roomRepo, roomBlockRepo)
 	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
+	roomBlockHandler := internalapi.NewRoomBlockHandler(inventoryService)
 
 	r := chi.NewRouter()
 
@@ -46,7 +47,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Property-ID"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -85,7 +86,13 @@ func main() {
 			r.Post("/", roomHandler.Create)
 			r.Get("/{id}", roomHandler.GetByID)
 			r.Put("/{id}/position", roomHandler.UpdatePosition)
-			r.Get("/map", inventoryHandler.GetMap)
+		})
+
+		r.Get("/map", inventoryHandler.GetMap)
+
+		r.Route("/room-blocks", func(r chi.Router) {
+			r.Post("/", roomBlockHandler.Create)
+			r.Delete("/{id}", roomBlockHandler.Delete)
 		})
 	})
 

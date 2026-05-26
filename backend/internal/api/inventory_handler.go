@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -81,6 +82,8 @@ func (h *InventoryHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 			api.JSON(w, http.StatusConflict, api.Error{Code: bizErr.Code, Message: bizErr.Message})
 			return
 		}
+		// Log error for debugging
+		log.Printf("GetMap error: %v", err)
 		api.InternalServerError(w, "Failed to load floor map")
 		return
 	}

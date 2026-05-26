@@ -4,7 +4,7 @@
 		<p class="text-teren-text-muted text-lg mb-6">Revenue Management Tools</p>
 		
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-			<a href="/floor-map-builder" 
+			<a href="/map?mode=setup" 
 			   class="flex items-center gap-3 p-4 border border-teren-border-subtle rounded-lg hover:border-teren-primary hover:bg-teren-primary-subtle transition-colors">
 				<span class="text-2xl">🗺️</span>
 				<div>

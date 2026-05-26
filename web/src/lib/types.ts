@@ -1,0 +1,58 @@
+// src/lib/types.ts
+// Alineado con models/map.go y Spec FMB-001
+
+export type RoomAvailability = 'available' | 'occupied' | 'pending' | 'blocked' | 'inactive';
+export type AppMode = 'setup' | 'ops';
+export type BlockReason = 'maintenance' | 'owner_use' | 'out_of_service';
+
+export interface RoomType {
+    id: string;
+    name: string;
+    max_occupancy: number;
+}
+
+export interface RoomMap {
+    id: string;
+    number: string;
+    pos_x: number;
+    pos_y: number;
+    room_type: { id: string; name: string };
+    availability: RoomAvailability;
+    active_booking: string | null;
+    pending_booking: string | null;
+    block: string | null;
+}
+
+export interface FloorMap {
+    id: string;
+    label: string;
+    floor_number: number;
+    sort_order: number;
+    rooms: RoomMap[];
+}
+
+export interface MapResponse {
+    property_id: string;
+    date_from: string; // YYYY-MM-DD
+    date_to: string;   // YYYY-MM-DD
+    floors: FloorMap[];
+}
+
+export interface RoomPositionUpdate {
+    id: string;
+    pos_x: number;
+    pos_y: number;
+}
+
+export interface CreateRoomBlockPayload {
+    room_id: string;
+    start_date: string; // YYYY-MM-DD
+    end_date: string;   // YYYY-MM-DD
+    reason: BlockReason;
+    notes?: string;
+}
+
+export interface ApiErrorResponse {
+    code: string;
+    message: string;
+}
