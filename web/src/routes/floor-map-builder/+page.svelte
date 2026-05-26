@@ -124,7 +124,9 @@
 
 	function selectRoom(room: Room) {
 		selectedRoom = room;
-		drawerOpen = true;
+		requestAnimationFrame(() => {
+			drawerOpen = true;
+		});
 	}
 
 	function closeDrawer() {
