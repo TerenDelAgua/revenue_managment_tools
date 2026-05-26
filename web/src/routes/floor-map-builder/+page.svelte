@@ -5,7 +5,6 @@
 
 	let properties = $state<Property[]>([]);
 	let floors = $state<Floor[]>([]);
-	let rooms = $state<Room[]>([]);
 	let selectedProperty = $state<Property | null>(null);
 	let selectedFloor = $state<Floor | null>(null);
 	let selectedRoom = $state<Room | null>(null);
@@ -14,6 +13,7 @@
 	let error = $state<string | null>(null);
 	let selectedDate = $state<string>(new Date().toISOString().split('T')[0]);
 	let drawerOpen = $state(false);
+	let showAllFloors = $state(false);
 
 	async function loadProperties() {
 		loading = true;
@@ -63,6 +63,12 @@
 		}
 	}
 
+	function getAllRooms() {
+		const allRooms: Room[] = [];
+		// En un futuro, aquí cargaríamos todas las habitaciones de todos los pisos
+		return allRooms;
+	}
+
 	async function handleRoomMove(roomId: string, x: number, y: number) {
 		try {
 			await api.rooms.updatePosition(roomId, { pos_x: x, pos_y: y });
@@ -82,7 +88,13 @@
 
 	function selectFloor(floor: Floor) {
 		selectedFloor = floor;
+		showAllFloors = false;
 		loadRooms(floor.id);
+	}
+
+	function selectAllFloors() {
+		showAllFloors = true;
+		selectedFloor = null;
 	}
 
 	function selectRoom(room: Room) {
@@ -122,6 +134,35 @@
 				return 'Blocked';
 			default:
 				return status;
+		}
+	}
+
+	function getDrawerActions(status: string) {
+		switch (status?.toLowerCase()) {
+			case 'available':
+				return [
+					{ label: 'Assign booking', primary: true, icon: '📅' },
+					{ label: 'Block room', primary: false, icon: '🔒' }
+				];
+			case 'occupied':
+				return [
+					{ label: 'Check out', primary: true, icon: '🚪' },
+					{ label: 'View invoice', primary: false, icon: '📄' }
+				];
+			case 'pending':
+			case 'pending check-in':
+				return [
+					{ label: 'Check in', primary: true, icon: '✅' },
+					{ label: 'Reassign room', primary: false, icon: '🔄' }
+				];
+			case 'maintenance':
+			case 'blocked':
+				return [
+					{ label: 'Remove block', primary: true, icon: '🔓', danger: true },
+					{ label: 'Edit block', primary: false, icon: '✏️' }
+				];
+			default:
+				return [];
 		}
 	}
 
@@ -235,11 +276,15 @@
 			<!-- Floor Selector -->
 			{#if selectedProperty && floors.length > 0}
 				<div class="flex items-center gap-2 mt-4">
-					<button class="px-4 py-2 rounded-lg bg-teren-surface-base border border-teren-primary text-teren-text-main font-medium">All floors</button>
+					<button
+						onclick={selectAllFloors}
+						class="px-4 py-2 rounded-lg transition-colors {showAllFloors ? 'bg-teren-surface-base border border-teren-primary text-teren-text-main font-medium' : 'text-teren-text-muted hover:text-teren-text-main'}">
+						All floors
+					</button>
 					{#each floors as floor (floor.id)}
 						<button
 							onclick={() => selectFloor(floor)}
-							class="px-4 py-2 rounded-lg transition-colors {selectedFloor?.id === floor.id ? 'bg-teren-surface-base border border-teren-primary text-teren-text-main font-medium' : 'text-teren-text-muted hover:text-teren-text-main'}">
+							class="px-4 py-2 rounded-lg transition-colors {!showAllFloors && selectedFloor?.id === floor.id ? 'bg-teren-surface-base border border-teren-primary text-teren-text-main font-medium' : 'text-teren-text-muted hover:text-teren-text-main'}">
 							{floor.label || `Floor ${floor.floor_number}`}
 						</button>
 					{/each}
@@ -255,9 +300,24 @@
 				<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
 					{error}
 				</div>
-			{:else if selectedFloor}
+			{:else if showAllFloors}
+				<!-- All Floors View -->
 				<div class="space-y-8">
-					<!-- Floor Map -->
+					{#each floors as floor (floor.id)}
+						<section>
+							<h2 class="text-lg font-semibold text-teren-text-main mb-4">
+								{floor.label?.toUpperCase() || `FLOOR ${floor.floor_number}`}
+							</h2>
+							<FloorMap 
+								floor={floor} 
+								rooms={[]}
+								onRoomClick={selectRoom} />
+						</section>
+					{/each}
+				</div>
+			{:else if selectedFloor}
+				<!-- Single Floor View -->
+				<div class="space-y-8">
 					<section>
 						<h2 class="text-lg font-semibold text-teren-text-main mb-4">
 							{selectedFloor.label?.toUpperCase() || `FLOOR ${selectedFloor.floor_number}`}
@@ -302,17 +362,20 @@
 		<div class="fixed inset-0 z-50">
 			<!-- Backdrop -->
 			<div 
-				class="absolute inset-0 bg-black/30"
+				class="absolute inset-0 bg-black/30 transition-opacity duration-300"
 				onclick={() => drawerOpen = false} />
 			
 			<!-- Drawer -->
-			<div class="absolute right-0 top-0 h-full w-96 bg-teren-surface-base border-l border-teren-border-subtle shadow-xl flex flex-col">
+			<div class="absolute right-0 top-0 h-full w-96 bg-teren-surface-base border-l border-teren-border-subtle shadow-xl flex flex-col transform transition-transform duration-300 ease-out {drawerOpen ? 'translate-x-0' : 'translate-x-full'}">
 				<!-- Drawer Header -->
 				<div class="p-6 border-b border-teren-border-subtle flex items-center justify-between">
-					<h2 class="text-xl font-bold text-teren-text-main">Room {selectedRoom.number}</h2>
+					<div>
+						<h2 class="text-3xl font-bold text-teren-text-main">Room {selectedRoom.number}</h2>
+						<p class="text-teren-text-muted mt-1">Deluxe Pool</p>
+					</div>
 					<button 
 						onclick={() => drawerOpen = false}
-						class="p-2 rounded-lg hover:bg-teren-background-base transition-colors">
+						class="p-2 rounded-lg hover:bg-teren-background-base transition-colors border border-teren-border-subtle">
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
 					</button>
 				</div>
@@ -321,73 +384,56 @@
 				<div class="flex-1 overflow-auto p-6 space-y-6">
 					<!-- Status Badge -->
 					<div class="flex items-center gap-3">
-						<span class={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border {getStatusColor(selectedRoom.status)}`}>
+						<span class={`inline-flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border {getStatusColor(selectedRoom.status)}`}>
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
 							{getStatusText(selectedRoom.status)}
 						</span>
 					</div>
 
 					<!-- Room Info -->
-					<div class="space-y-3">
-						<div class="flex justify-between">
-							<span class="text-teren-text-muted">Room Number</span>
-							<span class="font-medium text-teren-text-main">{selectedRoom.number}</span>
+					<div class="space-y-4">
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Rate / night</span>
+							<span class="font-semibold text-xl text-teren-text-main">IDR 950,000</span>
 						</div>
-						<div class="flex justify-between">
-							<span class="text-teren-text-muted">Status</span>
-							<span class="font-medium text-teren-text-main">{getStatusText(selectedRoom.status)}</span>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Guest</span>
+							<span class="font-medium text-teren-text-main">
+								{selectedRoom.status === 'occupied' ? 'Smith, J.' : '—'}
+							</span>
+						</div>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Nights</span>
+							<span class="font-medium text-teren-text-main">
+								{selectedRoom.status === 'occupied' ? '2 nights' : '—'}
+								{selectedRoom.status === 'pending' || selectedRoom.status === 'pending check-in' ? 'Today 15:00' : ''}
+							</span>
+						</div>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Note</span>
+							<span class="font-medium text-teren-text-main">
+								{selectedRoom.status === 'maintenance' || selectedRoom.status === 'blocked' ? 'AC Repair' : '—'}
+							</span>
+						</div>
+						<div class="flex justify-between py-2 border-b border-teren-border-subtle">
+							<span class="text-teren-text-muted">Floor</span>
+							<span class="font-medium text-teren-text-main">Ground floor</span>
 						</div>
 					</div>
-
-					<hr class="border-teren-border-subtle" />
-
-					<!-- Rate (example) -->
-					<div class="space-y-3">
-						<h3 class="font-semibold text-teren-text-main">Rate</h3>
-						<div class="bg-teren-background-base rounded-lg p-4">
-							<div class="text-2xl font-bold text-teren-text-main">IDR 850K</div>
-							<div class="text-sm text-teren-text-muted">per night</div>
-						</div>
-					</div>
-
-					<!-- Guest (if occupied) -->
-					{#if selectedRoom.status === 'occupied'}
-						<hr class="border-teren-border-subtle" />
-						<div class="space-y-3">
-							<h3 class="font-semibold text-teren-text-main">Guest</h3>
-							<div class="bg-teren-background-base rounded-lg p-4 space-y-2">
-								<div class="font-medium text-teren-text-main">John Doe</div>
-								<div class="text-sm text-teren-text-muted">Check-in: May 20, 2026</div>
-								<div class="text-sm text-teren-text-muted">Check-out: May 27, 2026</div>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Block Reason (if blocked/maintenance) -->
-					{#if selectedRoom.status === 'maintenance' || selectedRoom.status === 'blocked'}
-						<hr class="border-teren-border-subtle" />
-						<div class="space-y-3">
-							<h3 class="font-semibold text-teren-text-main">Block Reason</h3>
-							<div class="bg-teren-background-base rounded-lg p-4">
-								<p class="text-teren-text-main">Planned maintenance for air conditioning system.</p>
-								<p class="text-sm text-teren-text-muted mt-2">Until: May 30, 2026</p>
-							</div>
-						</div>
-					{/if}
 				</div>
 
 				<!-- Drawer Footer -->
 				<div class="p-6 border-t border-teren-border-subtle space-y-3">
-					<button class="w-full py-3 px-4 rounded-lg bg-teren-primary text-white font-medium hover:bg-teren-primary-hover transition-colors">
-						Edit Room
-					</button>
-					<button class="w-full py-3 px-4 rounded-lg border border-teren-border-subtle text-teren-text-main font-medium hover:bg-teren-background-base transition-colors">
-						Change Status
-					</button>
-					{#if selectedRoom.status === 'available'}
-						<button class="w-full py-3 px-4 rounded-lg border border-green-600 text-green-700 font-medium hover:bg-green-50 transition-colors">
-							Create Booking
+					{#each getDrawerActions(selectedRoom.status) as action, idx (idx)}
+						<button 
+							class="{idx === 0 && !action.danger ? 'bg-teren-primary text-white' : ''} 
+								   {action.danger ? 'border-red-600 text-red-700 bg-red-50 hover:bg-red-100' : ''}
+								   {idx > 0 && !action.danger ? 'border border-teren-border-subtle text-teren-text-main hover:bg-teren-background-base' : ''}
+								   w-full py-4 px-4 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2">
+							<span>{action.icon}</span>
+							{action.label}
 						</button>
-					{/if}
+					{/each}
 				</div>
 			</div>
 		</div>

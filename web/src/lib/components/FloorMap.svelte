@@ -48,6 +48,23 @@
 		}
 	}
 
+	function getStatusIcon(status: string) {
+		switch (status?.toLowerCase()) {
+			case 'available':
+				return '✓';
+			case 'occupied':
+				return '👤';
+			case 'pending':
+			case 'pending check-in':
+				return '⏰';
+			case 'maintenance':
+			case 'blocked':
+				return '🔧';
+			default:
+				return '';
+		}
+	}
+
 	function startDrag(room: Room, e: MouseEvent) {
 		isDragging = true;
 		draggedRoom = room;
@@ -108,7 +125,10 @@
 			onmousedown={(e) => startDrag(room, e)}
 			onclick={(e) => handleClick(room, e)}
 			class:dragging={draggedRoom?.id === room.id}>
-			<div class="font-bold text-xl text-teren-text-main">{room.number}</div>
+			<div class="flex items-start justify-between">
+				<div class="font-bold text-xl text-teren-text-main">{room.number}</div>
+				<div class="text-lg">{getStatusIcon(room.status)}</div>
+			</div>
 			<div class="text-xs font-medium mt-1 text-teren-text-muted">{getStatusText(room.status)}</div>
 		</div>
 	{/each}
