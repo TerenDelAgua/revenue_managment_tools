@@ -21,44 +21,35 @@ func NewRoomRepository(db *pgxpool.Pool) *RoomRepository {
 func (r *RoomRepository) Create(ctx context.Context, req *models.CreateRoomRequest) (*models.Room, error) {
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO rooms (floor_id, room_type_id, number, status, pos_x, pos_y)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at
-	`, req.FloorID, req.RoomTypeID, req.Number, req.Status, req.PosX, req.PosY).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
+		INSERT INTO rooms (floor_id, room_type_id, property_id, number, status, pos_x, pos_y) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7) 
+		RETURNING id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at`,
+		req.FloorID, req.RoomTypeID, req.PropertyID, req.Number, req.Status, req.PosX, req.PosY,
+	).Scan(
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status,
 		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
-
-	if err != nil {
-		return nil, err
-	}
-	return &room, nil
+	return &room, err
 }
 
 func (r *RoomRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Room, error) {
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
-		SELECT id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at
-		FROM rooms WHERE id = $1
-	`, id).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
+		SELECT id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at 
+		FROM rooms WHERE id = $1`, id).Scan(
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status,
 		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
-
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &room, nil
+	return &room, err
 }
 
 func (r *RoomRepository) ListByFloor(ctx context.Context, floorID uuid.UUID) ([]*models.Room, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at
-		FROM rooms WHERE floor_id = $1 ORDER BY number ASC
-	`, floorID)
+		SELECT id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at 
+		FROM rooms WHERE floor_id = $1 ORDER BY number ASC`, floorID)
 	if err != nil {
 		return nil, err
 	}
@@ -67,35 +58,130 @@ func (r *RoomRepository) ListByFloor(ctx context.Context, floorID uuid.UUID) ([]
 	var rooms []*models.Room
 	for rows.Next() {
 		var room models.Room
-		err := rows.Scan(
-			&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
-			&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
-		)
-		if err != nil {
+		if err := rows.Scan(&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status, &room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt); err != nil {
 			return nil, err
 		}
 		rooms = append(rooms, &room)
 	}
-
 	return rooms, rows.Err()
 }
 
 func (r *RoomRepository) UpdatePosition(ctx context.Context, id uuid.UUID, posX, posY int) (*models.Room, error) {
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
-		UPDATE rooms SET pos_x = $1, pos_y = $2, updated_at = NOW()
-		WHERE id = $3
-		RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at
-	`, posX, posY, id).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
+		UPDATE rooms SET pos_x = $1, pos_y = $2, updated_at = NOW() 
+		WHERE id = $3 RETURNING id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at`,
+		posX, posY, id).Scan(
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status,
 		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
-
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
+	return &room, err
+}
+
+// GetMapWithAvailability - Spec §3.1
+// Devuelve estructura anidada Floors → Rooms con estado derivado.
+func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.MapAvailabilityRequest) (*models.MapResponse, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT 
+			f.id AS floor_id, f.label, f.floor_number, f.sort_order,
+			r.id AS room_id, r.number, r.pos_x, r.pos_y, r.status AS room_status,
+			rt.id AS room_type_id, rt.name AS room_type_name,
+			CASE
+				WHEN r.status = 'inactive' THEN 'inactive'
+				WHEN rb.id IS NOT NULL THEN 'blocked'
+				WHEN b_in.id IS NOT NULL THEN 'occupied'
+				WHEN b_conf.id IS NOT NULL THEN 'pending'
+				ELSE 'available'
+			END AS availability_state,
+			b_in.id AS active_booking_id, b_conf.id AS pending_booking_id, rb.id AS block_id
+		FROM rooms r
+		JOIN floors f ON r.floor_id = f.id
+		JOIN room_types rt ON r.room_type_id = rt.id
+		LEFT JOIN room_blocks rb ON rb.room_id = r.id AND rb.start_date < $2 AND rb.end_date > $1
+		LEFT JOIN bookings b_in ON b_in.room_id = r.id AND b_in.status = 'checked_in' AND b_in.check_in < $2 AND b_in.check_out > $1
+		LEFT JOIN bookings b_conf ON b_conf.room_id = r.id AND b_conf.status = 'confirmed' AND b_conf.check_in < $2 AND b_conf.check_out > $1
+		WHERE r.property_id = $3
+		ORDER BY f.sort_order ASC, f.floor_number ASC, r.pos_y ASC, r.pos_x ASC`,
+		req.DateFrom, req.DateTo, req.PropertyID)
 	if err != nil {
 		return nil, err
 	}
-	return &room, nil
+	defer rows.Close()
+
+	// Agrupación en memoria O(N) para evitar duplicados por LEFT JOIN
+	floorMap := make(map[uuid.UUID]*models.FloorMap)
+	roomMap := make(map[uuid.UUID]*models.RoomMap)
+	var floorOrder []uuid.UUID
+
+	for rows.Next() {
+		var fID, rID, rtID uuid.UUID
+		var label, rNum, rtName, state string
+		var fNum, sOrder, posX, posY int
+		var rStatus string
+		var abID, pbID, blID *uuid.UUID
+
+		if err := rows.Scan(&fID, &label, &fNum, &sOrder, &rID, &rNum, &posX, &posY, &rStatus, &rtID, &rtName, &state, &abID, &pbID, &blID); err != nil {
+			return nil, err
+		}
+
+		// Init Floor if new
+		if _, exists := floorMap[fID]; !exists {
+			floorMap[fID] = &models.FloorMap{ID: fID, Label: label, FloorNumber: fNum, SortOrder: sOrder}
+			floorOrder = append(floorOrder, fID)
+		}
+
+		// Init Room if new
+		if _, exists := roomMap[rID]; !exists {
+			roomMap[rID] = &models.RoomMap{
+				ID: rID, Number: rNum, PosX: posX, PosY: posY,
+				RoomType: models.RoomTypeRef{ID: rtID, Name: rtName},
+			}
+			floorMap[fID].Rooms = append(floorMap[fID].Rooms, roomMap[rID])
+		}
+
+		// Overwrite state/IDs (último registro gana, suficiente para MVP)
+		roomMap[rID].Availability = state
+		roomMap[rID].ActiveBookingID = abID
+		roomMap[rID].PendingBookingID = pbID
+		roomMap[rID].BlockID = blID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Build response
+	floors := make([]models.FloorMap, 0, len(floorOrder))
+	for _, fID := range floorOrder {
+		floors = append(floors, *floorMap[fID])
+	}
+
+	return &models.MapResponse{
+		PropertyID: req.PropertyID,
+		DateFrom:   req.DateFrom.Format("2006-01-02"),
+		DateTo:     req.DateTo.Format("2006-01-02"),
+		Floors:     floors,
+	}, nil
+}
+
+// BatchUpdatePositions - Spec §5.2 (AC-13: Transaccional all-or-nothing)
+func (r *RoomRepository) BatchUpdatePositions(ctx context.Context, updates []models.RoomPositionUpdate) (int, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	for _, u := range updates {
+		_, err := tx.Exec(ctx, `
+			UPDATE rooms SET pos_x = $1, pos_y = $2, updated_at = NOW() WHERE id = $3`,
+			u.PosX, u.PosY, u.ID)
+		if err != nil {
+			return 0, err // Rollback automático por defer
+		}
+	}
+
+	return len(updates), tx.Commit(ctx)
 }
