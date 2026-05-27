@@ -162,7 +162,7 @@
 					selectedRoom.active_guest_name = null;
 					drawerOpen = false;
 
-					await api.bookings.checkout(activeBookingId || backup.active_booking, propertyId);
+					await api.bookings.checkout(activeBookingId || backup.active_booking || '', propertyId);
 					addToast(
 						`${guestName || 'Guest'} checked out · Room ${selectedRoom.number} ready`,
 						'success'

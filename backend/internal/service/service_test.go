@@ -269,6 +269,15 @@ func TestGetMap_BlockedRoom(t *testing.T) {
 	if room.BlockID == nil || *room.BlockID != blockID {
 		t.Fatalf("expected block %v, got %v", blockID, room.BlockID)
 	}
+	if room.BlockReason == nil || *room.BlockReason != "maintenance" {
+		t.Fatalf("expected block reason 'maintenance', got %v", room.BlockReason)
+	}
+	if room.BlockStartDate == nil || *room.BlockStartDate == "" {
+		t.Fatalf("expected populated block start date, got %v", room.BlockStartDate)
+	}
+	if room.BlockEndDate == nil || *room.BlockEndDate == "" {
+		t.Fatalf("expected populated block end date, got %v", room.BlockEndDate)
+	}
 }
 
 func TestGetMap_PriorityLogic(t *testing.T) {

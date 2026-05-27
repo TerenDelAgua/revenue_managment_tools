@@ -4,9 +4,17 @@
 	import { _ } from 'svelte-i18n';
 	import { addToast } from '$lib/store/toastStore';
 
+	// Subcomponentes refactorizados
+	import RoomDetailsCard from './drawer/RoomDetailsCard.svelte';
+	import GuestDetailsCard from './drawer/GuestDetailsCard.svelte';
+	import BlockDetailsCard from './drawer/BlockDetailsCard.svelte';
+	import CheckoutConfirmCard from './drawer/CheckoutConfirmCard.svelte';
+	import PendingBookingsList from './drawer/PendingBookingsList.svelte';
+	import BlockRoomForm from './drawer/BlockRoomForm.svelte';
+
 	interface Props {
 		room: RoomMap | null;
-		propertyId: string; // ← Se pasa desde el padre, ya que RoomMap no lo contiene
+		propertyId: string;
 		isOpen: boolean;
 		onClose: () => void;
 		onAction: (
@@ -17,13 +25,13 @@
 
 	let { room, propertyId, isOpen, onClose, onAction }: Props = $props();
 
-	// === Progressive Disclosure States ===
+	// === Estados de Revelación Progresiva ===
 	let showBlockForm = $state(false);
 	let showAssignList = $state(false);
 	let loadingBookings = $state(false);
 	let pendingBookings = $state<any[]>([]);
 
-	// === Block Form State ===
+	// === Estados del Formulario de Bloqueo ===
 	let blockReason = $state<'maintenance' | 'owner_use' | 'out_of_service'>('maintenance');
 	let blockNote = $state('');
 	let blockStart = $state(new Date().toISOString().split('T')[0]);
@@ -31,7 +39,7 @@
 	let isDateValid = $state(true);
 	let showCheckoutConfirm = $state(false);
 
-	// Reset states when drawer closes or room changes
+	// Reiniciar estados al cerrar el Drawer o cambiar de habitación
 	$effect(() => {
 		if (!isOpen) {
 			showBlockForm = false;
@@ -45,7 +53,7 @@
 		isDateValid = end > start;
 	});
 
-	// === Actions ===
+	// === Acciones ===
 	async function loadPendingBookings() {
 		if (!propertyId) return;
 		loadingBookings = true;
@@ -68,7 +76,6 @@
 
 	function handleBlockSubmit() {
 		if (!isDateValid) {
-			// No se envía la petición, pero se muestra feedback
 			addToast('End date must be after start date', 'error');
 			return;
 		}
@@ -89,7 +96,7 @@
 		blockEnd = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 	}
 
-	// === Derived UI Config ===
+	// === Configuración Derivada de la UI ===
 	const primaryAction = $derived.by(() => {
 		switch (room?.availability) {
 			case 'pending':
@@ -139,14 +146,14 @@
 		onclick={onClose}
 	></button>
 
-	<!-- Drawer Panel -->
+	<!-- Panel del Drawer -->
 	<div
 		class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md transform flex-col bg-[#FCFBFA] shadow-xl transition-transform duration-250 ease-out {isOpen
 			? 'translate-x-0'
 			: 'translate-x-full'}"
 		style="border-left: 1px solid #E7E5E4;"
 	>
-		<!-- Header -->
+		<!-- Encabezado -->
 		<div class="flex items-start justify-between border-b border-[#E7E5E4] bg-[#FCFBFA] px-6 py-4">
 			<div>
 				<div class="mb-1 flex items-center gap-2">
@@ -164,9 +171,7 @@
 					></span>
 				</div>
 				<p class="text-sm text-[#57534E]">
-					{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })} · {$_(
-						`status.${room.availability}`
-					)}
+					{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })} · {$_(`status.${room.availability}`)}
 				</p>
 			</div>
 			<button
@@ -184,304 +189,63 @@
 					stroke-width="2"
 					stroke-linecap="round"
 					stroke-linejoin="round"
-					><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"
-					></line></svg
 				>
+					<line x1="18" y1="6" x2="6" y2="18"></line>
+					<line x1="6" y1="6" x2="18" y2="18"></line>
+				</svg>
 			</button>
 		</div>
 
-		<!-- Scrollable Content -->
+		<!-- Contenido Scrollable -->
 		<div class="flex-1 space-y-5 overflow-y-auto p-5">
-			<!-- Room Details Card -->
-			<div class="rounded-xl border border-[#E7E5E4] bg-white p-4 shadow-sm">
-				<h3 class="mb-3 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">
-					{$_('drawer.details')}
-				</h3>
-				<div class="grid grid-cols-2 gap-4 text-sm">
-					<div>
-						<p class="text-xs text-[#57534E]">{$_('drawer.type')}</p>
-						<p class="font-medium text-[#1C1917]">
-							{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })}
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-[#57534E]">{$_('drawer.ref')}</p>
-						<p class="font-mono text-[#1C1917]">{room.id.slice(0, 8)}</p>
-					</div>
-				</div>
-			</div>
+			<!-- Ficha de Detalles de Habitación -->
+			<RoomDetailsCard {room} />
+
+			<!-- Ficha de Huésped (Hospedado o Entrante) -->
 			{#if room.active_booking || room.pending_booking}
-				<div class="space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4">
-					<h3 class="mb-2 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">
-						{room.availability === 'occupied' ? 'Checked In Guest' : 'Incoming Guest'}
-					</h3>
-
-					<!-- Guest Name -->
-					<div class="flex items-start gap-3">
-						<span class="text-lg">👤</span>
-						<div class="flex-1">
-							<p class="text-sm font-semibold text-[#1C1917]">
-								{room.active_guest_name || room.pending_guest_name}
-							</p>
-							<p class="text-xs text-[#57534E]">Guest</p>
-						</div>
-					</div>
-
-					<!-- Phone -->
-					{#if room.active_guest_phone || room.pending_guest_phone}
-						<div class="flex items-center gap-3 pl-11">
-							<span class="text-sm font-medium text-[#1C1917]">
-								{room.active_guest_phone || room.pending_guest_phone}
-							</span>
-						</div>
-					{/if}
-
-					<!-- Nationality -->
-					{#if room.active_guest_nationality || room.pending_guest_nationality}
-						<div class="flex items-center gap-3 pl-11">
-							<span
-								class="rounded-full bg-[#FFF7ED] px-2 py-1 text-xs font-semibold text-[#E06B20]"
-							>
-								{room.active_guest_nationality || room.pending_guest_nationality}
-							</span>
-						</div>
-					{/if}
-
-					<!-- Dates -->
-					<div class="mt-3 grid grid-cols-2 gap-4 border-t border-[#E7E5E4] pt-3">
-						<div>
-							<p class="text-[10px] text-[#57534E] uppercase">Check-in</p>
-							<p class="text-sm font-semibold text-[#1C1917]">
-								{room.active_check_in || room.pending_check_in}
-							</p>
-						</div>
-						<div>
-							<p class="text-[10px] text-[#57534E] uppercase">Check-out</p>
-							<p class="text-sm font-semibold text-[#1C1917]">
-								{room.active_check_out || room.pending_check_out}
-							</p>
-						</div>
-					</div>
-				</div>
+				<GuestDetailsCard {room} />
 			{/if}
 
+			<!-- Ficha de Detalles del Bloqueo -->
 			{#if room.availability === 'blocked' && room.block}
-				<div class="space-y-3 rounded-xl border border-[#DC2626]/20 bg-[#FEF2F2] p-4">
-					<h3 class="mb-2 text-[10px] font-bold tracking-widest text-[#991B1B] uppercase">
-						Room Blocked Details
-					</h3>
-
-					<!-- Reason -->
-					<div class="flex items-start gap-3">
-						<span class="text-lg">🛡️</span>
-						<div class="flex-1">
-							<p class="text-sm font-semibold text-[#1C1917] capitalize">
-								{room.block_reason?.replace('_', ' ') || 'Maintenance'}
-							</p>
-							<p class="text-xs text-[#57534E]">Reason</p>
-						</div>
-					</div>
-
-					<!-- Notes -->
-					{#if room.block_notes}
-						<div class="flex items-start gap-3 pl-11">
-							<div class="flex-1">
-								<p class="text-sm text-[#1C1917]">
-									{room.block_notes}
-								</p>
-								<p class="text-[10px] text-[#57534E] uppercase mt-1">Notes</p>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Dates -->
-					<div class="mt-3 grid grid-cols-2 gap-4 border-t border-[#DC2626]/10 pt-3">
-						<div>
-							<p class="text-[10px] text-[#57534E] uppercase">Blocked From</p>
-							<p class="text-sm font-semibold text-[#1C1917]">
-								{room.block_start_date}
-							</p>
-						</div>
-						<div>
-							<p class="text-[10px] text-[#57534E] uppercase">Blocked To</p>
-							<p class="text-sm font-semibold text-[#1C1917]">
-								{room.block_end_date}
-							</p>
-						</div>
-					</div>
-				</div>
+				<BlockDetailsCard {room} />
 			{/if}
 
+			<!-- Confirmación de Check-out -->
 			{#if showCheckoutConfirm && room?.availability === 'occupied'}
-				<div
-					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#FF8C42]/40 bg-[#FFF7ED] p-4 duration-200"
-				>
-					<div class="flex items-center gap-2">
-						<span class="text-lg">🧾</span>
-						<h3 class="text-sm font-bold tracking-wide text-[#1C1917] uppercase">
-							Confirm Check-out
-						</h3>
-					</div>
-
-					<div class="space-y-2 rounded-lg border border-[#E7E5E4] bg-white p-3">
-						<div class="flex justify-between text-sm">
-							<span class="text-[#57534E]">Guest</span>
-							<span class="font-semibold text-[#1C1917]">{room.active_guest_name}</span>
-						</div>
-						<div class="flex justify-between text-sm">
-							<span class="text-[#57534E]">Stay</span>
-							<span class="font-semibold text-[#1C1917] tabular-nums">
-								{room.active_check_in} → {room.active_check_out}
-							</span>
-						</div>
-						<div class="flex justify-between text-sm">
-							<span class="text-[#57534E]">Nights</span>
-							<span class="font-semibold text-[#1C1917] tabular-nums">{stayNights}</span>
-						</div>
-						<div class="flex items-center justify-between border-t border-[#E7E5E4] pt-2">
-							<span class="text-sm font-medium text-[#1C1917]">Total</span>
-							<span class="text-lg font-bold text-[#FF8C42] tabular-nums">IDR 500.000</span>
-						</div>
-					</div>
-
-					<div class="grid grid-cols-2 gap-2">
-						<button
-							onclick={() => (showCheckoutConfirm = false)}
-							class="rounded-lg border border-[#E7E5E4] bg-white py-2.5 text-sm font-medium text-[#57534E] transition-colors hover:bg-[#F5F4F1]"
-						>
-							Cancel
-						</button>
-						<button
-							onclick={confirmCheckout}
-							class="rounded-lg bg-[#1C1917] py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#3F3D38] active:scale-95"
-						>
-							Confirm Check-out
-						</button>
-					</div>
-				</div>
+				<CheckoutConfirmCard
+					{room}
+					{stayNights}
+					onCancel={() => (showCheckoutConfirm = false)}
+					onConfirm={confirmCheckout}
+				/>
 			{/if}
 
-			<!-- INLINE LIST: Pending Bookings -->
+			<!-- Listado de Reservas Pendientes de Asignar -->
 			{#if showAssignList}
-				<div
-					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4 duration-200"
-				>
-					<div class="flex items-center justify-between border-b border-[#E7E5E4] pb-2">
-						<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">
-							{$_('drawer.pendingBookings')}
-						</h3>
-						<button
-							onclick={() => (showAssignList = false)}
-							class="rounded px-2 py-1 text-[11px] font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4] hover:text-[#1C1917]"
-						>
-							{$_('drawer.cancel')}
-						</button>
-					</div>
-
-					{#if loadingBookings}
-						<div class="animate-pulse space-y-2">
-							<div class="h-14 rounded-lg bg-[#E7E5E4]"></div>
-							<div class="h-14 rounded-lg bg-[#E7E5E4]"></div>
-						</div>
-					{:else if !pendingBookings || pendingBookings.length === 0}
-						<p class="py-4 text-center text-sm text-[#57534E]">
-							{$_('drawer.noPending')}
-						</p>
-					{:else}
-						<div class="scrollbar-thin max-h-56 space-y-2 overflow-y-auto pr-1">
-							{#each pendingBookings as booking (booking.id)}
-								<button
-									onclick={() => handleAssign(booking.id)}
-									class="group w-full rounded-lg border border-[#E7E5E4] bg-white p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FF8C42] hover:shadow-md active:scale-[0.98]"
-								>
-									<div class="flex items-start justify-between gap-3">
-										<div class="flex-1">
-											<p
-												class="font-semibold text-[#1C1917] transition-colors group-hover:text-[#FF8C42]"
-											>
-												{booking.guest_name}
-											</p>
-											<p class="mt-0.5 text-[11px] text-[#57534E] tabular-nums">
-												{booking.check_in} → {booking.check_out}
-											</p>
-											<p class="mt-0.5 text-[11px] text-[#57534E] capitalize">
-												{booking.source} · {booking.adults}
-												{$_('drawer.pax')}
-											</p>
-										</div>
-										<span class="text-sm font-bold whitespace-nowrap text-[#1C1917] tabular-nums">
-											IDR {(booking.total_amount / 1000).toFixed(0)}k
-										</span>
-									</div>
-								</button>
-							{/each}
-						</div>
-					{/if}
-				</div>
+				<PendingBookingsList
+					{loadingBookings}
+					{pendingBookings}
+					onCancel={() => (showAssignList = false)}
+					onAssign={handleAssign}
+				/>
 			{/if}
 
-			<!-- Block Form (Progressive Disclosure) -->
+			<!-- Formulario para Bloquear Habitación -->
 			{#if showBlockForm}
-				<div
-					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4 duration-200"
-				>
-					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">Block Room</h3>
-
-					<!-- Reason Selection -->
-					<select
-						bind:value={blockReason}
-						class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] transition-all outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
-					>
-						<option value="maintenance">Maintenance</option>
-						<option value="owner_use">Owner Use</option>
-						<option value="out_of_service">Out of Service</option>
-					</select>
-
-					<!-- Date Range -->
-					<div class="grid grid-cols-2 gap-3">
-						<div class="relative">
-							<label class="mb-1 block text-xs font-medium text-[#57534E]">Start Date</label>
-							<input
-								type="date"
-								bind:value={blockStart}
-								class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-							/>
-							{#if !isDateValid && blockStart}
-								<div class="absolute -bottom-5 left-0 text-xs text-[#DC2626]">Invalid date</div>
-							{/if}
-						</div>
-						<div class="relative">
-							<label class="mb-1 block text-xs font-medium text-[#57534E]">End Date</label>
-							<input
-								type="date"
-								bind:value={blockEnd}
-								class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-							/>
-							{#if !isDateValid && blockEnd}
-								<div class="absolute -bottom-5 left-0 text-xs text-[#DC2626]">
-									End must be after start
-								</div>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Notes -->
-					<div>
-						<label class="mb-1 block text-xs font-medium text-[#57534E]">Notes (Optional)</label>
-						<textarea
-							bind:value={blockNote}
-							rows="2"
-							placeholder="Why is this room blocked?"
-							class="w-full resize-none rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-						></textarea>
-					</div>
-				</div>
+				<BlockRoomForm
+					bind:blockReason
+					bind:blockNote
+					bind:blockStart
+					bind:blockEnd
+					{isDateValid}
+				/>
 			{/if}
 		</div>
 
+		<!-- Pie de página / Acciones Principales -->
 		<div class="space-y-3 border-t border-[#E7E5E4] bg-[#FCFBFA] p-5">
 			{#if showBlockForm}
-				<!-- Block confirmation action -->
 				<button
 					onclick={handleBlockSubmit}
 					class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF8C42] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
@@ -495,7 +259,6 @@
 					{$_('drawer.cancel')}
 				</button>
 			{:else if !showAssignList}
-				<!-- Primary Action -->
 				{#if room.availability === 'occupied' && !showCheckoutConfirm}
 					<button
 						onclick={requestCheckout}
@@ -511,10 +274,11 @@
 							stroke-width="2"
 							stroke-linecap="round"
 							stroke-linejoin="round"
-							><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline
-								points="16 17 21 12 16 7"
-							></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg
 						>
+							<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+							<polyline points="16 17 21 12 16 7"></polyline>
+							<line x1="21" y1="12" x2="9" y2="12"></line>
+						</svg>
 						Check Out Guest
 					</button>
 				{:else if room.availability !== 'occupied'}
@@ -529,7 +293,7 @@
 					</button>
 				{/if}
 
-				<!-- Block Room option if available -->
+				<!-- Opción de Bloqueo si está disponible -->
 				{#if room.availability !== 'blocked' && room.availability !== 'inactive'}
 					<button
 						onclick={() => (showBlockForm = true)}
