@@ -91,8 +91,8 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 			rt.id AS room_type_id, rt.name AS room_type_name,
 			CASE
 				WHEN r.status = 'inactive' THEN 'inactive'
-				WHEN rb.id IS NOT NULL THEN 'blocked'
 				WHEN b_in.id IS NOT NULL THEN 'occupied'
+				WHEN rb.id IS NOT NULL THEN 'blocked'
 				WHEN b_conf.id IS NOT NULL THEN 'pending'
 				ELSE 'available'
 			END AS availability_state,

@@ -1,3 +1,5 @@
+import type { MapResponse, CreateRoomBlockPayload } from '$lib/types';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -119,6 +121,30 @@ export const api = {
 			request<Room>(`/rooms/${id}/position`, {
 				method: 'PUT',
 				body: JSON.stringify(data)
+			})
+	},
+	map: {
+		get: (dateFrom: string, dateTo: string, propertyId: string) =>
+			request<MapResponse>(`/map?date_from=${dateFrom}&date_to=${dateTo}`, {
+				headers: {
+					'X-Property-ID': propertyId
+				}
+			})
+	},
+	bookings: {
+		pending: (propertyId: string) =>
+			request<any[]>(`/bookings/pending?property_id=${propertyId}`),
+		performAction: (action: 'checkin' | 'checkout' | 'unblock', roomId: string) =>
+			request<any>(`/bookings/${action}`, {
+				method: 'POST',
+				body: JSON.stringify({ room_id: roomId })
+			})
+	},
+	roomBlocks: {
+		create: (payload: CreateRoomBlockPayload) =>
+			request<any>('/room-blocks', {
+				method: 'POST',
+				body: JSON.stringify(payload)
 			})
 	}
 };
