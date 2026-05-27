@@ -5,166 +5,319 @@
 		room: RoomMap | null;
 		isOpen: boolean;
 		onClose: () => void;
-		onAction: (
-			action: 'assign' | 'checkin' | 'checkout' | 'block' | 'unblock' | 'view_block' | 'activate',
-			payload?: any
-		) => void;
+		onAction: (action: string, payload?: any) => void;
 	}
 
 	let { room, isOpen, onClose, onAction }: Props = $props();
+
+	// Estado local para formularios inline (Progressive Disclosure)
 	let showBlockForm = $state(false);
 	let blockReason = $state('maintenance');
 	let blockNote = $state('');
-	let loading = $state(false);
+	let blockStart = $state(new Date().toISOString().split('T')[0]);
+	let blockEnd = $state(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
 
-	$effect(() => {
-		if (room) {
-			showBlockForm = false;
-			blockReason = 'maintenance';
-			blockNote = '';
-		}
-	});
+	// Mapeo de etiquetas legibles
+	const statusLabels = {
+		available: 'Disponible',
+		occupied: 'Ocupada',
+		pending: 'Pendiente',
+		blocked: 'Bloqueada',
+		inactive: 'Inactiva'
+	};
 
-	// Configuración de acciones según estado (Spec §2.2 / §2.3)
-	const actions = $derived(room ? {
-		available: { primary: 'Asignar a reserva', icon: '📋', callback: () => onAction('assign') },
-		pending: { primary: 'Check-in', icon: '🟢', callback: () => onAction('checkin') },
-		occupied: {
-			primary: 'Check-out',
-			icon: '🚪',
-			callback: () => onAction('checkout'),
-			variant: 'secondary'
-		},
-		blocked: { primary: 'Ver motivo', icon: '🔧', callback: () => onAction('view_block') },
-		inactive: { primary: 'Activar', icon: '⚡', callback: () => onAction('activate') }
-	} : {
-		available: { primary: '', icon: '', callback: () => {} },
-		pending: { primary: '', icon: '', callback: () => {} },
-		occupied: { primary: '', icon: '', callback: () => {} },
-		blocked: { primary: '', icon: '', callback: () => {} },
-		inactive: { primary: '', icon: '', callback: () => {} }
-	});
+	const statusColors = {
+		available: 'bg-[#16A34A]',
+		occupied: 'bg-[#DC2626]',
+		pending: 'bg-[#D97706]',
+		blocked: 'bg-[#44403C]',
+		inactive: 'bg-[#A8A29E]'
+	};
 
-	async function handleBlock() {
-		if (!room) return;
-		loading = true;
-		try {
-			await onAction('block', { reason: blockReason, note: blockNote });
-			showBlockForm = false;
-		} finally {
-			loading = false;
-		}
+	function handleBlockSubmit() {
+		onAction('block', {
+			room_id: room?.id,
+			reason: blockReason,
+			notes: blockNote,
+			start_date: blockStart,
+			end_date: blockEnd
+		});
+		showBlockForm = false;
 	}
 </script>
 
 {#if room}
+	<!-- Backdrop -->
+	<button
+		type="button"
+		aria-label="Close drawer"
+		class="fixed inset-0 z-40 w-full border-none bg-[#1C1917]/30 p-0 backdrop-blur-sm transition-opacity duration-300 {isOpen
+			? 'opacity-100'
+			: 'pointer-events-none opacity-0'}"
+		onclick={onClose}
+	></button>
+
+	<!-- Drawer Panel -->
 	<div
-		class="pointer-events-none fixed inset-0 z-50 flex justify-end {isOpen
-			? 'pointer-events-auto'
-			: ''}"
+		class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md transform flex-col bg-[#FCFBFA] shadow-2xl transition-transform duration-300 ease-out {isOpen
+			? 'translate-x-0'
+			: 'translate-x-full'}"
+		style="border-left: 1px solid #E7E5E4;"
 	>
-		<!-- Backdrop -->
-		<div
-			class="absolute inset-0 bg-[#1C1917]/20 backdrop-blur-[2px] transition-opacity duration-200 {isOpen
-				? 'opacity-100'
-				: 'opacity-0'}"
-			onclick={onClose}
-			role="button"
-			tabindex="0"
-			onkeydown={(e) => e.key === 'Escape' && onClose()}
-			aria-label="Cerrar panel"
-		></div>
-
-		<!-- Drawer Panel -->
-		<div
-			class="relative h-full w-full max-w-md border-l border-[#E7E5E4] bg-[#FCFBFA] shadow-2xl transition-transform duration-300 ease-out {isOpen
-				? 'translate-x-0'
-				: 'translate-x-full'} flex flex-col"
-		>
-			<!-- Header -->
-			<div class="flex items-center justify-between border-b border-[#E7E5E4] p-5">
-				<div>
-					<h2 class="text-xl font-semibold text-[#1C1917]">{room.number}</h2>
-					<p class="mt-0.5 text-sm text-[#57534E]">{room.room_type.name} · {room.availability}</p>
+		<!-- Header -->
+		<div class="flex items-start justify-between border-b border-[#E7E5E4] bg-[#FCFBFA] px-6 py-5">
+			<div>
+				<div class="mb-1 flex items-center gap-2">
+					<h2 class="text-2xl font-bold tracking-tight text-[#1C1917]">{room.number}</h2>
+					<span class="h-2.5 w-2.5 rounded-full {statusColors[room.availability]}"></span>
 				</div>
-				<button
-					onclick={onClose}
-					class="rounded-lg p-2 text-[#57534E] transition hover:bg-[#F5F4F1]">✕</button
-				>
+				<div class="flex items-center gap-2">
+					<span class="text-sm font-medium text-[#57534E]">{room.room_type.name}</span>
+					<span class="h-1.5 w-1.5 rounded-full bg-[#D6D3D1]"></span>
+					<span class="text-sm font-medium tracking-wide text-[#57534E] uppercase">
+						{statusLabels[room.availability]}
+					</span>
+				</div>
 			</div>
+			<button
+				title="Close"
+				onclick={onClose}
+				class="rounded-lg p-2 text-[#57534E] transition-colors hover:bg-[#F5F4F1] hover:text-[#1C1917]"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					width="24"
+					height="24"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"
+					></line></svg
+				>
+			</button>
+		</div>
 
-			<!-- Body -->
-			<div class="flex-1 overflow-y-auto p-5">
-				{#if room.availability === 'blocked'}
-					<div class="mb-4 rounded-xl border border-[#FF8C42]/30 bg-[#FFF7ED] p-4">
-						<p class="text-sm font-medium text-[#1C1917]">Motivo: {blockReason}</p>
-						{#if blockNote}<p class="mt-1 text-xs text-[#57534E]">{blockNote}</p>{/if}
+		<!-- Content Scrollable -->
+		<div class="flex-1 space-y-6 overflow-y-auto p-6">
+			<!-- Info Card (Datos reales disponibles) -->
+			<div class="rounded-xl border border-[#E7E5E4] bg-white p-4 shadow-sm">
+				<h3 class="mb-3 text-xs font-bold tracking-wider text-[#57534E] uppercase">Room Details</h3>
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<p class="text-xs text-[#57534E]">Type</p>
+						<p class="text-sm font-semibold text-[#1C1917]">{room.room_type.name}</p>
+					</div>
+					<div>
+						<p class="text-xs text-[#57534E]">Reference</p>
+						<p class="font-mono text-sm font-semibold text-[#1C1917]">{room.id.slice(0, 8)}...</p>
+					</div>
+				</div>
+
+				<!-- Estado de Booking (Si existe) -->
+				{#if room.active_booking}
+					<div
+						class="mt-4 rounded-lg border border-t border-[#DC2626]/20 border-[#E7E5E4] bg-[#DC2626]/5 p-3 pt-4"
+					>
+						<p class="text-xs font-bold text-[#DC2626] uppercase">Checked In</p>
+						<p class="mt-1 text-xs text-[#57534E]">
+							Booking ID: {room.active_booking.slice(0, 8)}...
+						</p>
 					</div>
 				{/if}
 
-				<!-- Unified Block Widget (Inline) -->
-				{#if showBlockForm}
+				{#if room.block}
 					<div
-						class="mb-4 rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-4 transition-all duration-200"
+						class="mt-4 rounded-lg border border-t border-[#44403C]/20 border-[#E7E5E4] bg-[#44403C]/5 p-3 pt-4"
 					>
-						<div class="space-y-3">
-							<select
-								bind:value={blockReason}
-								class="w-full rounded-lg border border-[#E7E5E4] bg-[#F5F4F1] p-3 text-[#1C1917] outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
+						<p class="text-xs font-bold text-[#44403C] uppercase">Blocked</p>
+						<p class="mt-1 text-xs text-[#57534E]">Block ID: {room.block.slice(0, 8)}...</p>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Block Inline Form (Progressive Disclosure) -->
+			{#if showBlockForm}
+				<div
+					class="animate-in fade-in slide-in-from-top-2 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-5 duration-200"
+				>
+					<h3 class="mb-3 text-sm font-bold text-[#1C1917]">Block Room</h3>
+					<div class="space-y-4">
+						<div>
+							<label for="blockReason" class="mb-1 block text-xs font-medium text-[#57534E]"
+								>Reason</label
 							>
-								<option value="maintenance">Mantenimiento</option>
-								<option value="owner_use">Uso propietario</option>
-								<option value="out_of_service">Fuera de servicio</option>
+							<select
+								id="blockReason"
+								bind:value={blockReason}
+								class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] transition-all outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
+							>
+								<option value="maintenance">Maintenance</option>
+								<option value="owner_use">Owner Use</option>
+								<option value="out_of_service">Out of Service</option>
 							</select>
-							<input
-								type="text"
+						</div>
+						<div class="grid grid-cols-2 gap-3">
+							<div>
+								<label for="blockStart" class="mb-1 block text-xs font-medium text-[#57534E]"
+									>Start Date</label
+								>
+								<input
+									id="blockStart"
+									type="date"
+									bind:value={blockStart}
+									class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+								/>
+							</div>
+							<div>
+								<label for="blockEnd" class="mb-1 block text-xs font-medium text-[#57534E]"
+									>End Date</label
+								>
+								<input
+									id="blockEnd"
+									type="date"
+									bind:value={blockEnd}
+									class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+								/>
+							</div>
+						</div>
+						<div>
+							<label for="blockNote" class="mb-1 block text-xs font-medium text-[#57534E]"
+								>Notes (Optional)</label
+							>
+							<textarea
+								id="blockNote"
 								bind:value={blockNote}
-								placeholder="Notas opcionales..."
-								class="w-full rounded-lg border border-[#E7E5E4] bg-[#F5F4F1] p-3 text-[#1C1917] outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
-							/>
+								rows="2"
+								placeholder="Why is this room blocked?"
+								class="w-full resize-none rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+							></textarea>
 						</div>
 					</div>
-				{/if}
-			</div>
+				</div>
+			{/if}
+		</div>
 
-			<!-- Footer Actions -->
-			<div class="space-y-2 border-t border-[#E7E5E4] bg-[#FCFBFA] p-5">
-				{#if showBlockForm}
+		<!-- Footer Actions -->
+		<div class="space-y-3 border-t border-[#E7E5E4] bg-[#FCFBFA] p-6">
+			<!-- Primary Action Contextual -->
+			{#if !showBlockForm}
+				{#if room.availability === 'available'}
 					<button
-						onclick={handleBlock}
-						disabled={loading}
-						class="w-full rounded-xl py-3 font-medium bg-[#FF8C42] text-white hover:bg-[#E06B20] transition active:scale-[0.98]"
+						onclick={() => onAction('assign')}
+						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF8C42] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#E06B20] active:scale-95"
 					>
-						{loading ? 'Bloqueando...' : 'Confirmar Bloqueo'}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+							></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg
+						>
+						Assign Booking
 					</button>
-				{:else}
+				{:else if room.availability === 'pending'}
 					<button
-						onclick={actions[room.availability]?.callback}
-						disabled={loading}
-						class="w-full rounded-xl py-3 font-medium transition active:scale-[0.98] {room.availability ===
-						'occupied'
-							? 'bg-[#F5F4F1] text-[#1C1917]'
-							: 'bg-[#FF8C42] text-white hover:bg-[#E06B20]'}"
+						onclick={() => onAction('checkin')}
+						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#16A34A] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#15803D] active:scale-95"
 					>
-						{actions[room.availability]?.icon}
-						{actions[room.availability]?.primary}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline
+								points="22 4 12 14.01 9 11.01"
+							></polyline></svg
+						>
+						Check In
 					</button>
-				{/if}
-
-				{#if room.availability !== 'blocked'}
+				{:else if room.availability === 'occupied'}
 					<button
-						onclick={() => (showBlockForm = !showBlockForm)}
-						class="w-full rounded-xl py-3 font-medium text-[#57534E] transition hover:bg-[#F5F4F1]"
+						onclick={() => onAction('checkout')}
+						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#3F3D38] active:scale-95"
 					>
-						{showBlockForm ? 'Cancelar' : 'Bloquear habitación'}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline
+								points="16 17 21 12 16 7"
+							></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg
+						>
+						Check Out
 					</button>
-				{:else}
+				{:else if room.availability === 'blocked'}
 					<button
 						onclick={() => onAction('unblock')}
-						disabled={loading}
-						class="w-full rounded-xl py-3 font-medium text-[#DC2626] transition hover:bg-[#FEF2F2]"
+						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#DC2626] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#B91C1C] active:scale-95"
 					>
-						🗑️ Eliminar bloqueo
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"
+							></line></svg
+						>
+						Remove Block
+					</button>
+				{:else if room.availability === 'inactive'}
+					<button
+						onclick={() => onAction('activate')}
+						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#A8A29E] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#78716C] active:scale-95"
+					>
+						Activate Room
+					</button>
+				{/if}
+			{/if}
+
+			<!-- Secondary Actions -->
+			<div class="grid grid-cols-2 gap-3 pt-2">
+				{#if room.availability !== 'blocked' && room.availability !== 'inactive' && !showBlockForm}
+					<button
+						onclick={() => (showBlockForm = true)}
+						class="col-span-2 rounded-lg bg-[#F5F4F1] py-3 text-sm font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4]"
+					>
+						Block Room
+					</button>
+				{/if}
+				{#if showBlockForm}
+					<button
+						onclick={() => (showBlockForm = false)}
+						class="rounded-lg bg-[#F5F4F1] py-3 text-sm font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4]"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={handleBlockSubmit}
+						class="rounded-lg bg-[#FF8C42] py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#E06B20] active:scale-95"
+					>
+						Confirm Block
 					</button>
 				{/if}
 			</div>

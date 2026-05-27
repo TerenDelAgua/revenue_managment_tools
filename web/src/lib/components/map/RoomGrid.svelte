@@ -28,8 +28,9 @@
 		if (!roomId || mode !== 'setup') return;
 
 		const rect = gridEl.getBoundingClientRect();
-		const rawX = Math.floor((e.clientX - rect.left) / STEP);
-		const rawY = Math.floor((e.clientY - rect.top) / STEP);
+		// Account for 24px padding (p-6) and scroll positions of the grid element
+		const rawX = Math.floor((e.clientX - rect.left - 24 + gridEl.scrollLeft) / STEP);
+		const rawY = Math.floor((e.clientY - rect.top - 24 + gridEl.scrollTop) / STEP);
 
 		// BR-06: Clamp to 12x20 grid
 		const posX = Math.max(0, Math.min(11, rawX));
@@ -37,17 +38,24 @@
 
 		onDrop(roomId, posX, posY);
 	}
+
+	// Calculate the lowest block's Y position to dynamically expand the grid downwards
+	let maxPosY = $derived(rooms.length > 0 ? Math.max(...rooms.map((r) => r.pos_y)) : 0);
+	// Always provide at least 6 rows, and ensure there's at least 1 empty row below the lowest block (clamped to 20 max)
+	let rowCount = $derived(Math.min(20, Math.max(6, maxPosY + 2)));
 </script>
 
 <div
 	bind:this={gridEl}
-	class="room-grid grid overflow-auto rounded-xl bg-[#F5F4F1] p-4"
-	style="grid-template-columns: repeat(12, 3.5rem); grid-auto-rows: 3.5rem; gap: 6px;"
+	class="room-grid overflow-auto rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-6 shadow-sm"
+	style="display: grid; grid-template-columns: repeat(12, 56px); grid-template-rows: repeat({rowCount}, 56px); gap: 6px; background-image: radial-gradient(#E7E5E4 1px, transparent 1px); background-size: 20px 20px;"
 	ondragover={handleDragOver}
 	ondrop={handleDrop}
+	role="grid"
+	tabindex="0"
 >
 	{#each rooms as room (room.id)}
-		<RoomToken {room} state={room.availability} {mode} {onSelect} />
+		<RoomToken {room} {mode} {onSelect} />
 	{/each}
 
 	{#if mode === 'setup' && rooms.length === 0}

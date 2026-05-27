@@ -5,6 +5,7 @@
 	import RoomPalette from '$lib/components/map/RoomPalette.svelte';
 	import RoomDrawer from '$lib/components/map/RoomDrawer.svelte';
 	import type { MapResponse, RoomMap } from '$lib/types';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
 
 	const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
@@ -59,7 +60,7 @@
 		// Optimistic UI: actualizar localmente
 		let foundRoom: RoomMap | undefined;
 		let oldPos = { x: 0, y: 0 };
-		
+
 		for (const floor of mapData.floors) {
 			const r = floor.rooms.find((r) => r.id === roomId);
 			if (r) {
@@ -95,13 +96,13 @@
 
 	async function handleDrawerAction(action: string, payload?: any) {
 		if (!selectedRoom) return;
-		
+
 		try {
 			if (action === 'block') {
 				// Crear bloqueo
 				const res = await fetch(`${API_BASE_URL}/room-blocks`, {
 					method: 'POST',
-					headers: { 
+					headers: {
 						'Content-Type': 'application/json',
 						'X-Property-ID': '89ce1655-d0c6-417a-8c69-3ad59241e0d0'
 					},
@@ -126,7 +127,7 @@
 				if (!res.ok) throw new Error('Error al eliminar bloqueo');
 			}
 			// Otras acciones como assign, checkin, checkout son simuladas o se añadirán en Fase 2
-			
+
 			drawerOpen = false;
 			await loadMap(); // Refrescar estado
 		} catch (err: any) {
@@ -146,18 +147,8 @@
 			>
 				{mode === 'setup' ? 'Vista Operaciones' : 'Modo Setup'}
 			</button>
-			<input
-				type="date"
-				bind:value={dateFrom}
-				onchange={loadMap}
-				class="rounded-lg border px-3 py-2"
-			/>
-			<input
-				type="date"
-				bind:value={dateTo}
-				onchange={loadMap}
-				class="rounded-lg border px-3 py-2"
-			/>
+			<DateInput label="From" value={dateFrom} onChange={(v) => (dateFrom = v)} />
+			<DateInput label="To" value={dateTo} onChange={(v) => (dateTo = v)} />
 		</div>
 	</header>
 
