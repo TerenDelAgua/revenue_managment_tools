@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { RoomMap } from '$lib/types';
 	import { api } from '$lib/api/client';
+	import { _ } from 'svelte-i18n';
 
 	interface Props {
 		room: RoomMap | null;
@@ -64,24 +65,16 @@
 	}
 
 	// === Derived UI Config ===
-	const statusLabels = {
-		available: 'Disponible',
-		occupied: 'Ocupada',
-		pending: 'Pendiente (Check-in)',
-		blocked: 'Bloqueada',
-		inactive: 'Inactiva'
-	};
-
 	const primaryAction = $derived.by(() => {
 		switch (room?.availability) {
 			case 'pending':
-				return { label: 'Check In', color: 'bg-[#16A34A]', action: 'checkin' as const };
+				return { labelKey: 'drawer.checkIn', color: 'bg-[#16A34A]', action: 'checkin' as const };
 			case 'occupied':
-				return { label: 'Check Out', color: 'bg-[#1C1917]', action: 'checkout' as const };
+				return { labelKey: 'drawer.checkOut', color: 'bg-[#1C1917]', action: 'checkout' as const };
 			case 'blocked':
-				return { label: 'Remove Block', color: 'bg-[#DC2626]', action: 'unblock' as const };
+				return { labelKey: 'drawer.removeBlock', color: 'bg-[#DC2626]', action: 'unblock' as const };
 			default:
-				return { label: 'Assign Booking', color: 'bg-[#FF8C42]', action: 'assign' as const };
+				return { labelKey: 'drawer.assignBooking', color: 'bg-[#FF8C42]', action: 'assign' as const };
 		}
 	});
 </script>
@@ -122,7 +115,7 @@
 					></span>
 				</div>
 				<p class="text-sm text-[#57534E]">
-					{room.room_type.name} · {statusLabels[room.availability]}
+					{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })} · {$_(`status.${room.availability}`)}
 				</p>
 			</div>
 			<button
@@ -149,14 +142,14 @@
 		<div class="flex-1 space-y-5 overflow-y-auto p-5">
 			<!-- Room Details Card -->
 			<div class="rounded-xl border border-[#E7E5E4] bg-white p-4 shadow-sm">
-				<h3 class="mb-3 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">Details</h3>
+				<h3 class="mb-3 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">{$_('drawer.details')}</h3>
 				<div class="grid grid-cols-2 gap-4 text-sm">
 					<div>
-						<p class="text-xs text-[#57534E]">Type</p>
-						<p class="font-medium text-[#1C1917]">{room.room_type.name}</p>
+						<p class="text-xs text-[#57534E]">{$_('drawer.type')}</p>
+						<p class="font-medium text-[#1C1917]">{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })}</p>
 					</div>
 					<div>
-						<p class="text-xs text-[#57534E]">Ref</p>
+						<p class="text-xs text-[#57534E]">{$_('drawer.ref')}</p>
 						<p class="font-mono text-[#1C1917]">{room.id.slice(0, 8)}</p>
 					</div>
 				</div>
@@ -169,13 +162,13 @@
 				>
 					<div class="flex items-center justify-between border-b border-[#E7E5E4] pb-2">
 						<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">
-							Pending Bookings
+							{$_('drawer.pendingBookings')}
 						</h3>
 						<button
 							onclick={() => (showAssignList = false)}
 							class="rounded px-2 py-1 text-[11px] font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4] hover:text-[#1C1917]"
 						>
-							Cancel
+							{$_('drawer.cancel')}
 						</button>
 					</div>
 
@@ -186,7 +179,7 @@
 						</div>
 					{:else if pendingBookings.length === 0}
 						<p class="py-4 text-center text-sm text-[#57534E]">
-							No pending bookings for this period.
+							{$_('drawer.noPending')}
 						</p>
 					{:else}
 						<div class="scrollbar-thin max-h-56 space-y-2 overflow-y-auto pr-1">
@@ -206,7 +199,7 @@
 												{booking.check_in} → {booking.check_out}
 											</p>
 											<p class="mt-0.5 text-[11px] text-[#57534E] capitalize">
-												{booking.source} · {booking.adults} pax
+												{booking.source} · {booking.adults} {$_('drawer.pax')}
 											</p>
 										</div>
 										<span class="text-sm font-bold whitespace-nowrap text-[#1C1917] tabular-nums">
@@ -225,14 +218,14 @@
 				<div
 					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4 duration-200"
 				>
-					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">Block Room</h3>
+					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">{$_('drawer.blockRoom')}</h3>
 					<select
 						bind:value={blockReason}
 						class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
 					>
-						<option value="maintenance">Maintenance</option>
-						<option value="owner_use">Owner Use</option>
-						<option value="out_of_service">Out of Service</option>
+						<option value="maintenance">{$_('drawer.maintenance')}</option>
+						<option value="owner_use">{$_('drawer.ownerUse')}</option>
+						<option value="out_of_service">{$_('drawer.outOfService')}</option>
 					</select>
 					<div class="grid grid-cols-2 gap-2">
 						<input
@@ -257,13 +250,13 @@
 					onclick={handleBlockSubmit}
 					class="w-full py-3.5 bg-[#FF8C42] flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
 				>
-					Confirm Block
+					{$_('drawer.confirmBlock')}
 				</button>
 				<button
 					onclick={() => (showBlockForm = false)}
 					class="w-full py-2.5 bg-[#F5F4F1] flex items-center justify-center gap-2 rounded-lg font-medium text-xs text-[#57534E] transition-all duration-200 hover:bg-[#E7E5E4]"
 				>
-					Cancel
+					{$_('drawer.cancel')}
 				</button>
 			{:else if !showAssignList}
 				<!-- Primary Action -->
@@ -274,7 +267,7 @@
 							: onAction(primaryAction.action)}
 					class="w-full py-3.5 {primaryAction.color} flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
 				>
-					{primaryAction.label}
+					{$_(primaryAction.labelKey)}
 				</button>
 
 				<!-- Block Room option if available -->
@@ -283,7 +276,7 @@
 						onclick={() => (showBlockForm = true)}
 						class="w-full py-2.5 bg-[#F5F4F1] text-xs font-medium text-[#57534E] rounded-lg transition-colors hover:bg-[#E7E5E4]"
 					>
-						Block Room
+						{$_('drawer.blockRoom')}
 					</button>
 				{/if}
 			{/if}

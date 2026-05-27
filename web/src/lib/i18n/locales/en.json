@@ -10,5 +10,37 @@
     "subtitle": "Hotels · Revenue Suite",
     "properties": "Properties",
     "hotelOwner": "Hotel Owner"
+  },
+  "roomTypes": {
+    "Standard Room": "Standard Room",
+    "Superior Room": "Superior Room",
+    "Deluxe Room": "Deluxe Room",
+    "Suite": "Suite"
+  },
+  "status": {
+    "available": "Available",
+    "occupied": "Occupied",
+    "pending": "Pending (Check-in)",
+    "blocked": "Blocked",
+    "inactive": "Inactive"
+  },
+  "drawer": {
+    "details": "Details",
+    "type": "Type",
+    "ref": "Ref",
+    "pendingBookings": "Pending Bookings",
+    "cancel": "Cancel",
+    "noPending": "No pending bookings for this period.",
+    "pax": "pax",
+    "blockRoom": "Block Room",
+    "maintenance": "Maintenance",
+    "ownerUse": "Owner Use",
+    "outOfService": "Out of Service",
+    "confirmBlock": "Confirm Block",
+    "checkIn": "Check In",
+    "checkOut": "Check Out",
+    "removeBlock": "Remove Block",
+    "assignBooking": "Assign Booking",
+    "availableTypes": "Available Types"
   }
 }
