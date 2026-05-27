@@ -31,6 +31,10 @@ export interface RoomMap {
     active_booking: string | null;
     pending_booking: string | null;
     block: string | null;
+    block_reason?: string | null;
+    block_notes?: string | null;
+    block_start_date?: string | null;
+    block_end_date?: string | null;
 }
 
 export interface FloorMap {

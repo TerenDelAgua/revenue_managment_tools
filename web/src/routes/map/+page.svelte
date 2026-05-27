@@ -158,7 +158,14 @@
 					selectedRoom.availability = 'blocked';
 					drawerOpen = false;
 
-					await api.roomBlocks.create({ room_id: selectedRoom.id, propertyId, ...payload });
+					// Formatear fechas a RFC3339 para deserialización en Go (time.Time)
+					const formattedPayload = {
+						...payload,
+						start_date: payload.start_date ? `${payload.start_date}T00:00:00Z` : undefined,
+						end_date: payload.end_date ? `${payload.end_date}T00:00:00Z` : undefined
+					};
+
+					await api.roomBlocks.create({ room_id: selectedRoom.id, propertyId, ...formattedPayload });
 					addToast('Room blocked successfully', 'success');
 					break;
 				}

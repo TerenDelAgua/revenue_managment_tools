@@ -37,6 +37,10 @@ type RoomMap struct {
 	ActiveBookingID  *uuid.UUID  `json:"active_booking"`
 	PendingBookingID *uuid.UUID  `json:"pending_booking"`
 	BlockID          *uuid.UUID  `json:"block"`
+	BlockReason      *string     `json:"block_reason"`
+	BlockNotes       *string     `json:"block_notes"`
+	BlockStartDate   *string     `json:"block_start_date"`
+	BlockEndDate     *string     `json:"block_end_date"`
 
 	// Guest information
 	ActiveGuestName        *string `json:"active_guest_name"`

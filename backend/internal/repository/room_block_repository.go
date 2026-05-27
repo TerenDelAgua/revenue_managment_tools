@@ -19,6 +19,11 @@ func NewRoomBlockRepository(db *pgxpool.Pool) *RoomBlockRepository {
 }
 
 func (r *RoomBlockRepository) Create(ctx context.Context, req *models.CreateRoomBlockRequest) (*models.RoomBlock, error) {
+	if req.CreatedBy == uuid.Nil {
+		// Fallback para desarrollo/pruebas cuando aún no hay JWT Auth implementado
+		_ = r.db.QueryRow(ctx, "SELECT id FROM users LIMIT 1").Scan(&req.CreatedBy)
+	}
+
 	var block models.RoomBlock
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO room_blocks (room_id, created_by, start_date, end_date, reason, notes)

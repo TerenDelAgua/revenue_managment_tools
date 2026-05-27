@@ -99,6 +99,10 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 			b_in.id AS active_booking_id, 
 			b_conf.id AS pending_booking_id, 
 			rb.id AS block_id,
+			rb.reason::text AS block_reason,
+			rb.notes AS block_notes,
+			rb.start_date::text AS block_start_date,
+			rb.end_date::text AS block_end_date,
 			-- Guest info for active booking
 			g_in.full_name AS active_guest_name,
 			g_in.phone AS active_guest_phone,
@@ -138,6 +142,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		var fNum, sOrder, posX, posY int
 		var rStatus string
 		var abID, pbID, blID *uuid.UUID
+		var bReason, bNotes, bStart, bEnd *string
 
 		// Guest fields
 		var activeGuestName, activeGuestPhone, activeGuestNationality *string
@@ -146,6 +151,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		var pendingCheckIn, pendingCheckOut *string
 
 		if err := rows.Scan(&fID, &label, &fNum, &sOrder, &rID, &rNum, &posX, &posY, &rStatus, &rtID, &rtName, &state, &abID, &pbID, &blID,
+			&bReason, &bNotes, &bStart, &bEnd,
 			&activeGuestName, &activeGuestPhone, &activeGuestNationality, &activeCheckIn, &activeCheckOut,
 			&pendingGuestName, &pendingGuestPhone, &pendingGuestNationality, &pendingCheckIn, &pendingCheckOut); err != nil {
 			return nil, err
@@ -171,6 +177,10 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		roomMap[rID].ActiveBookingID = abID
 		roomMap[rID].PendingBookingID = pbID
 		roomMap[rID].BlockID = blID
+		roomMap[rID].BlockReason = bReason
+		roomMap[rID].BlockNotes = bNotes
+		roomMap[rID].BlockStartDate = bStart
+		roomMap[rID].BlockEndDate = bEnd
 
 		// Overwrite guest info
 		if activeGuestName != nil {

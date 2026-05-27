@@ -2,6 +2,7 @@
 	import type { RoomMap } from '$lib/types';
 	import { api } from '$lib/api/client';
 	import { _ } from 'svelte-i18n';
+	import { addToast } from '$lib/store/toastStore';
 
 	interface Props {
 		room: RoomMap | null;
@@ -27,6 +28,7 @@
 	let blockNote = $state('');
 	let blockStart = $state(new Date().toISOString().split('T')[0]);
 	let blockEnd = $state(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+	let isDateValid = $state(true);
 	let showCheckoutConfirm = $state(false);
 
 	// Reset states when drawer closes or room changes
@@ -38,6 +40,9 @@
 			blockReason = 'maintenance';
 			blockNote = '';
 		}
+		const start = new Date(blockStart);
+		const end = new Date(blockEnd);
+		isDateValid = end > start;
 	});
 
 	// === Actions ===
@@ -62,6 +67,12 @@
 	}
 
 	function handleBlockSubmit() {
+		if (!isDateValid) {
+			// No se envía la petición, pero se muestra feedback
+			addToast('End date must be after start date', 'error');
+			return;
+		}
+
 		if (!room) return;
 		onAction('block', {
 			room_id: room.id,
@@ -74,6 +85,8 @@
 		// Reset
 		blockReason = 'maintenance';
 		blockNote = '';
+		blockStart = new Date().toISOString().split('T')[0];
+		blockEnd = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 	}
 
 	// === Derived UI Config ===
@@ -252,6 +265,53 @@
 				</div>
 			{/if}
 
+			{#if room.availability === 'blocked' && room.block}
+				<div class="space-y-3 rounded-xl border border-[#DC2626]/20 bg-[#FEF2F2] p-4">
+					<h3 class="mb-2 text-[10px] font-bold tracking-widest text-[#991B1B] uppercase">
+						Room Blocked Details
+					</h3>
+
+					<!-- Reason -->
+					<div class="flex items-start gap-3">
+						<span class="text-lg">🛡️</span>
+						<div class="flex-1">
+							<p class="text-sm font-semibold text-[#1C1917] capitalize">
+								{room.block_reason?.replace('_', ' ') || 'Maintenance'}
+							</p>
+							<p class="text-xs text-[#57534E]">Reason</p>
+						</div>
+					</div>
+
+					<!-- Notes -->
+					{#if room.block_notes}
+						<div class="flex items-start gap-3 pl-11">
+							<div class="flex-1">
+								<p class="text-sm text-[#1C1917]">
+									{room.block_notes}
+								</p>
+								<p class="text-[10px] text-[#57534E] uppercase mt-1">Notes</p>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Dates -->
+					<div class="mt-3 grid grid-cols-2 gap-4 border-t border-[#DC2626]/10 pt-3">
+						<div>
+							<p class="text-[10px] text-[#57534E] uppercase">Blocked From</p>
+							<p class="text-sm font-semibold text-[#1C1917]">
+								{room.block_start_date}
+							</p>
+						</div>
+						<div>
+							<p class="text-[10px] text-[#57534E] uppercase">Blocked To</p>
+							<p class="text-sm font-semibold text-[#1C1917]">
+								{room.block_end_date}
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			{#if showCheckoutConfirm && room?.availability === 'occupied'}
 				<div
 					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#FF8C42]/40 bg-[#FFF7ED] p-4 duration-200"
@@ -365,28 +425,55 @@
 				<div
 					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4 duration-200"
 				>
-					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">
-						{$_('drawer.blockRoom')}
-					</h3>
+					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">Block Room</h3>
+
+					<!-- Reason Selection -->
 					<select
 						bind:value={blockReason}
-						class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
+						class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] transition-all outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
 					>
-						<option value="maintenance">{$_('drawer.maintenance')}</option>
-						<option value="owner_use">{$_('drawer.ownerUse')}</option>
-						<option value="out_of_service">{$_('drawer.outOfService')}</option>
+						<option value="maintenance">Maintenance</option>
+						<option value="owner_use">Owner Use</option>
+						<option value="out_of_service">Out of Service</option>
 					</select>
-					<div class="grid grid-cols-2 gap-2">
-						<input
-							type="date"
-							bind:value={blockStart}
-							class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-						/>
-						<input
-							type="date"
-							bind:value={blockEnd}
-							class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-						/>
+
+					<!-- Date Range -->
+					<div class="grid grid-cols-2 gap-3">
+						<div class="relative">
+							<label class="mb-1 block text-xs font-medium text-[#57534E]">Start Date</label>
+							<input
+								type="date"
+								bind:value={blockStart}
+								class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+							/>
+							{#if !isDateValid && blockStart}
+								<div class="absolute -bottom-5 left-0 text-xs text-[#DC2626]">Invalid date</div>
+							{/if}
+						</div>
+						<div class="relative">
+							<label class="mb-1 block text-xs font-medium text-[#57534E]">End Date</label>
+							<input
+								type="date"
+								bind:value={blockEnd}
+								class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+							/>
+							{#if !isDateValid && blockEnd}
+								<div class="absolute -bottom-5 left-0 text-xs text-[#DC2626]">
+									End must be after start
+								</div>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Notes -->
+					<div>
+						<label class="mb-1 block text-xs font-medium text-[#57534E]">Notes (Optional)</label>
+						<textarea
+							bind:value={blockNote}
+							rows="2"
+							placeholder="Why is this room blocked?"
+							class="w-full resize-none rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+						></textarea>
 					</div>
 				</div>
 			{/if}
@@ -412,9 +499,22 @@
 				{#if room.availability === 'occupied' && !showCheckoutConfirm}
 					<button
 						onclick={requestCheckout}
-						class="w-full py-3.5 bg-[#1C1917] hover:bg-[#3F3D38] text-white font-semibold rounded-lg shadow-sm active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
+						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#3F3D38] active:scale-95"
 					>
-						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline
+								points="16 17 21 12 16 7"
+							></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg
+						>
 						Check Out Guest
 					</button>
 				{:else if room.availability !== 'occupied'}
