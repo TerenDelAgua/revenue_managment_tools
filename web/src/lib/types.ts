@@ -12,16 +12,16 @@ export interface RoomType {
 }
 
 export interface RoomMap {
-    active_guest_name: any;
-    pending_guest_name: any;
-    active_guest_phone: any;
-    pending_guest_phone: any;
-    active_guest_nationality: any;
-    pending_guest_nationality: any;
-    active_check_in: any;
-    pending_check_in: any;
-    active_check_out: any;
-    pending_check_out: any;
+    active_guest_name?: any;
+    pending_guest_name?: any;
+    active_guest_phone?: any;
+    pending_guest_phone?: any;
+    active_guest_nationality?: any;
+    pending_guest_nationality?: any;
+    active_check_in?: any;
+    pending_check_in?: any;
+    active_check_out?: any;
+    pending_check_out?: any;
     id: string;
     number: string;
     pos_x: number;

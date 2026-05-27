@@ -634,3 +634,58 @@ func TestBlockOverlapConstraint(t *testing.T) {
 		t.Fatalf("expected BusinessError with Code BLOCK_CONFLICT, got: %v", err)
 	}
 }
+
+func TestAssignBookingAndPendingFilter(t *testing.T) {
+	ctx := context.Background()
+	db, _, bookingSvc := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "202", 0, 10, "active")
+
+	// 1. Insert a confirmed booking with room_id = NULL in SQL (unassigned booking)
+	bookingID := uuid.New()
+	_, err := db.Exec(ctx, `
+		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
+		VALUES ($1, $2, NULL, $3, $4, $5, $6, 100000, 'direct', 'confirmed')
+	`, bookingID, f.PropertyID, f.GuestID, f.UserID, 
+	   time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC), 
+	   time.Date(2026, 5, 30, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("failed to insert unassigned booking: %v", err)
+	}
+
+	// 2. Fetch pending bookings - should be returned in list
+	pendingList, err := bookingSvc.GetPendingBookings(ctx, f.PropertyID)
+	if err != nil {
+		t.Fatalf("failed to fetch pending bookings: %v", err)
+	}
+
+	found := false
+	for _, b := range pendingList {
+		if b.ID == bookingID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected unassigned booking to be found in pending bookings list, but it wasn't")
+	}
+
+	// 3. Assign room to this booking
+	err = bookingSvc.AssignRoom(ctx, bookingID, roomID)
+	if err != nil {
+		t.Fatalf("failed to assign room: %v", err)
+	}
+
+	// 4. Fetch pending bookings again - should NOT be returned in list anymore
+	pendingListAfter, err := bookingSvc.GetPendingBookings(ctx, f.PropertyID)
+	if err != nil {
+		t.Fatalf("failed to fetch pending bookings after assignment: %v", err)
+	}
+
+	for _, b := range pendingListAfter {
+		if b.ID == bookingID {
+			t.Fatal("expected assigned booking to be excluded from pending bookings list, but it was found")
+		}
+	}
+}
+

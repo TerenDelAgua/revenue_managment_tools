@@ -11,6 +11,15 @@
 
 	const propertyId = '89ce1655-d0c6-417a-8c69-3ad59241e0d0'; // UUID de prueba actual
 
+	async function parseError(res: Response): Promise<Error> {
+		try {
+			const data = await res.json();
+			return new Error(data.message || `API Error: ${res.status}`);
+		} catch {
+			return new Error(`API Error: ${res.status}`);
+		}
+	}
+
 	let mode = $state<'setup' | 'ops'>('ops');
 	let dateFrom = $state(new Date().toISOString().split('T')[0]);
 	let dateTo = $state(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
@@ -96,73 +105,102 @@
 			availability: selectedRoom.availability,
 			active_booking: selectedRoom.active_booking,
 			pending_booking: selectedRoom.pending_booking,
-			block: selectedRoom.block
+			block: selectedRoom.block,
+			active_guest_name: selectedRoom.active_guest_name,
+			pending_guest_name: selectedRoom.pending_guest_name
 		};
 
-		// 2. Optimistic UI: Actualizar inmediatamente
-		switch (action) {
-			case 'checkin':
-				selectedRoom.availability = 'occupied';
-				selectedRoom.active_booking = selectedRoom.pending_booking;
-				selectedRoom.pending_booking = null;
-				break;
-			case 'checkout':
-				selectedRoom.availability = 'available';
-				selectedRoom.active_booking = null;
-				break;
-			case 'block':
-				selectedRoom.availability = 'blocked';
-				selectedRoom.block = 'temp_block_id';
-				break;
-			case 'unblock':
-				selectedRoom.availability = 'available';
-				selectedRoom.block = null;
-				break;
-			case 'assign':
-				selectedRoom.availability = 'pending';
-				selectedRoom.pending_booking = payload?.booking_id || 'temp_booking';
-				break;
-		}
-
-		drawerOpen = false; // Cerrar drawer tras acción
-
 		try {
-			// 3. Llamadas API reales usando el cliente (sin `fetch` directo)
 			switch (action) {
-				case 'checkin':
-					if (!backup.active_booking) throw new Error('No active booking');
-					await api.bookings.checkin(backup.active_booking, propertyId);
+				case 'checkin': {
+					// Validación: necesitamos un booking pending o active
+					const bookingId = selectedRoom.pending_booking || selectedRoom.active_booking;
+					if (!bookingId) {
+						addToast('No booking found for this room.', 'error');
+						return;
+					}
+
+					// Optimistic UI
+					selectedRoom.availability = 'occupied';
+					selectedRoom.active_booking = bookingId;
+					selectedRoom.pending_booking = null;
+					drawerOpen = false;
+
+					await api.bookings.checkin(bookingId, propertyId);
+					addToast(`Check-in completed · ${backup.pending_guest_name || 'Guest'}`, 'success');
 					break;
-				case 'checkout':
-					if (!backup.active_booking) throw new Error('No active booking');
-					await api.bookings.checkout(backup.active_booking, propertyId);
+				}
+
+				case 'checkout': {
+					if (!selectedRoom.active_booking) {
+						addToast('No active booking to check out.', 'error');
+						return;
+					}
+
+					// Optimistic UI
+					selectedRoom.availability = 'available';
+					const guestName = selectedRoom.active_guest_name;
+					const activeBookingId = selectedRoom.active_booking;
+					selectedRoom.active_booking = null;
+					selectedRoom.active_guest_name = null;
+					drawerOpen = false;
+
+					await api.bookings.checkout(activeBookingId || backup.active_booking, propertyId);
+					addToast(
+						`${guestName || 'Guest'} checked out · Room ${selectedRoom.number} ready`,
+						'success'
+					);
 					break;
-				case 'block':
+				}
+
+				case 'block': {
+					// Optimistic
+					selectedRoom.availability = 'blocked';
+					drawerOpen = false;
+
 					await api.roomBlocks.create({ room_id: selectedRoom.id, propertyId, ...payload });
+					addToast('Room blocked successfully', 'success');
 					break;
-				case 'unblock':
-					if (!backup.block) throw new Error('No block to remove');
-					await api.roomBlocks.delete(backup.block, propertyId);
+				}
+
+				case 'unblock': {
+					if (!selectedRoom.block) throw new Error('No block to remove');
+					const blockId = selectedRoom.block;
+					selectedRoom.availability = 'available';
+					selectedRoom.block = null;
+					drawerOpen = false;
+
+					await api.roomBlocks.delete(blockId, propertyId);
+					addToast('Block removed', 'success');
 					break;
-				case 'assign':
+				}
+
+				case 'assign': {
 					if (!payload?.booking_id) throw new Error('No booking selected');
+					// Optimistic UI
+					selectedRoom.availability = 'pending';
+					selectedRoom.pending_booking = payload.booking_id;
+					drawerOpen = false;
+
 					await api.bookings.assign(payload.booking_id, selectedRoom.id, propertyId);
+					addToast(`Room ${selectedRoom.number} assigned`, 'success');
 					break;
+				}
+
 				default:
-					throw new Error('Unknown action');
+					throw new Error(`Unknown action: ${action}`);
 			}
 
-			// 4. Sync final: Refrescar mapa con datos reales del servidor
+			// Sync final con datos reales
 			await loadMap();
-		} catch (error) {
+		} catch (error: any) {
 			console.error(`[Drawer] Action '${action}' failed:`, error);
 
-			// Rollback silencioso
+			// Rollback
 			Object.assign(selectedRoom, backup);
-			drawerOpen = true; // Reabrir para reintentar
+			drawerOpen = true;
 
-			// Feedback no bloqueante (TEREN Style)
-			addToast(`Failed to ${action}. Connection lost or conflict detected.`, 'error');
+			addToast(error?.message || `Failed to ${action}. Connection lost or conflict detected.`, 'error');
 		}
 	}
 </script>

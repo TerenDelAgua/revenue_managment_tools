@@ -16,3 +16,6 @@ ALTER TABLE rooms ADD CONSTRAINT rooms_floor_id_number_key UNIQUE (floor_id, num
 
 ALTER TABLE rooms DROP CONSTRAINT IF EXISTS rooms_property_fk;
 ALTER TABLE rooms DROP COLUMN IF EXISTS property_id;
+
+-- Revertir room_id nullable
+ALTER TABLE bookings ALTER COLUMN room_id SET NOT NULL;

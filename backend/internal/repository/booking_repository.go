@@ -90,7 +90,7 @@ func (r *BookingRepository) GetPendingByProperty(ctx context.Context, propertyID
 		SELECT b.id, g.full_name, b.check_in, b.check_out, b.source, b.total_amount
 		FROM bookings b
 		JOIN guests g ON b.guest_id = g.id
-		WHERE b.property_id = $1 AND b.status = 'confirmed'
+		WHERE b.property_id = $1 AND b.status = 'confirmed' AND b.room_id IS NULL
 		ORDER BY b.check_in ASC
 	`, propertyID)
 	if err != nil {
@@ -98,7 +98,7 @@ func (r *BookingRepository) GetPendingByProperty(ctx context.Context, propertyID
 	}
 	defer rows.Close()
 
-	var bookings []*PendingBookingDTO
+	bookings := make([]*PendingBookingDTO, 0)
 	for rows.Next() {
 		var b PendingBookingDTO
 		var checkIn, checkOut time.Time

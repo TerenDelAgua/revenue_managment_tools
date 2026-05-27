@@ -27,6 +27,18 @@
 	let blockNote = $state('');
 	let blockStart = $state(new Date().toISOString().split('T')[0]);
 	let blockEnd = $state(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+	let showCheckoutConfirm = $state(false);
+
+	// Reset states when drawer closes or room changes
+	$effect(() => {
+		if (!isOpen) {
+			showBlockForm = false;
+			showAssignList = false;
+			showCheckoutConfirm = false;
+			blockReason = 'maintenance';
+			blockNote = '';
+		}
+	});
 
 	// === Actions ===
 	async function loadPendingBookings() {
@@ -34,7 +46,7 @@
 		loadingBookings = true;
 		showAssignList = true;
 		try {
-			pendingBookings = await api.bookings.pending(propertyId);
+			pendingBookings = (await api.bookings.pending(propertyId)) || [];
 		} catch (e) {
 			console.error('Failed to load bookings', e);
 			pendingBookings = [];
@@ -85,6 +97,22 @@
 				};
 		}
 	});
+
+	const stayNights = $derived.by(() => {
+		if (!room?.active_check_in || !room?.active_check_out) return 0;
+		const start = new Date(room.active_check_in);
+		const end = new Date(room.active_check_out);
+		return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
+	});
+
+	function requestCheckout() {
+		showCheckoutConfirm = true;
+	}
+
+	function confirmCheckout() {
+		showCheckoutConfirm = false;
+		onAction('checkout');
+	}
 </script>
 
 {#if room}
@@ -224,6 +252,55 @@
 				</div>
 			{/if}
 
+			{#if showCheckoutConfirm && room?.availability === 'occupied'}
+				<div
+					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#FF8C42]/40 bg-[#FFF7ED] p-4 duration-200"
+				>
+					<div class="flex items-center gap-2">
+						<span class="text-lg">🧾</span>
+						<h3 class="text-sm font-bold tracking-wide text-[#1C1917] uppercase">
+							Confirm Check-out
+						</h3>
+					</div>
+
+					<div class="space-y-2 rounded-lg border border-[#E7E5E4] bg-white p-3">
+						<div class="flex justify-between text-sm">
+							<span class="text-[#57534E]">Guest</span>
+							<span class="font-semibold text-[#1C1917]">{room.active_guest_name}</span>
+						</div>
+						<div class="flex justify-between text-sm">
+							<span class="text-[#57534E]">Stay</span>
+							<span class="font-semibold text-[#1C1917] tabular-nums">
+								{room.active_check_in} → {room.active_check_out}
+							</span>
+						</div>
+						<div class="flex justify-between text-sm">
+							<span class="text-[#57534E]">Nights</span>
+							<span class="font-semibold text-[#1C1917] tabular-nums">{stayNights}</span>
+						</div>
+						<div class="flex items-center justify-between border-t border-[#E7E5E4] pt-2">
+							<span class="text-sm font-medium text-[#1C1917]">Total</span>
+							<span class="text-lg font-bold text-[#FF8C42] tabular-nums">IDR 500.000</span>
+						</div>
+					</div>
+
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							onclick={() => (showCheckoutConfirm = false)}
+							class="rounded-lg border border-[#E7E5E4] bg-white py-2.5 text-sm font-medium text-[#57534E] transition-colors hover:bg-[#F5F4F1]"
+						>
+							Cancel
+						</button>
+						<button
+							onclick={confirmCheckout}
+							class="rounded-lg bg-[#1C1917] py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#3F3D38] active:scale-95"
+						>
+							Confirm Check-out
+						</button>
+					</div>
+				</div>
+			{/if}
+
 			<!-- INLINE LIST: Pending Bookings -->
 			{#if showAssignList}
 				<div
@@ -246,7 +323,7 @@
 							<div class="h-14 rounded-lg bg-[#E7E5E4]"></div>
 							<div class="h-14 rounded-lg bg-[#E7E5E4]"></div>
 						</div>
-					{:else if pendingBookings.length === 0}
+					{:else if !pendingBookings || pendingBookings.length === 0}
 						<p class="py-4 text-center text-sm text-[#57534E]">
 							{$_('drawer.noPending')}
 						</p>
@@ -332,15 +409,25 @@
 				</button>
 			{:else if !showAssignList}
 				<!-- Primary Action -->
-				<button
-					onclick={() =>
-						primaryAction.action === 'assign'
-							? loadPendingBookings()
-							: onAction(primaryAction.action)}
-					class="w-full py-3.5 {primaryAction.color} flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
-				>
-					{$_(primaryAction.labelKey)}
-				</button>
+				{#if room.availability === 'occupied' && !showCheckoutConfirm}
+					<button
+						onclick={requestCheckout}
+						class="w-full py-3.5 bg-[#1C1917] hover:bg-[#3F3D38] text-white font-semibold rounded-lg shadow-sm active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+						Check Out Guest
+					</button>
+				{:else if room.availability !== 'occupied'}
+					<button
+						onclick={() =>
+							primaryAction.action === 'assign'
+								? loadPendingBookings()
+								: onAction(primaryAction.action)}
+						class="w-full py-3.5 {primaryAction.color} flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
+					>
+						{$_(primaryAction.labelKey)}
+					</button>
+				{/if}
 
 				<!-- Block Room option if available -->
 				{#if room.availability !== 'blocked' && room.availability !== 'inactive'}

@@ -63,3 +63,6 @@ CREATE INDEX IF NOT EXISTS idx_bookings_room_dates_active
 -- Para listado rápido de floors por property (tabs del mapa)
 CREATE INDEX IF NOT EXISTS idx_floors_property_sort
     ON floors (property_id, sort_order, floor_number);
+
+-- Permite reservas sin habitación asignada (Spec FMB-001 / PMS flow)
+ALTER TABLE bookings ALTER COLUMN room_id DROP NOT NULL;
