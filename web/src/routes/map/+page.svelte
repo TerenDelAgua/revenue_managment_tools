@@ -8,6 +8,7 @@
 	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
+	import OccupancyBar from '$lib/components/map/OccupancyBar.svelte';
 
 	const propertyId = '89ce1655-d0c6-417a-8c69-3ad59241e0d0'; // UUID de prueba actual
 
@@ -20,6 +21,7 @@
 		}
 	}
 
+	let currentUser = $state({ role: 'owner' });
 	let mode = $state<'setup' | 'ops'>('ops');
 	let dateFrom = $state(new Date().toISOString().split('T')[0]);
 	let dateTo = $state(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
@@ -42,8 +44,23 @@
 
 	// Fetch map data
 
+	// Reactively adjust dates to keep dateTo strictly after dateFrom
+	$effect(() => {
+		if (dateFrom && dateTo) {
+			const from = new Date(dateFrom);
+			const to = new Date(dateTo);
+			if (from >= to) {
+				const nextDay = new Date(from);
+				nextDay.setDate(nextDay.getDate() + 1);
+				dateTo = nextDay.toISOString().split('T')[0];
+			}
+		}
+	});
+
 	async function loadMap() {
 		if (!browser) return;
+		if (new Date(dateFrom) >= new Date(dateTo)) return; // Guard during input transition
+
 		loading = true;
 		try {
 			mapData = await api.map.get(dateFrom, dateTo, propertyId);
@@ -165,7 +182,11 @@
 						end_date: payload.end_date ? `${payload.end_date}T00:00:00Z` : undefined
 					};
 
-					await api.roomBlocks.create({ room_id: selectedRoom.id, propertyId, ...formattedPayload });
+					await api.roomBlocks.create({
+						room_id: selectedRoom.id,
+						propertyId,
+						...formattedPayload
+					});
 					addToast('Room blocked successfully', 'success');
 					break;
 				}
@@ -207,7 +228,10 @@
 			Object.assign(selectedRoom, backup);
 			drawerOpen = true;
 
-			addToast(error?.message || `Failed to ${action}. Connection lost or conflict detected.`, 'error');
+			addToast(
+				error?.message || `Failed to ${action}. Connection lost or conflict detected.`,
+				'error'
+			);
 		}
 	}
 </script>
@@ -228,12 +252,16 @@
 		</div>
 	</header>
 
+	{#if currentUser.role === 'owner'}
+		<OccupancyBar {mapData} />
+	{/if}
+
 	<div class="flex flex-1 gap-4">
-		<aside class="hidden w-64 md:block">
-			{#if mode === 'setup'}
+		{#if mode === 'setup'}
+			<aside class="hidden w-64 md:block">
 				<RoomPalette roomTypes={[]} onDragStart={() => {}} />
-			{/if}
-		</aside>
+			</aside>
+		{/if}
 
 		<main class="flex-1 space-y-4">
 			<FloorTabs
