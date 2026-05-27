@@ -47,6 +47,7 @@ func main() {
 	reportRepo := repository.NewReportRepository(db.Pool)
 	reportService := service.NewReportService(reportRepo)
 	reportHandler := internalapi.NewReportHandler(reportService)
+	healthHandler := internalapi.NewHealthHandler(db.Pool)
 
 	r := chi.NewRouter()
 
@@ -73,10 +74,7 @@ func main() {
 		w.Write([]byte("TEREN Hotels Revenue Management API"))
 	})
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
-	})
+	r.Get("/health", healthHandler.Check)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/properties", func(r chi.Router) {
