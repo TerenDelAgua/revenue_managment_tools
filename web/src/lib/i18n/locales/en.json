@@ -1,0 +1,14 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "floorMap": "Floor Map",
+    "bookings": "Bookings",
+    "guests": "Guests",
+    "settings": "Settings"
+  },
+  "header": {
+    "subtitle": "Hotels · Revenue Suite",
+    "properties": "Properties",
+    "hotelOwner": "Hotel Owner"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "nav": {
+    "dashboard": "Dasbor",
+    "floorMap": "Peta Lantai",
+    "bookings": "Pemesanan",
+    "guests": "Tamu",
+    "settings": "Pengaturan"
+  },
+  "header": {
+    "subtitle": "Hotel · Manajemen Pendapatan",
+    "properties": "Properti",
+    "hotelOwner": "Pemilik Hotel"
+  }
+}

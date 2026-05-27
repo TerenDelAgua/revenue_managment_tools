@@ -1,49 +1,89 @@
 <script lang="ts">
 	import type { RoomMap } from '$lib/types';
+	import { api } from '$lib/api/client';
 
 	interface Props {
 		room: RoomMap | null;
+		propertyId: string; // ← Se pasa desde el padre, ya que RoomMap no lo contiene
 		isOpen: boolean;
 		onClose: () => void;
-		onAction: (action: string, payload?: any) => void;
+		onAction: (
+			action: 'assign' | 'checkin' | 'checkout' | 'block' | 'unblock',
+			payload?: any
+		) => void;
 	}
 
-	let { room, isOpen, onClose, onAction }: Props = $props();
+	let { room, propertyId, isOpen, onClose, onAction }: Props = $props();
 
-	// Estado local para formularios inline (Progressive Disclosure)
+	// === Progressive Disclosure States ===
 	let showBlockForm = $state(false);
-	let blockReason = $state('maintenance');
+	let showAssignList = $state(false);
+	let loadingBookings = $state(false);
+	let pendingBookings = $state<any[]>([]);
+
+	// === Block Form State ===
+	let blockReason = $state<'maintenance' | 'owner_use' | 'out_of_service'>('maintenance');
 	let blockNote = $state('');
 	let blockStart = $state(new Date().toISOString().split('T')[0]);
 	let blockEnd = $state(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
 
-	// Mapeo de etiquetas legibles
-	const statusLabels = {
-		available: 'Disponible',
-		occupied: 'Ocupada',
-		pending: 'Pendiente',
-		blocked: 'Bloqueada',
-		inactive: 'Inactiva'
-	};
+	// === Actions ===
+	async function loadPendingBookings() {
+		if (!propertyId) return;
+		loadingBookings = true;
+		showAssignList = true;
+		try {
+			pendingBookings = await api.bookings.pending(propertyId);
+		} catch (e) {
+			console.error('Failed to load bookings', e);
+			pendingBookings = [];
+		} finally {
+			loadingBookings = false;
+		}
+	}
 
-	const statusColors = {
-		available: 'bg-[#16A34A]',
-		occupied: 'bg-[#DC2626]',
-		pending: 'bg-[#D97706]',
-		blocked: 'bg-[#44403C]',
-		inactive: 'bg-[#A8A29E]'
-	};
+	function handleAssign(bookingId: string) {
+		if (!room) return;
+		onAction('assign', { booking_id: bookingId, room_id: room.id });
+		showAssignList = false;
+	}
 
 	function handleBlockSubmit() {
+		if (!room) return;
 		onAction('block', {
-			room_id: room?.id,
+			room_id: room.id,
 			reason: blockReason,
 			notes: blockNote,
 			start_date: blockStart,
 			end_date: blockEnd
 		});
 		showBlockForm = false;
+		// Reset
+		blockReason = 'maintenance';
+		blockNote = '';
 	}
+
+	// === Derived UI Config ===
+	const statusLabels = {
+		available: 'Disponible',
+		occupied: 'Ocupada',
+		pending: 'Pendiente (Check-in)',
+		blocked: 'Bloqueada',
+		inactive: 'Inactiva'
+	};
+
+	const primaryAction = $derived.by(() => {
+		switch (room?.availability) {
+			case 'pending':
+				return { label: 'Check In', color: 'bg-[#16A34A]', action: 'checkin' as const };
+			case 'occupied':
+				return { label: 'Check Out', color: 'bg-[#1C1917]', action: 'checkout' as const };
+			case 'blocked':
+				return { label: 'Remove Block', color: 'bg-[#DC2626]', action: 'unblock' as const };
+			default:
+				return { label: 'Assign Booking', color: 'bg-[#FF8C42]', action: 'assign' as const };
+		}
+	});
 </script>
 
 {#if room}
@@ -51,43 +91,48 @@
 	<button
 		type="button"
 		aria-label="Close drawer"
-		class="fixed inset-0 z-40 w-full border-none bg-[#1C1917]/30 p-0 backdrop-blur-sm transition-opacity duration-300 {isOpen
-			? 'opacity-100'
+		class="fixed inset-0 z-40 block w-full bg-[#1C1917]/20 backdrop-blur-[1px] transition-opacity duration-200 {isOpen
+			? 'opacity-100 cursor-default'
 			: 'pointer-events-none opacity-0'}"
 		onclick={onClose}
 	></button>
 
 	<!-- Drawer Panel -->
 	<div
-		class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md transform flex-col bg-[#FCFBFA] shadow-2xl transition-transform duration-300 ease-out {isOpen
+		class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md transform flex-col bg-[#FCFBFA] shadow-xl transition-transform duration-250 ease-out {isOpen
 			? 'translate-x-0'
 			: 'translate-x-full'}"
 		style="border-left: 1px solid #E7E5E4;"
 	>
 		<!-- Header -->
-		<div class="flex items-start justify-between border-b border-[#E7E5E4] bg-[#FCFBFA] px-6 py-5">
+		<div class="flex items-start justify-between border-b border-[#E7E5E4] bg-[#FCFBFA] px-6 py-4">
 			<div>
 				<div class="mb-1 flex items-center gap-2">
-					<h2 class="text-2xl font-bold tracking-tight text-[#1C1917]">{room.number}</h2>
-					<span class="h-2.5 w-2.5 rounded-full {statusColors[room.availability]}"></span>
+					<h2 class="text-xl font-bold tracking-tight text-[#1C1917]">{room.number}</h2>
+					<span
+						class="h-2.5 w-2.5 rounded-full {room.availability === 'available'
+							? 'bg-[#16A34A]'
+							: room.availability === 'occupied'
+								? 'bg-[#DC2626]'
+								: room.availability === 'pending'
+									? 'bg-[#D97706]'
+									: room.availability === 'blocked'
+										? 'bg-[#44403C]'
+										: 'bg-[#A8A29E]'}"
+					></span>
 				</div>
-				<div class="flex items-center gap-2">
-					<span class="text-sm font-medium text-[#57534E]">{room.room_type.name}</span>
-					<span class="h-1.5 w-1.5 rounded-full bg-[#D6D3D1]"></span>
-					<span class="text-sm font-medium tracking-wide text-[#57534E] uppercase">
-						{statusLabels[room.availability]}
-					</span>
-				</div>
+				<p class="text-sm text-[#57534E]">
+					{room.room_type.name} · {statusLabels[room.availability]}
+				</p>
 			</div>
 			<button
-				title="Close"
 				onclick={onClose}
 				class="rounded-lg p-2 text-[#57534E] transition-colors hover:bg-[#F5F4F1] hover:text-[#1C1917]"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					width="24"
-					height="24"
+					width="20"
+					height="20"
 					viewBox="0 0 24 24"
 					fill="none"
 					stroke="currentColor"
@@ -100,227 +145,148 @@
 			</button>
 		</div>
 
-		<!-- Content Scrollable -->
-		<div class="flex-1 space-y-6 overflow-y-auto p-6">
-			<!-- Info Card (Datos reales disponibles) -->
+		<!-- Scrollable Content -->
+		<div class="flex-1 space-y-5 overflow-y-auto p-5">
+			<!-- Room Details Card -->
 			<div class="rounded-xl border border-[#E7E5E4] bg-white p-4 shadow-sm">
-				<h3 class="mb-3 text-xs font-bold tracking-wider text-[#57534E] uppercase">Room Details</h3>
-				<div class="grid grid-cols-2 gap-4">
+				<h3 class="mb-3 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">Details</h3>
+				<div class="grid grid-cols-2 gap-4 text-sm">
 					<div>
 						<p class="text-xs text-[#57534E]">Type</p>
-						<p class="text-sm font-semibold text-[#1C1917]">{room.room_type.name}</p>
+						<p class="font-medium text-[#1C1917]">{room.room_type.name}</p>
 					</div>
 					<div>
-						<p class="text-xs text-[#57534E]">Reference</p>
-						<p class="font-mono text-sm font-semibold text-[#1C1917]">{room.id.slice(0, 8)}...</p>
+						<p class="text-xs text-[#57534E]">Ref</p>
+						<p class="font-mono text-[#1C1917]">{room.id.slice(0, 8)}</p>
 					</div>
 				</div>
-
-				<!-- Estado de Booking (Si existe) -->
-				{#if room.active_booking}
-					<div
-						class="mt-4 rounded-lg border border-t border-[#DC2626]/20 border-[#E7E5E4] bg-[#DC2626]/5 p-3 pt-4"
-					>
-						<p class="text-xs font-bold text-[#DC2626] uppercase">Checked In</p>
-						<p class="mt-1 text-xs text-[#57534E]">
-							Booking ID: {room.active_booking.slice(0, 8)}...
-						</p>
-					</div>
-				{/if}
-
-				{#if room.block}
-					<div
-						class="mt-4 rounded-lg border border-t border-[#44403C]/20 border-[#E7E5E4] bg-[#44403C]/5 p-3 pt-4"
-					>
-						<p class="text-xs font-bold text-[#44403C] uppercase">Blocked</p>
-						<p class="mt-1 text-xs text-[#57534E]">Block ID: {room.block.slice(0, 8)}...</p>
-					</div>
-				{/if}
 			</div>
 
-			<!-- Block Inline Form (Progressive Disclosure) -->
+			<!-- INLINE LIST: Pending Bookings -->
+			{#if showAssignList}
+				<div
+					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4 duration-200"
+				>
+					<div class="flex items-center justify-between border-b border-[#E7E5E4] pb-2">
+						<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">
+							Pending Bookings
+						</h3>
+						<button
+							onclick={() => (showAssignList = false)}
+							class="rounded px-2 py-1 text-[11px] font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4] hover:text-[#1C1917]"
+						>
+							Cancel
+						</button>
+					</div>
+
+					{#if loadingBookings}
+						<div class="animate-pulse space-y-2">
+							<div class="h-14 rounded-lg bg-[#E7E5E4]"></div>
+							<div class="h-14 rounded-lg bg-[#E7E5E4]"></div>
+						</div>
+					{:else if pendingBookings.length === 0}
+						<p class="py-4 text-center text-sm text-[#57534E]">
+							No pending bookings for this period.
+						</p>
+					{:else}
+						<div class="scrollbar-thin max-h-56 space-y-2 overflow-y-auto pr-1">
+							{#each pendingBookings as booking (booking.id)}
+								<button
+									onclick={() => handleAssign(booking.id)}
+									class="group w-full rounded-lg border border-[#E7E5E4] bg-white p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FF8C42] hover:shadow-md active:scale-[0.98]"
+								>
+									<div class="flex items-start justify-between gap-3">
+										<div class="flex-1">
+											<p
+												class="font-semibold text-[#1C1917] transition-colors group-hover:text-[#FF8C42]"
+											>
+												{booking.guest_name}
+											</p>
+											<p class="mt-0.5 text-[11px] text-[#57534E] tabular-nums">
+												{booking.check_in} → {booking.check_out}
+											</p>
+											<p class="mt-0.5 text-[11px] text-[#57534E] capitalize">
+												{booking.source} · {booking.adults} pax
+											</p>
+										</div>
+										<span class="text-sm font-bold whitespace-nowrap text-[#1C1917] tabular-nums">
+											IDR {(booking.total_amount / 1000).toFixed(0)}k
+										</span>
+									</div>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- Block Form (Progressive Disclosure) -->
 			{#if showBlockForm}
 				<div
-					class="animate-in fade-in slide-in-from-top-2 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-5 duration-200"
+					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4 duration-200"
 				>
-					<h3 class="mb-3 text-sm font-bold text-[#1C1917]">Block Room</h3>
-					<div class="space-y-4">
-						<div>
-							<label for="blockReason" class="mb-1 block text-xs font-medium text-[#57534E]"
-								>Reason</label
-							>
-							<select
-								id="blockReason"
-								bind:value={blockReason}
-								class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] transition-all outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
-							>
-								<option value="maintenance">Maintenance</option>
-								<option value="owner_use">Owner Use</option>
-								<option value="out_of_service">Out of Service</option>
-							</select>
-						</div>
-						<div class="grid grid-cols-2 gap-3">
-							<div>
-								<label for="blockStart" class="mb-1 block text-xs font-medium text-[#57534E]"
-									>Start Date</label
-								>
-								<input
-									id="blockStart"
-									type="date"
-									bind:value={blockStart}
-									class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-								/>
-							</div>
-							<div>
-								<label for="blockEnd" class="mb-1 block text-xs font-medium text-[#57534E]"
-									>End Date</label
-								>
-								<input
-									id="blockEnd"
-									type="date"
-									bind:value={blockEnd}
-									class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-								/>
-							</div>
-						</div>
-						<div>
-							<label for="blockNote" class="mb-1 block text-xs font-medium text-[#57534E]"
-								>Notes (Optional)</label
-							>
-							<textarea
-								id="blockNote"
-								bind:value={blockNote}
-								rows="2"
-								placeholder="Why is this room blocked?"
-								class="w-full resize-none rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
-							></textarea>
-						</div>
+					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">Block Room</h3>
+					<select
+						bind:value={blockReason}
+						class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
+					>
+						<option value="maintenance">Maintenance</option>
+						<option value="owner_use">Owner Use</option>
+						<option value="out_of_service">Out of Service</option>
+					</select>
+					<div class="grid grid-cols-2 gap-2">
+						<input
+							type="date"
+							bind:value={blockStart}
+							class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+						/>
+						<input
+							type="date"
+							bind:value={blockEnd}
+							class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
+						/>
 					</div>
 				</div>
 			{/if}
 		</div>
 
-		<!-- Footer Actions -->
-		<div class="space-y-3 border-t border-[#E7E5E4] bg-[#FCFBFA] p-6">
-			<!-- Primary Action Contextual -->
-			{#if !showBlockForm}
-				{#if room.availability === 'available'}
-					<button
-						onclick={() => onAction('assign')}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF8C42] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#E06B20] active:scale-95"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
-							></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg
-						>
-						Assign Booking
-					</button>
-				{:else if room.availability === 'pending'}
-					<button
-						onclick={() => onAction('checkin')}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#16A34A] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#15803D] active:scale-95"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline
-								points="22 4 12 14.01 9 11.01"
-							></polyline></svg
-						>
-						Check In
-					</button>
-				{:else if room.availability === 'occupied'}
-					<button
-						onclick={() => onAction('checkout')}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#3F3D38] active:scale-95"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline
-								points="16 17 21 12 16 7"
-							></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg
-						>
-						Check Out
-					</button>
-				{:else if room.availability === 'blocked'}
-					<button
-						onclick={() => onAction('unblock')}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#DC2626] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#B91C1C] active:scale-95"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"
-							></line></svg
-						>
-						Remove Block
-					</button>
-				{:else if room.availability === 'inactive'}
-					<button
-						onclick={() => onAction('activate')}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#A8A29E] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#78716C] active:scale-95"
-					>
-						Activate Room
-					</button>
-				{/if}
-			{/if}
+		<div class="space-y-3 border-t border-[#E7E5E4] bg-[#FCFBFA] p-5">
+			{#if showBlockForm}
+				<!-- Block confirmation action -->
+				<button
+					onclick={handleBlockSubmit}
+					class="w-full py-3.5 bg-[#FF8C42] flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
+				>
+					Confirm Block
+				</button>
+				<button
+					onclick={() => (showBlockForm = false)}
+					class="w-full py-2.5 bg-[#F5F4F1] flex items-center justify-center gap-2 rounded-lg font-medium text-xs text-[#57534E] transition-all duration-200 hover:bg-[#E7E5E4]"
+				>
+					Cancel
+				</button>
+			{:else if !showAssignList}
+				<!-- Primary Action -->
+				<button
+					onclick={() =>
+						primaryAction.action === 'assign'
+							? loadPendingBookings()
+							: onAction(primaryAction.action)}
+					class="w-full py-3.5 {primaryAction.color} flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
+				>
+					{primaryAction.label}
+				</button>
 
-			<!-- Secondary Actions -->
-			<div class="grid grid-cols-2 gap-3 pt-2">
-				{#if room.availability !== 'blocked' && room.availability !== 'inactive' && !showBlockForm}
+				<!-- Block Room option if available -->
+				{#if room.availability !== 'blocked' && room.availability !== 'inactive'}
 					<button
 						onclick={() => (showBlockForm = true)}
-						class="col-span-2 rounded-lg bg-[#F5F4F1] py-3 text-sm font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4]"
+						class="w-full py-2.5 bg-[#F5F4F1] text-xs font-medium text-[#57534E] rounded-lg transition-colors hover:bg-[#E7E5E4]"
 					>
 						Block Room
 					</button>
 				{/if}
-				{#if showBlockForm}
-					<button
-						onclick={() => (showBlockForm = false)}
-						class="rounded-lg bg-[#F5F4F1] py-3 text-sm font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4]"
-					>
-						Cancel
-					</button>
-					<button
-						onclick={handleBlockSubmit}
-						class="rounded-lg bg-[#FF8C42] py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#E06B20] active:scale-95"
-					>
-						Confirm Block
-					</button>
-				{/if}
-			</div>
+			{/if}
 		</div>
 	</div>
 {/if}

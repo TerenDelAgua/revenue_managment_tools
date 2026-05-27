@@ -6,8 +6,9 @@
 	import RoomDrawer from '$lib/components/map/RoomDrawer.svelte';
 	import type { MapResponse, RoomMap } from '$lib/types';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
+	import { api } from '$lib/api/client';
 
-	const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+	const propertyId = '89ce1655-d0c6-417a-8c69-3ad59241e0d0'; // UUID de prueba actual
 
 	let mode = $state<'setup' | 'ops'>('ops');
 	let dateFrom = $state(new Date().toISOString().split('T')[0]);
@@ -34,11 +35,7 @@
 		if (!browser) return;
 		loading = true;
 		try {
-			const res = await fetch(`${API_BASE_URL}/map?date_from=${dateFrom}&date_to=${dateTo}`, {
-				headers: { 'X-Property-ID': '89ce1655-d0c6-417a-8c69-3ad59241e0d0' } // UUID de prueba actual
-			});
-			if (!res.ok) throw new Error('Failed to load map');
-			mapData = await res.json();
+			mapData = await api.map.get(dateFrom, dateTo, propertyId);
 
 			// Auto-select first floor if none is active
 			if (mapData && mapData.floors.length > 0 && !activeFloorId) {
@@ -75,12 +72,7 @@
 		if (!foundRoom) return;
 
 		try {
-			const res = await fetch(`${API_BASE_URL}/rooms/${roomId}/position`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ pos_x: x, pos_y: y })
-			});
-			if (!res.ok) throw new Error('Failed to update position');
+			await api.rooms.updatePosition(roomId, { pos_x: x, pos_y: y });
 		} catch {
 			// Rollback si falla
 			foundRoom.pos_x = oldPos.x;
@@ -97,41 +89,35 @@
 	async function handleDrawerAction(action: string, payload?: any) {
 		if (!selectedRoom) return;
 
-		try {
-			if (action === 'block') {
-				// Crear bloqueo
-				const res = await fetch(`${API_BASE_URL}/room-blocks`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'X-Property-ID': '89ce1655-d0c6-417a-8c69-3ad59241e0d0'
-					},
-					body: JSON.stringify({
-						room_id: selectedRoom.id,
-						created_by: '80e6c703-9bb6-46c5-a6a3-6eb8b14a23b9', // UUID usuario simulado
-						start_date: dateFrom,
-						end_date: dateTo, // En este caso bloqueamos por el periodo seleccionado
-						reason: payload.reason,
-						notes: payload.note || ''
-					})
-				});
-				if (!res.ok) {
-					const errData = await res.json();
-					throw new Error(errData.message || 'Error al bloquear habitación');
-				}
-			} else if (action === 'unblock') {
-				if (!selectedRoom.block) return;
-				const res = await fetch(`${API_BASE_URL}/room-blocks/${selectedRoom.block}`, {
-					method: 'DELETE'
-				});
-				if (!res.ok) throw new Error('Error al eliminar bloqueo');
-			}
-			// Otras acciones como assign, checkin, checkout son simuladas o se añadirán en Fase 2
+		// 1. Optimistic UI: Actualizar el estado local inmediatamente para feedback visual
+		const originalAvailability = selectedRoom.availability;
+		let newState = selectedRoom.availability;
 
-			drawerOpen = false;
-			await loadMap(); // Refrescar estado
-		} catch (err: any) {
-			alert(err.message || 'Error al realizar acción');
+		if (action === 'checkin') newState = 'occupied';
+		else if (action === 'checkout') newState = 'available';
+		else if (action === 'block') newState = 'blocked';
+		else if (action === 'unblock') newState = 'available';
+
+		// Aplicar cambio local
+		selectedRoom.availability = newState;
+		drawerOpen = false; // Cerrar drawer
+
+		try {
+			// 2. Llamada al Backend usando el API client unificado
+			if (action === 'block') {
+				await api.roomBlocks.create(payload);
+			} else if (action === 'checkin' || action === 'checkout' || action === 'unblock') {
+				await api.bookings.performAction(action, selectedRoom.id);
+			}
+
+			// 3. Refrescar datos reales
+			await loadMap();
+		} catch (error) {
+			// 4. Rollback si falla
+			console.error('Action failed', error);
+			alert('Action failed. Reverting...');
+			selectedRoom.availability = originalAvailability;
+			drawerOpen = true; // Re-abrir drawer para que intente de nuevo
 		}
 	}
 </script>
@@ -183,6 +169,7 @@
 
 <RoomDrawer
 	room={selectedRoom}
+	{propertyId}
 	isOpen={drawerOpen}
 	onClose={() => (drawerOpen = false)}
 	onAction={handleDrawerAction}
