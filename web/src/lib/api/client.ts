@@ -1,4 +1,4 @@
-import type { MapResponse, CreateRoomBlockPayload } from '$lib/types';
+import type { MapResponse, CreateRoomBlockPayload, ReportResponse, DailyBreakdownResponse } from '$lib/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
@@ -169,5 +169,11 @@ export const api = {
 				method: 'DELETE',
 				headers: { 'X-Property-ID': propertyId }
 			})
+	},
+	reports: {
+		metrics: (propertyId: string, dateFrom: string, dateTo: string) =>
+			request<ReportResponse>(`/reports/metrics?property_id=${propertyId}&date_from=${dateFrom}&date_to=${dateTo}`),
+		daily: (propertyId: string, dateFrom: string, dateTo: string) =>
+			request<DailyBreakdownResponse>(`/reports/daily?property_id=${propertyId}&date_from=${dateFrom}&date_to=${dateTo}`)
 	}
 };

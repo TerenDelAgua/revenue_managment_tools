@@ -52,6 +52,7 @@ export interface MapResponse {
     floors: FloorMap[];
 }
 
+// === Actions & Payloads ===
 export interface RoomPositionUpdate {
     id: string;
     pos_x: number;
@@ -69,4 +70,44 @@ export interface CreateRoomBlockPayload {
 export interface ApiErrorResponse {
     code: string;
     message: string;
+}
+
+// === Reports & Revenue Structures ===
+export interface ReportResponse {
+    property_id: string;
+    date_from: string;
+    date_to: string;
+    total_rooms: number;
+    days_in_range: number;
+    booked_nights: number;
+    total_revenue: number;
+    occupancy_rate: number; // 0.00 - 100.00
+    adr: number;            // Average Daily Rate
+    revpar: number;         // Revenue Per Available Room
+}
+
+export interface DailyBreakdown {
+    date: string; // YYYY-MM-DD
+    occupied_rooms: number;
+    available_rooms: number;
+    total_rooms: number;
+    occupancy_rate: number;
+    daily_revenue: number;
+    adr: number;
+    revpar: number;
+}
+
+export interface DailyBreakdownResponse {
+    property_id: string;
+    date_from: string;
+    date_to: string;
+    days: DailyBreakdown[];
+    summary: ReportResponse;
+}
+
+// === Misc / UI ===
+export interface BreadcrumbItem {
+    label: string;
+    href?: string;
+    current?: boolean;
 }

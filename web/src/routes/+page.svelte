@@ -1,10 +1,56 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { addToast } from '$lib/store/toastStore';
+	import type { ReportResponse, DailyBreakdownResponse } from '$lib/types';
+	import { api } from '$lib/api/client';
+
+	const propertyId = '89ce1655-d0c6-417a-8c69-3ad59241e0d0'; // UUID de prueba actual
+
+	let metrics = $state<ReportResponse | null>(null);
+	let dailyData = $state<DailyBreakdownResponse | null>(null);
+	let loading = $state(true);
 
 	function triggerFeatureAlert(name: string) {
 		addToast(`La funcionalidad '${name}' se encuentra en desarrollo como parte de la Fase 2.`, 'info');
 	}
+
+	onMount(async () => {
+		const to = new Date();
+		const from = new Date();
+		from.setDate(from.getDate() - 30);
+		
+		const dateTo = to.toISOString().split('T')[0];
+		const dateFrom = from.toISOString().split('T')[0];
+		
+		try {
+			const [metricsRes, dailyRes] = await Promise.all([
+				api.reports.metrics(propertyId, dateFrom, dateTo),
+				api.reports.daily(propertyId, dateFrom, dateTo)
+			]);
+
+			metrics = metricsRes;
+			dailyData = dailyRes;
+		} catch (e) {
+			console.error('Failed to load dashboard data', e);
+		} finally {
+			loading = false;
+		}
+	});
+
+	const formatCurrency = (amount: number) => {
+		return `IDR ${amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+	};
 </script>
+
+{#snippet sparkline(data: number[], color: string)}
+	<svg viewBox="0 0 100 30" class="w-full h-8 mt-2" preserveAspectRatio="none">
+		{#if data.length > 1}
+			{@const max = Math.max(...data, 1)}
+			{@const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${30 - (d / max) * 30}`).join(' ')}
+			<polyline points={points} fill="none" stroke={color} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+		{/if}
+	</svg>
+{/snippet}
 
 <div class="flex flex-col gap-6 max-w-6xl mx-auto py-4">
 
@@ -17,7 +63,7 @@
 		</div>
 		<div class="flex gap-2 bg-[#FCFBFA] border border-[#E7E5E4] rounded-xl p-1.5 shadow-sm">
 			<button class="rounded-lg bg-[#F5F4F1] px-3.5 py-1.5 text-xs font-semibold text-[#1C1917] transition hover:brightness-95">
-				Today · May 26
+				Last 30 Days
 			</button>
 			<button class="rounded-lg px-3.5 py-1.5 text-xs font-semibold text-[#57534E] transition hover:bg-[#F5F4F1]">
 				This Week
@@ -32,8 +78,12 @@
 				<span class="text-xs font-bold text-[#FF8C42] tracking-wider uppercase">Occupancy</span>
 				<span class="text-lg">🛏️</span>
 			</div>
-			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">78.4%</p>
-			<p class="text-xs text-[#16A34A] mt-1 font-medium">↑ +4.2% from last week</p>
+			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">{loading ? '...' : (metrics?.occupancy_rate?.toFixed(1) || '0')}%</p>
+			{#if dailyData && dailyData.days.length > 0}
+				{@render sparkline(dailyData.days.map(d => d.occupancy_rate), '#16A34A')}
+			{:else}
+				<div class="h-8 mt-2"></div>
+			{/if}
 		</div>
 
 		<div class="rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-5 shadow-sm hover:shadow-md transition">
@@ -41,8 +91,12 @@
 				<span class="text-xs font-bold text-[#FF8C42] tracking-wider uppercase">RevPAR</span>
 				<span class="text-lg">💲</span>
 			</div>
-			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">$84.67</p>
-			<p class="text-xs text-[#16A34A] mt-1 font-medium">↑ +$6.10 average</p>
+			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">{loading ? '...' : formatCurrency(metrics?.revpar || 0)}</p>
+			{#if dailyData && dailyData.days.length > 0}
+				{@render sparkline(dailyData.days.map(d => d.revpar), '#3B82F6')}
+			{:else}
+				<div class="h-8 mt-2"></div>
+			{/if}
 		</div>
 
 		<div class="rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-5 shadow-sm hover:shadow-md transition">
@@ -50,8 +104,12 @@
 				<span class="text-xs font-bold text-[#FF8C42] tracking-wider uppercase">Average Daily Rate</span>
 				<span class="text-lg">📈</span>
 			</div>
-			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">$108.00</p>
-			<p class="text-xs text-[#57534E] mt-1 font-medium">Static strategy active</p>
+			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">{loading ? '...' : formatCurrency(metrics?.adr || 0)}</p>
+			{#if dailyData && dailyData.days.length > 0}
+				{@render sparkline(dailyData.days.map(d => d.adr), '#8B5CF6')}
+			{:else}
+				<div class="h-8 mt-2"></div>
+			{/if}
 		</div>
 
 		<div class="rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-5 shadow-sm hover:shadow-md transition">
@@ -59,8 +117,8 @@
 				<span class="text-xs font-bold text-[#FF8C42] tracking-wider uppercase">Active Blocks</span>
 				<span class="text-lg">🔧</span>
 			</div>
-			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">2 rooms</p>
-			<p class="text-xs text-[#D97706] mt-1 font-medium">1 Maintenance · 1 Owner use</p>
+			<p class="text-2xl font-extrabold text-[#1C1917] mt-3 tabular-nums">0 rooms</p>
+			<p class="text-xs text-[#D97706] mt-1 font-medium">No blocks found</p>
 		</div>
 	</div>
 

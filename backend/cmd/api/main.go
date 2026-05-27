@@ -44,6 +44,10 @@ func main() {
 	bookingService := service.NewBookingService(db.Pool, bookingRepo, inventoryService)
 	bookingHandler := internalapi.NewBookingHandler(bookingService)
 
+	reportRepo := repository.NewReportRepository(db.Pool)
+	reportService := service.NewReportService(reportRepo)
+	reportHandler := internalapi.NewReportHandler(reportService)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -105,6 +109,11 @@ func main() {
 			r.Patch("/{id}", bookingHandler.Assign)
 			r.Post("/{id}/checkin", bookingHandler.CheckIn)
 			r.Post("/{id}/checkout", bookingHandler.CheckOut)
+		})
+
+		r.Route("/reports", func(r chi.Router) {
+			r.Get("/metrics", reportHandler.GetMetrics)
+			r.Get("/daily", reportHandler.GetDailyBreakdown)
 		})
 	})
 

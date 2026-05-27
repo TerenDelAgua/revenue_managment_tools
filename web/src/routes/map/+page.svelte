@@ -253,7 +253,7 @@
 	</header>
 
 	{#if currentUser.role === 'owner'}
-		<OccupancyBar {mapData} />
+		<OccupancyBar {propertyId} {dateFrom} {dateTo} />
 	{/if}
 
 	<div class="flex flex-1 gap-4">
