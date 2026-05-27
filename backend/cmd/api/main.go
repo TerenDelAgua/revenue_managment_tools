@@ -31,6 +31,7 @@ func main() {
 	floorRepo := repository.NewFloorRepository(db.Pool)
 	roomRepo := repository.NewRoomRepository(db.Pool)
 	roomBlockRepo := repository.NewRoomBlockRepository(db.Pool)
+	bookingRepo := repository.NewBookingRepository(db.Pool)
 
 	propertyHandler := internalapi.NewPropertyHandler(propertyRepo)
 	floorHandler := internalapi.NewFloorHandler(floorRepo)
@@ -39,6 +40,9 @@ func main() {
 	inventoryService := service.NewInventoryService(db.Pool, roomRepo, roomBlockRepo)
 	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
 	roomBlockHandler := internalapi.NewRoomBlockHandler(inventoryService)
+
+	bookingService := service.NewBookingService(db.Pool, bookingRepo, inventoryService)
+	bookingHandler := internalapi.NewBookingHandler(bookingService)
 
 	r := chi.NewRouter()
 
@@ -93,6 +97,13 @@ func main() {
 		r.Route("/room-blocks", func(r chi.Router) {
 			r.Post("/", roomBlockHandler.Create)
 			r.Delete("/{id}", roomBlockHandler.Delete)
+		})
+
+		r.Route("/bookings", func(r chi.Router) {
+			r.Post("/", bookingHandler.Create)
+			r.Get("/pending", bookingHandler.GetPending)
+			r.Post("/{id}/checkin", bookingHandler.CheckIn)
+			r.Post("/{id}/checkout", bookingHandler.CheckOut)
 		})
 	})
 

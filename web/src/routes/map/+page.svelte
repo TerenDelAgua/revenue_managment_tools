@@ -7,6 +7,7 @@
 	import type { MapResponse, RoomMap } from '$lib/types';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import { api } from '$lib/api/client';
+	import { addToast } from '$lib/store/toastStore';
 
 	const propertyId = '89ce1655-d0c6-417a-8c69-3ad59241e0d0'; // UUID de prueba actual
 
@@ -31,6 +32,7 @@
 	});
 
 	// Fetch map data
+
 	async function loadMap() {
 		if (!browser) return;
 		loading = true;
@@ -77,7 +79,7 @@
 			// Rollback si falla
 			foundRoom.pos_x = oldPos.x;
 			foundRoom.pos_y = oldPos.y;
-			alert('Layout no guardado. Verifica conexión.');
+			addToast('Layout no guardado. Verifica conexión.', 'error');
 		}
 	}
 
@@ -89,35 +91,103 @@
 	async function handleDrawerAction(action: string, payload?: any) {
 		if (!selectedRoom) return;
 
-		// 1. Optimistic UI: Actualizar el estado local inmediatamente para feedback visual
-		const originalAvailability = selectedRoom.availability;
-		let newState = selectedRoom.availability;
+		// 1. Guardar estado original para rollback
+		const backup = {
+			availability: selectedRoom.availability,
+			active_booking: selectedRoom.active_booking,
+			pending_booking: selectedRoom.pending_booking,
+			block: selectedRoom.block
+		};
 
-		if (action === 'checkin') newState = 'occupied';
-		else if (action === 'checkout') newState = 'available';
-		else if (action === 'block') newState = 'blocked';
-		else if (action === 'unblock') newState = 'available';
+		// 2. Optimistic UI: Actualizar inmediatamente
+		switch (action) {
+			case 'checkin':
+				selectedRoom.availability = 'occupied';
+				selectedRoom.active_booking = selectedRoom.pending_booking;
+				selectedRoom.pending_booking = null;
+				break;
+			case 'checkout':
+				selectedRoom.availability = 'available';
+				selectedRoom.active_booking = null;
+				break;
+			case 'block':
+				selectedRoom.availability = 'blocked';
+				selectedRoom.block = 'temp_block_id';
+				break;
+			case 'unblock':
+				selectedRoom.availability = 'available';
+				selectedRoom.block = null;
+				break;
+			case 'assign':
+				selectedRoom.availability = 'pending';
+				selectedRoom.pending_booking = payload?.booking_id || 'temp_booking';
+				break;
+		}
 
-		// Aplicar cambio local
-		selectedRoom.availability = newState;
-		drawerOpen = false; // Cerrar drawer
+		drawerOpen = false; // Cerrar drawer tras acción
 
 		try {
-			// 2. Llamada al Backend usando el API client unificado
-			if (action === 'block') {
-				await api.roomBlocks.create(payload);
-			} else if (action === 'checkin' || action === 'checkout' || action === 'unblock') {
-				await api.bookings.performAction(action, selectedRoom.id);
+			// 3. Llamadas API reales
+			const headers = {
+				'Content-Type': 'application/json',
+				'X-Property-ID': propertyId // Reemplazar con JWT claim en prod
+			};
+			let res: Response;
+
+			switch (action) {
+				case 'checkin':
+					if (!backup.active_booking) throw new Error('No active booking');
+					res = await fetch(`/api/v1/bookings/${backup.active_booking}/checkin`, {
+						method: 'POST',
+						headers
+					});
+					break;
+				case 'checkout':
+					if (!backup.active_booking) throw new Error('No active booking');
+					res = await fetch(`/api/v1/bookings/${backup.active_booking}/checkout`, {
+						method: 'POST',
+						headers
+					});
+					break;
+				case 'block':
+					res = await fetch('/api/v1/room-blocks', {
+						method: 'POST',
+						headers,
+						body: JSON.stringify({ room_id: selectedRoom.id, ...payload })
+					});
+					break;
+				case 'unblock':
+					if (!backup.block) throw new Error('No block to remove');
+					res = await fetch(`/api/v1/room-blocks/${backup.block}`, { method: 'DELETE', headers });
+					break;
+				case 'assign':
+					if (!payload?.booking_id) throw new Error('No booking selected');
+					res = await fetch(`/api/v1/bookings/${payload.booking_id}`, {
+						method: 'PATCH',
+						headers,
+						body: JSON.stringify({ room_id: selectedRoom.id })
+					});
+					break;
+				default:
+					throw new Error('Unknown action');
 			}
 
-			// 3. Refrescar datos reales
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({ message: 'API Error' }));
+				throw new Error(err.message);
+			}
+
+			// 4. Sync final: Refrescar mapa con datos reales del servidor
 			await loadMap();
 		} catch (error) {
-			// 4. Rollback si falla
-			console.error('Action failed', error);
-			alert('Action failed. Reverting...');
-			selectedRoom.availability = originalAvailability;
-			drawerOpen = true; // Re-abrir drawer para que intente de nuevo
+			console.error(`[Drawer] Action '${action}' failed:`, error);
+
+			// Rollback silencioso
+			Object.assign(selectedRoom, backup);
+			drawerOpen = true; // Reabrir para reintentar
+
+			// Feedback no bloqueante (TEREN Style)
+			addToast(`Failed to ${action}. Connection lost or conflict detected.`, 'error');
 		}
 	}
 </script>

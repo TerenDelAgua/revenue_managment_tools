@@ -1,39 +1,13 @@
 <script lang="ts">
-	// Custom alert para features simuladas
-	let showAlert = $state(false);
-	let alertFeatureName = $state('');
+	import { addToast } from '$lib/store/toastStore';
 
 	function triggerFeatureAlert(name: string) {
-		alertFeatureName = name;
-		showAlert = true;
-		setTimeout(() => {
-			showAlert = false;
-		}, 4000);
+		addToast(`La funcionalidad '${name}' se encuentra en desarrollo como parte de la Fase 2.`, 'info');
 	}
 </script>
 
 <div class="flex flex-col gap-6 max-w-6xl mx-auto py-4">
-	<!-- Toast Notification (Custom alert) -->
-	{#if showAlert}
-		<div
-			class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-[#FF8C42]/30 bg-[#FCFBFA] p-4 shadow-2xl transition-all duration-300 ease-out"
-			role="alert"
-		>
-			<span class="text-2xl">🚧</span>
-			<div>
-				<h5 class="text-sm font-bold text-[#1C1917]">{alertFeatureName}</h5>
-				<p class="text-xs text-[#57534E] mt-0.5">
-					Esta funcionalidad se encuentra en desarrollo como parte de la Fase 2 de TEREN Suite.
-				</p>
-			</div>
-			<button
-				onclick={() => (showAlert = false)}
-				class="ml-4 rounded-lg p-1.5 text-[#A8A29E] transition hover:bg-[#F5F4F1] hover:text-[#1C1917]"
-			>
-				✕
-			</button>
-		</div>
-	{/if}
+
 
 	<!-- Header Area -->
 	<div class="flex flex-wrap items-center justify-between gap-4">
