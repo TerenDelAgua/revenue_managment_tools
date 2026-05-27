@@ -127,54 +127,29 @@
 		drawerOpen = false; // Cerrar drawer tras acción
 
 		try {
-			// 3. Llamadas API reales
-			const headers = {
-				'Content-Type': 'application/json',
-				'X-Property-ID': propertyId // Reemplazar con JWT claim en prod
-			};
-			let res: Response;
-
+			// 3. Llamadas API reales usando el cliente (sin `fetch` directo)
 			switch (action) {
 				case 'checkin':
 					if (!backup.active_booking) throw new Error('No active booking');
-					res = await fetch(`/api/v1/bookings/${backup.active_booking}/checkin`, {
-						method: 'POST',
-						headers
-					});
+					await api.bookings.checkin(backup.active_booking, propertyId);
 					break;
 				case 'checkout':
 					if (!backup.active_booking) throw new Error('No active booking');
-					res = await fetch(`/api/v1/bookings/${backup.active_booking}/checkout`, {
-						method: 'POST',
-						headers
-					});
+					await api.bookings.checkout(backup.active_booking, propertyId);
 					break;
 				case 'block':
-					res = await fetch('/api/v1/room-blocks', {
-						method: 'POST',
-						headers,
-						body: JSON.stringify({ room_id: selectedRoom.id, ...payload })
-					});
+					await api.roomBlocks.create({ room_id: selectedRoom.id, propertyId, ...payload });
 					break;
 				case 'unblock':
 					if (!backup.block) throw new Error('No block to remove');
-					res = await fetch(`/api/v1/room-blocks/${backup.block}`, { method: 'DELETE', headers });
+					await api.roomBlocks.delete(backup.block, propertyId);
 					break;
 				case 'assign':
 					if (!payload?.booking_id) throw new Error('No booking selected');
-					res = await fetch(`/api/v1/bookings/${payload.booking_id}`, {
-						method: 'PATCH',
-						headers,
-						body: JSON.stringify({ room_id: selectedRoom.id })
-					});
+					await api.bookings.assign(payload.booking_id, selectedRoom.id, propertyId);
 					break;
 				default:
 					throw new Error('Unknown action');
-			}
-
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({ message: 'API Error' }));
-				throw new Error(err.message);
 			}
 
 			// 4. Sync final: Refrescar mapa con datos reales del servidor

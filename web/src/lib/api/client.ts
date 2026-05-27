@@ -15,6 +15,10 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 		throw new Error(`API Error: ${response.status}`);
 	}
 
+	if (response.status === 204) {
+		return {} as T;
+	}
+
 	return response.json();
 }
 
@@ -134,17 +138,36 @@ export const api = {
 	bookings: {
 		pending: (propertyId: string) =>
 			request<any[]>(`/bookings/pending?property_id=${propertyId}`),
-		performAction: (action: 'checkin' | 'checkout' | 'unblock', roomId: string) =>
-			request<any>(`/bookings/${action}`, {
+		checkin: (bookingId: string, propertyId: string) =>
+			request<any>(`/bookings/${bookingId}/checkin`, {
 				method: 'POST',
+				headers: { 'X-Property-ID': propertyId }
+			}),
+		checkout: (bookingId: string, propertyId: string) =>
+			request<any>(`/bookings/${bookingId}/checkout`, {
+				method: 'POST',
+				headers: { 'X-Property-ID': propertyId }
+			}),
+		assign: (bookingId: string, roomId: string, propertyId: string) =>
+			request<any>(`/bookings/${bookingId}`, {
+				method: 'PATCH',
+				headers: { 'X-Property-ID': propertyId },
 				body: JSON.stringify({ room_id: roomId })
 			})
 	},
 	roomBlocks: {
-		create: (payload: CreateRoomBlockPayload) =>
-			request<any>('/room-blocks', {
+		create: (payload: CreateRoomBlockPayload & { propertyId: string }) => {
+			const { propertyId, ...rest } = payload;
+			return request<any>('/room-blocks', {
 				method: 'POST',
-				body: JSON.stringify(payload)
+				headers: { 'X-Property-ID': propertyId },
+				body: JSON.stringify(rest)
+			});
+		},
+		delete: (blockId: string, propertyId: string) =>
+			request<any>(`/room-blocks/${blockId}`, {
+				method: 'DELETE',
+				headers: { 'X-Property-ID': propertyId }
 			})
 	}
 };

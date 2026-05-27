@@ -45,3 +45,13 @@ func (s *BookingService) CheckIn(ctx context.Context, bookingID uuid.UUID) error
 func (s *BookingService) CheckOut(ctx context.Context, bookingID uuid.UUID) error {
 	return s.bookingRepo.CheckOut(ctx, bookingID)
 }
+
+func (s *BookingService) GetPendingBookings(ctx context.Context, propertyID uuid.UUID) ([]*repository.PendingBookingDTO, error) {
+	return s.bookingRepo.GetPendingByProperty(ctx, propertyID)
+}
+
+func (s *BookingService) AssignRoom(ctx context.Context, bookingID, roomID uuid.UUID) error {
+	return s.bookingRepo.AssignRoom(ctx, bookingID, roomID)
+}
+
+

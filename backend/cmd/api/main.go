@@ -50,7 +50,7 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Property-ID"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
@@ -102,6 +102,7 @@ func main() {
 		r.Route("/bookings", func(r chi.Router) {
 			r.Post("/", bookingHandler.Create)
 			r.Get("/pending", bookingHandler.GetPending)
+			r.Patch("/{id}", bookingHandler.Assign)
 			r.Post("/{id}/checkin", bookingHandler.CheckIn)
 			r.Post("/{id}/checkout", bookingHandler.CheckOut)
 		})

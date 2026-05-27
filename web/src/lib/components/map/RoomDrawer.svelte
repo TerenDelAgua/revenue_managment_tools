@@ -72,9 +72,17 @@
 			case 'occupied':
 				return { labelKey: 'drawer.checkOut', color: 'bg-[#1C1917]', action: 'checkout' as const };
 			case 'blocked':
-				return { labelKey: 'drawer.removeBlock', color: 'bg-[#DC2626]', action: 'unblock' as const };
+				return {
+					labelKey: 'drawer.removeBlock',
+					color: 'bg-[#DC2626]',
+					action: 'unblock' as const
+				};
 			default:
-				return { labelKey: 'drawer.assignBooking', color: 'bg-[#FF8C42]', action: 'assign' as const };
+				return {
+					labelKey: 'drawer.assignBooking',
+					color: 'bg-[#FF8C42]',
+					action: 'assign' as const
+				};
 		}
 	});
 </script>
@@ -85,7 +93,7 @@
 		type="button"
 		aria-label="Close drawer"
 		class="fixed inset-0 z-40 block w-full bg-[#1C1917]/20 backdrop-blur-[1px] transition-opacity duration-200 {isOpen
-			? 'opacity-100 cursor-default'
+			? 'cursor-default opacity-100'
 			: 'pointer-events-none opacity-0'}"
 		onclick={onClose}
 	></button>
@@ -115,10 +123,13 @@
 					></span>
 				</div>
 				<p class="text-sm text-[#57534E]">
-					{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })} · {$_(`status.${room.availability}`)}
+					{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })} · {$_(
+						`status.${room.availability}`
+					)}
 				</p>
 			</div>
 			<button
+				title={$_('drawer.close')}
 				onclick={onClose}
 				class="rounded-lg p-2 text-[#57534E] transition-colors hover:bg-[#F5F4F1] hover:text-[#1C1917]"
 			>
@@ -142,11 +153,15 @@
 		<div class="flex-1 space-y-5 overflow-y-auto p-5">
 			<!-- Room Details Card -->
 			<div class="rounded-xl border border-[#E7E5E4] bg-white p-4 shadow-sm">
-				<h3 class="mb-3 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">{$_('drawer.details')}</h3>
+				<h3 class="mb-3 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">
+					{$_('drawer.details')}
+				</h3>
 				<div class="grid grid-cols-2 gap-4 text-sm">
 					<div>
 						<p class="text-xs text-[#57534E]">{$_('drawer.type')}</p>
-						<p class="font-medium text-[#1C1917]">{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })}</p>
+						<p class="font-medium text-[#1C1917]">
+							{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })}
+						</p>
 					</div>
 					<div>
 						<p class="text-xs text-[#57534E]">{$_('drawer.ref')}</p>
@@ -154,6 +169,60 @@
 					</div>
 				</div>
 			</div>
+			{#if room.active_booking || room.pending_booking}
+				<div class="space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4">
+					<h3 class="mb-2 text-[10px] font-bold tracking-widest text-[#57534E] uppercase">
+						{room.availability === 'occupied' ? 'Checked In Guest' : 'Incoming Guest'}
+					</h3>
+
+					<!-- Guest Name -->
+					<div class="flex items-start gap-3">
+						<span class="text-lg">👤</span>
+						<div class="flex-1">
+							<p class="text-sm font-semibold text-[#1C1917]">
+								{room.active_guest_name || room.pending_guest_name}
+							</p>
+							<p class="text-xs text-[#57534E]">Guest</p>
+						</div>
+					</div>
+
+					<!-- Phone -->
+					{#if room.active_guest_phone || room.pending_guest_phone}
+						<div class="flex items-center gap-3 pl-11">
+							<span class="text-sm font-medium text-[#1C1917]">
+								{room.active_guest_phone || room.pending_guest_phone}
+							</span>
+						</div>
+					{/if}
+
+					<!-- Nationality -->
+					{#if room.active_guest_nationality || room.pending_guest_nationality}
+						<div class="flex items-center gap-3 pl-11">
+							<span
+								class="rounded-full bg-[#FFF7ED] px-2 py-1 text-xs font-semibold text-[#E06B20]"
+							>
+								{room.active_guest_nationality || room.pending_guest_nationality}
+							</span>
+						</div>
+					{/if}
+
+					<!-- Dates -->
+					<div class="mt-3 grid grid-cols-2 gap-4 border-t border-[#E7E5E4] pt-3">
+						<div>
+							<p class="text-[10px] text-[#57534E] uppercase">Check-in</p>
+							<p class="text-sm font-semibold text-[#1C1917]">
+								{room.active_check_in || room.pending_check_in}
+							</p>
+						</div>
+						<div>
+							<p class="text-[10px] text-[#57534E] uppercase">Check-out</p>
+							<p class="text-sm font-semibold text-[#1C1917]">
+								{room.active_check_out || room.pending_check_out}
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
 
 			<!-- INLINE LIST: Pending Bookings -->
 			{#if showAssignList}
@@ -199,7 +268,8 @@
 												{booking.check_in} → {booking.check_out}
 											</p>
 											<p class="mt-0.5 text-[11px] text-[#57534E] capitalize">
-												{booking.source} · {booking.adults} {$_('drawer.pax')}
+												{booking.source} · {booking.adults}
+												{$_('drawer.pax')}
 											</p>
 										</div>
 										<span class="text-sm font-bold whitespace-nowrap text-[#1C1917] tabular-nums">
@@ -218,7 +288,9 @@
 				<div
 					class="animate-in fade-in slide-in-from-top-2 space-y-3 rounded-xl border border-[#E7E5E4] bg-[#F5F4F1] p-4 duration-200"
 				>
-					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">{$_('drawer.blockRoom')}</h3>
+					<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">
+						{$_('drawer.blockRoom')}
+					</h3>
 					<select
 						bind:value={blockReason}
 						class="w-full rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-sm text-[#1C1917] outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
@@ -248,13 +320,13 @@
 				<!-- Block confirmation action -->
 				<button
 					onclick={handleBlockSubmit}
-					class="w-full py-3.5 bg-[#FF8C42] flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
+					class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF8C42] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
 				>
 					{$_('drawer.confirmBlock')}
 				</button>
 				<button
 					onclick={() => (showBlockForm = false)}
-					class="w-full py-2.5 bg-[#F5F4F1] flex items-center justify-center gap-2 rounded-lg font-medium text-xs text-[#57534E] transition-all duration-200 hover:bg-[#E7E5E4]"
+					class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#F5F4F1] py-2.5 text-xs font-medium text-[#57534E] transition-all duration-200 hover:bg-[#E7E5E4]"
 				>
 					{$_('drawer.cancel')}
 				</button>
@@ -274,7 +346,7 @@
 				{#if room.availability !== 'blocked' && room.availability !== 'inactive'}
 					<button
 						onclick={() => (showBlockForm = true)}
-						class="w-full py-2.5 bg-[#F5F4F1] text-xs font-medium text-[#57534E] rounded-lg transition-colors hover:bg-[#E7E5E4]"
+						class="w-full rounded-lg bg-[#F5F4F1] py-2.5 text-xs font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4]"
 					>
 						{$_('drawer.blockRoom')}
 					</button>

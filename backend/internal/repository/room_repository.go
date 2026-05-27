@@ -96,13 +96,29 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 				WHEN b_conf.id IS NOT NULL THEN 'pending'
 				ELSE 'available'
 			END AS availability_state,
-			b_in.id AS active_booking_id, b_conf.id AS pending_booking_id, rb.id AS block_id
+			b_in.id AS active_booking_id, 
+			b_conf.id AS pending_booking_id, 
+			rb.id AS block_id,
+			-- Guest info for active booking
+			g_in.full_name AS active_guest_name,
+			g_in.phone AS active_guest_phone,
+			g_in.nationality AS active_guest_nationality,
+			b_in.check_in::text AS active_check_in,
+			b_in.check_out::text AS active_check_out,
+			-- Guest info for pending booking
+			g_conf.full_name AS pending_guest_name,
+			g_conf.phone AS pending_guest_phone,
+			g_conf.nationality AS pending_guest_nationality,
+			b_conf.check_in::text AS pending_check_in,
+			b_conf.check_out::text AS pending_check_out
 		FROM rooms r
 		JOIN floors f ON r.floor_id = f.id
 		JOIN room_types rt ON r.room_type_id = rt.id
 		LEFT JOIN room_blocks rb ON rb.room_id = r.id AND rb.start_date < $2 AND rb.end_date > $1
 		LEFT JOIN bookings b_in ON b_in.room_id = r.id AND b_in.status = 'checked_in' AND b_in.check_in < $2 AND b_in.check_out > $1
 		LEFT JOIN bookings b_conf ON b_conf.room_id = r.id AND b_conf.status = 'confirmed' AND b_conf.check_in < $2 AND b_conf.check_out > $1
+		LEFT JOIN guests g_in ON g_in.id = b_in.guest_id
+		LEFT JOIN guests g_conf ON g_conf.id = b_conf.guest_id
 		WHERE r.property_id = $3
 		ORDER BY f.sort_order ASC, f.floor_number ASC, r.pos_y ASC, r.pos_x ASC`,
 		req.DateFrom, req.DateTo, req.PropertyID)
@@ -123,7 +139,15 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		var rStatus string
 		var abID, pbID, blID *uuid.UUID
 
-		if err := rows.Scan(&fID, &label, &fNum, &sOrder, &rID, &rNum, &posX, &posY, &rStatus, &rtID, &rtName, &state, &abID, &pbID, &blID); err != nil {
+		// Guest fields
+		var activeGuestName, activeGuestPhone, activeGuestNationality *string
+		var activeCheckIn, activeCheckOut *string
+		var pendingGuestName, pendingGuestPhone, pendingGuestNationality *string
+		var pendingCheckIn, pendingCheckOut *string
+
+		if err := rows.Scan(&fID, &label, &fNum, &sOrder, &rID, &rNum, &posX, &posY, &rStatus, &rtID, &rtName, &state, &abID, &pbID, &blID,
+			&activeGuestName, &activeGuestPhone, &activeGuestNationality, &activeCheckIn, &activeCheckOut,
+			&pendingGuestName, &pendingGuestPhone, &pendingGuestNationality, &pendingCheckIn, &pendingCheckOut); err != nil {
 			return nil, err
 		}
 
@@ -147,6 +171,22 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		roomMap[rID].ActiveBookingID = abID
 		roomMap[rID].PendingBookingID = pbID
 		roomMap[rID].BlockID = blID
+
+		// Overwrite guest info
+		if activeGuestName != nil {
+			roomMap[rID].ActiveGuestName = activeGuestName
+			roomMap[rID].ActiveGuestPhone = activeGuestPhone
+			roomMap[rID].ActiveGuestNationality = activeGuestNationality
+			roomMap[rID].ActiveCheckIn = activeCheckIn
+			roomMap[rID].ActiveCheckOut = activeCheckOut
+		}
+		if pendingGuestName != nil {
+			roomMap[rID].PendingGuestName = pendingGuestName
+			roomMap[rID].PendingGuestPhone = pendingGuestPhone
+			roomMap[rID].PendingGuestNationality = pendingGuestNationality
+			roomMap[rID].PendingCheckIn = pendingCheckIn
+			roomMap[rID].PendingCheckOut = pendingCheckOut
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

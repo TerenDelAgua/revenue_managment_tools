@@ -45,6 +45,12 @@ func (r *BookingRepository) CheckOut(ctx context.Context, bookingID uuid.UUID) e
 	return err
 }
 
+// AssignRoom asigna un ID de habitación a una reserva.
+func (r *BookingRepository) AssignRoom(ctx context.Context, bookingID, roomID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `UPDATE bookings SET room_id = $1, updated_at = NOW() WHERE id = $2`, roomID, bookingID)
+	return err
+}
+
 // GetPendingByRoom devuelve reservas confirmadas pero no checked-in para una habitación en un rango de fechas.
 func (r *BookingRepository) GetPendingByRoom(ctx context.Context, roomID uuid.UUID, start, end time.Time) ([]*models.Booking, error) {
 	rows, err := r.db.Query(ctx, `
@@ -64,6 +70,44 @@ func (r *BookingRepository) GetPendingByRoom(ctx context.Context, roomID uuid.UU
 		if err := rows.Scan(&b.ID, &b.PropertyID, &b.RoomID, &b.GuestID, &b.CreatedBy, &b.CheckIn, &b.CheckOut, &b.TotalAmount, &b.Source, &b.Status, &b.Notes, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
+		bookings = append(bookings, &b)
+	}
+	return bookings, rows.Err()
+}
+
+type PendingBookingDTO struct {
+	ID          uuid.UUID `json:"id"`
+	GuestName   string    `json:"guest_name"`
+	CheckIn     string    `json:"check_in"`
+	CheckOut    string    `json:"check_out"`
+	Source      string    `json:"source"`
+	Adults      int       `json:"adults"`
+	TotalAmount int       `json:"total_amount"`
+}
+
+func (r *BookingRepository) GetPendingByProperty(ctx context.Context, propertyID uuid.UUID) ([]*PendingBookingDTO, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT b.id, g.full_name, b.check_in, b.check_out, b.source, b.total_amount
+		FROM bookings b
+		JOIN guests g ON b.guest_id = g.id
+		WHERE b.property_id = $1 AND b.status = 'confirmed'
+		ORDER BY b.check_in ASC
+	`, propertyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bookings []*PendingBookingDTO
+	for rows.Next() {
+		var b PendingBookingDTO
+		var checkIn, checkOut time.Time
+		if err := rows.Scan(&b.ID, &b.GuestName, &checkIn, &checkOut, &b.Source, &b.TotalAmount); err != nil {
+			return nil, err
+		}
+		b.CheckIn = checkIn.Format("2006-01-02")
+		b.CheckOut = checkOut.Format("2006-01-02")
+		b.Adults = 2 // Hardcoded as it's not in DB schema currently
 		bookings = append(bookings, &b)
 	}
 	return bookings, rows.Err()

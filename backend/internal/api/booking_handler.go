@@ -130,3 +130,29 @@ func (h *BookingHandler) CheckOut(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// Assign - PATCH /api/v1/bookings/{id}
+// Asigna una habitación a una reserva pendiente.
+func (h *BookingHandler) Assign(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		api.BadRequest(w, "Invalid booking ID")
+		return
+	}
+
+	var req struct {
+		RoomID uuid.UUID `json:"room_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.BadRequest(w, "Invalid request body")
+		return
+	}
+	defer r.Body.Close()
+
+	if err := h.svc.AssignRoom(r.Context(), id, req.RoomID); err != nil {
+		api.InternalServerError(w, "Failed to assign room")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
