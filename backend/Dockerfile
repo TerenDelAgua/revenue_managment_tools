@@ -25,7 +25,10 @@ WORKDIR /app
 COPY --from=builder /app/api .
 COPY --from=builder /app/run-migrations .
 
-RUN chmod +x /app/api /app/run-migrations
+# Copy entrypoint script
+COPY entrypoint.sh .
+
+RUN chmod +x /app/api /app/run-migrations /app/entrypoint.sh
 
 # Copy SQL migrations
 COPY --from=builder /app/migrations ./migrations
@@ -37,4 +40,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 
-CMD ["./api"]
+CMD ["./entrypoint.sh"]
