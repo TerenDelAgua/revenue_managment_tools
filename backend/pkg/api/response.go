@@ -11,18 +11,23 @@ func JSON(w http.ResponseWriter, status int, data any) {
 	json.NewEncoder(w).Encode(data)
 }
 
-func Error(w http.ResponseWriter, status int, message string) {
-	JSON(w, status, map[string]string{"error": message})
+type Error struct {
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message"`
+}
+
+func SendError(w http.ResponseWriter, status int, message string) {
+	JSON(w, status, Error{Message: message})
 }
 
 func BadRequest(w http.ResponseWriter, message string) {
-	Error(w, http.StatusBadRequest, message)
+	SendError(w, http.StatusBadRequest, message)
 }
 
 func NotFound(w http.ResponseWriter, message string) {
-	Error(w, http.StatusNotFound, message)
+	SendError(w, http.StatusNotFound, message)
 }
 
 func InternalServerError(w http.ResponseWriter, message string) {
-	Error(w, http.StatusInternalServerError, message)
+	SendError(w, http.StatusInternalServerError, message)
 }

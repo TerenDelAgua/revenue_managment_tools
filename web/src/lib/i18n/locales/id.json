@@ -1,0 +1,46 @@
+{
+  "nav": {
+    "dashboard": "Dasbor",
+    "floorMap": "Peta Lantai",
+    "bookings": "Pemesanan",
+    "guests": "Tamu",
+    "settings": "Pengaturan"
+  },
+  "header": {
+    "subtitle": "Hotel · Manajemen Pendapatan",
+    "properties": "Properti",
+    "hotelOwner": "Pemilik Hotel"
+  },
+  "roomTypes": {
+    "Standard Room": "Kamar Standar",
+    "Superior Room": "Kamar Superior",
+    "Deluxe Room": "Kamar Deluxe",
+    "Suite": "Kamar Suite"
+  },
+  "status": {
+    "available": "Tersedia",
+    "occupied": "Terisi",
+    "pending": "Tertunda (Check-in)",
+    "blocked": "Diblokir",
+    "inactive": "Tidak Aktif"
+  },
+  "drawer": {
+    "details": "Detail",
+    "type": "Tipe",
+    "ref": "Ref",
+    "pendingBookings": "Pemesanan Tertunda",
+    "cancel": "Batal",
+    "noPending": "Tidak ada pemesanan tertunda untuk periode ini.",
+    "pax": "pax",
+    "blockRoom": "Blokir Kamar",
+    "maintenance": "Pemeliharaan",
+    "ownerUse": "Penggunaan Pemilik",
+    "outOfService": "Di Luar Layanan",
+    "confirmBlock": "Konfirmasi Blokir",
+    "checkIn": "Check In",
+    "checkOut": "Check Out",
+    "removeBlock": "Hapus Blokir",
+    "assignBooking": "Tetapkan Pemesanan",
+    "availableTypes": "Tipe Tersedia"
+  }
+}

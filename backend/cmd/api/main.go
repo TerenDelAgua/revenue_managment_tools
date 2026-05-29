@@ -10,6 +10,7 @@ import (
 
 	internalapi "github.com/terendelagua/teren-hotels-backend/internal/api"
 	"github.com/terendelagua/teren-hotels-backend/internal/repository"
+	"github.com/terendelagua/teren-hotels-backend/internal/service"
 	"github.com/terendelagua/teren-hotels-backend/pkg/config"
 	"github.com/terendelagua/teren-hotels-backend/pkg/database"
 )
@@ -29,19 +30,40 @@ func main() {
 	propertyRepo := repository.NewPropertyRepository(db.Pool)
 	floorRepo := repository.NewFloorRepository(db.Pool)
 	roomRepo := repository.NewRoomRepository(db.Pool)
+	roomBlockRepo := repository.NewRoomBlockRepository(db.Pool)
+	bookingRepo := repository.NewBookingRepository(db.Pool)
 
 	propertyHandler := internalapi.NewPropertyHandler(propertyRepo)
 	floorHandler := internalapi.NewFloorHandler(floorRepo)
 	roomHandler := internalapi.NewRoomHandler(roomRepo)
 
+	inventoryService := service.NewInventoryService(db.Pool, roomRepo, roomBlockRepo)
+	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
+	roomBlockHandler := internalapi.NewRoomBlockHandler(inventoryService)
+
+	bookingService := service.NewBookingService(db.Pool, bookingRepo, inventoryService)
+	bookingHandler := internalapi.NewBookingHandler(bookingService)
+
+	reportRepo := repository.NewReportRepository(db.Pool)
+	reportService := service.NewReportService(reportRepo)
+	reportHandler := internalapi.NewReportHandler(reportService)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	allowedOrigins := []string{
+		"http://localhost:5173", 
+		"http://localhost:3000",
+		"https://teren-hotels-staging-frontend.up.railway.app", // Change for real frontend URL
+		"https://hotels.teren.dev", // Production
+	}
+
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Property-ID"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -80,6 +102,26 @@ func main() {
 			r.Post("/", roomHandler.Create)
 			r.Get("/{id}", roomHandler.GetByID)
 			r.Put("/{id}/position", roomHandler.UpdatePosition)
+		})
+
+		r.Get("/map", inventoryHandler.GetMap)
+
+		r.Route("/room-blocks", func(r chi.Router) {
+			r.Post("/", roomBlockHandler.Create)
+			r.Delete("/{id}", roomBlockHandler.Delete)
+		})
+
+		r.Route("/bookings", func(r chi.Router) {
+			r.Post("/", bookingHandler.Create)
+			r.Get("/pending", bookingHandler.GetPending)
+			r.Patch("/{id}", bookingHandler.Assign)
+			r.Post("/{id}/checkin", bookingHandler.CheckIn)
+			r.Post("/{id}/checkout", bookingHandler.CheckOut)
+		})
+
+		r.Route("/reports", func(r chi.Router) {
+			r.Get("/metrics", reportHandler.GetMetrics)
+			r.Get("/daily", reportHandler.GetDailyBreakdown)
 		})
 	})
 
