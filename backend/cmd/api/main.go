@@ -52,8 +52,16 @@ func main() {
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	allowedOrigins := []string{
+		"http://localhost:5173", 
+		"http://localhost:3000",
+		"https://teren-hotels-staging-frontend.up.railway.app", // Change for real frontend URL
+		"https://hotels.teren.dev", // Production
+	}
+
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Property-ID"},
 		ExposedHeaders:   []string{"Link"},
