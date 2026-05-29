@@ -17,13 +17,15 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o migrations cmd/mi
 # Production stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata bash
 
 WORKDIR /app
 
 # Copy binaries
 COPY --from=builder /app/api .
 COPY --from=builder /app/migrations .
+
+RUN chmod +x /app/api /app/migrations
 
 # Copy SQL migrations
 COPY --from=builder /app/migrations ./migrations
