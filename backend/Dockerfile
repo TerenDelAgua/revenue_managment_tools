@@ -12,7 +12,7 @@ COPY . .
 
 # Build API server and migration runner
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api cmd/api/main.go
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o migrations cmd/migrations/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o run-migrations cmd/migrations/main.go
 
 # Production stage
 FROM alpine:latest
@@ -23,9 +23,9 @@ WORKDIR /app
 
 # Copy binaries
 COPY --from=builder /app/api .
-COPY --from=builder /app/migrations .
+COPY --from=builder /app/run-migrations .
 
-RUN chmod +x /app/api /app/migrations
+RUN chmod +x /app/api /app/run-migrations
 
 # Copy SQL migrations
 COPY --from=builder /app/migrations ./migrations
