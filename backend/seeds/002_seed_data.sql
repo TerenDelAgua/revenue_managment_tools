@@ -3,8 +3,9 @@
 -- Grid: 12 cols × 20 rows (Spec FMB-001 §4.1)
 
 -- 1. Property
-INSERT INTO properties (name, slug, currency, timezone, settings)
+INSERT INTO properties (id, name, slug, currency, timezone, settings)
 VALUES (
+    '89ce1655-d0c6-417a-8c69-3ad59241e0d0',
     'TEREN Test Hotel',
     'teren-test-hotel',
     'IDR',
@@ -34,20 +35,20 @@ WITH
     floor2 AS (SELECT id FROM floors f, prop p WHERE f.property_id = p.property_id AND f.floor_number = 2),
     floor3 AS (SELECT id FROM floors f, prop p WHERE f.property_id = p.property_id AND f.floor_number = 3),
     rt     AS (SELECT id FROM room_types r, prop p WHERE r.property_id = p.property_id LIMIT 1)
-INSERT INTO rooms (property_id, floor_id, room_type_id, number, status, pos_x, pos_y)
+INSERT INTO rooms (floor_id, room_type_id, number, status, pos_x, pos_y)
 -- Ground Floor · y=0 · 5 rooms
-SELECT p.property_id, f1.id, rt.id, '101', 'active', 0, 0 FROM prop p, floor1 f1, rt
-UNION ALL SELECT p.property_id, f1.id, rt.id, '102', 'active', 1, 0 FROM prop p, floor1 f1, rt
-UNION ALL SELECT p.property_id, f1.id, rt.id, '103', 'active', 2, 0 FROM prop p, floor1 f1, rt
-UNION ALL SELECT p.property_id, f1.id, rt.id, '104', 'active', 3, 0 FROM prop p, floor1 f1, rt
-UNION ALL SELECT p.property_id, f1.id, rt.id, '105', 'active', 4, 0 FROM prop p, floor1 f1, rt
+SELECT f1.id, rt.id, '101', 'active', 0, 0 FROM prop p, floor1 f1, rt
+UNION ALL SELECT f1.id, rt.id, '102', 'active', 1, 0 FROM prop p, floor1 f1, rt
+UNION ALL SELECT f1.id, rt.id, '103', 'active', 2, 0 FROM prop p, floor1 f1, rt
+UNION ALL SELECT f1.id, rt.id, '104', 'active', 3, 0 FROM prop p, floor1 f1, rt
+UNION ALL SELECT f1.id, rt.id, '105', 'active', 4, 0 FROM prop p, floor1 f1, rt
 -- First Floor · y=0 · 4 rooms
-UNION ALL SELECT p.property_id, f2.id, rt.id, '201', 'active', 0, 0 FROM prop p, floor2 f2, rt
-UNION ALL SELECT p.property_id, f2.id, rt.id, '202', 'active', 1, 0 FROM prop p, floor2 f2, rt
-UNION ALL SELECT p.property_id, f2.id, rt.id, '203', 'active', 2, 0 FROM prop p, floor2 f2, rt
-UNION ALL SELECT p.property_id, f2.id, rt.id, '204', 'active', 3, 0 FROM prop p, floor2 f2, rt
+UNION ALL SELECT f2.id, rt.id, '201', 'active', 0, 0 FROM prop p, floor2 f2, rt
+UNION ALL SELECT f2.id, rt.id, '202', 'active', 1, 0 FROM prop p, floor2 f2, rt
+UNION ALL SELECT f2.id, rt.id, '203', 'active', 2, 0 FROM prop p, floor2 f2, rt
+UNION ALL SELECT f2.id, rt.id, '204', 'active', 3, 0 FROM prop p, floor2 f2, rt
 -- Second Floor · y=0 · 3 rooms
-UNION ALL SELECT p.property_id, f3.id, rt.id, '301', 'active', 0, 0 FROM prop p, floor3 f3, rt
-UNION ALL SELECT p.property_id, f3.id, rt.id, '302', 'active', 1, 0 FROM prop p, floor3 f3, rt
-UNION ALL SELECT p.property_id, f3.id, rt.id, '303', 'active', 2, 0 FROM prop p, floor3 f3, rt
+UNION ALL SELECT f3.id, rt.id, '301', 'active', 0, 0 FROM prop p, floor3 f3, rt
+UNION ALL SELECT f3.id, rt.id, '302', 'active', 1, 0 FROM prop p, floor3 f3, rt
+UNION ALL SELECT f3.id, rt.id, '303', 'active', 2, 0 FROM prop p, floor3 f3, rt
 ON CONFLICT DO NOTHING;

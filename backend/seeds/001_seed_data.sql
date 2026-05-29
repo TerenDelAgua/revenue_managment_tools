@@ -2,8 +2,9 @@
 -- Run this migration after 001_initial_schema.sql
 
 -- Create a test property
-INSERT INTO properties (name, slug, currency, timezone, settings)
+INSERT INTO properties (id, name, slug, currency, timezone, settings)
 VALUES (
+    '89ce1655-d0c6-417a-8c69-3ad59241e0d0',
     'TEREN Test Hotel',
     'teren-test-hotel',
     'IDR',

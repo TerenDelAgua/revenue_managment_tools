@@ -10,7 +10,6 @@ type Room struct {
 	ID         uuid.UUID `json:"id" db:"id"`
 	FloorID    uuid.UUID `json:"floor_id" db:"floor_id"`
 	RoomTypeID uuid.UUID `json:"room_type_id" db:"room_type_id"`
-	PropertyID uuid.UUID `json:"property_id" db:"property_id"`
 	Number     string    `json:"number" db:"number"`
 	Status     string    `json:"status" db:"status"`
 	PosX       int       `json:"pos_x" db:"pos_x"`
@@ -22,7 +21,6 @@ type Room struct {
 type CreateRoomRequest struct {
 	FloorID    uuid.UUID `json:"floor_id" validate:"required"`
 	RoomTypeID uuid.UUID `json:"room_type_id" validate:"required"`
-	PropertyID uuid.UUID `json:"property_id" validate:"required"`
 	Number     string    `json:"number" validate:"required"`
 	Status     string    `json:"status" validate:"required"`
 	PosX       int       `json:"pos_x"`

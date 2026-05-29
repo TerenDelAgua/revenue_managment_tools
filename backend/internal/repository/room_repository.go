@@ -21,12 +21,12 @@ func NewRoomRepository(db *pgxpool.Pool) *RoomRepository {
 func (r *RoomRepository) Create(ctx context.Context, req *models.CreateRoomRequest) (*models.Room, error) {
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO rooms (floor_id, room_type_id, property_id, number, status, pos_x, pos_y) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7) 
-		RETURNING id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at`,
-		req.FloorID, req.RoomTypeID, req.PropertyID, req.Number, req.Status, req.PosX, req.PosY,
+		INSERT INTO rooms (floor_id, room_type_id, number, status, pos_x, pos_y) 
+		VALUES ($1, $2, $3, $4, $5, $6) 
+		RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at`,
+		req.FloorID, req.RoomTypeID, req.Number, req.Status, req.PosX, req.PosY,
 	).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status,
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
 		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
 	return &room, err
@@ -35,9 +35,9 @@ func (r *RoomRepository) Create(ctx context.Context, req *models.CreateRoomReque
 func (r *RoomRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Room, error) {
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
-		SELECT id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at 
+		SELECT id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at 
 		FROM rooms WHERE id = $1`, id).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status,
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
 		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -48,7 +48,7 @@ func (r *RoomRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Roo
 
 func (r *RoomRepository) ListByFloor(ctx context.Context, floorID uuid.UUID) ([]*models.Room, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at 
+		SELECT id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at 
 		FROM rooms WHERE floor_id = $1 ORDER BY number ASC`, floorID)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (r *RoomRepository) ListByFloor(ctx context.Context, floorID uuid.UUID) ([]
 	var rooms []*models.Room
 	for rows.Next() {
 		var room models.Room
-		if err := rows.Scan(&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status, &room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt); err != nil {
+		if err := rows.Scan(&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status, &room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt); err != nil {
 			return nil, err
 		}
 		rooms = append(rooms, &room)
@@ -70,9 +70,9 @@ func (r *RoomRepository) UpdatePosition(ctx context.Context, id uuid.UUID, posX,
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
 		UPDATE rooms SET pos_x = $1, pos_y = $2, updated_at = NOW() 
-		WHERE id = $3 RETURNING id, floor_id, room_type_id, property_id, number, status, pos_x, pos_y, created_at, updated_at`,
+		WHERE id = $3 RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at`,
 		posX, posY, id).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.PropertyID, &room.Number, &room.Status,
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
 		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -123,7 +123,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		LEFT JOIN bookings b_conf ON b_conf.room_id = r.id AND b_conf.status = 'confirmed' AND b_conf.check_in < $2 AND b_conf.check_out > $1
 		LEFT JOIN guests g_in ON g_in.id = b_in.guest_id
 		LEFT JOIN guests g_conf ON g_conf.id = b_conf.guest_id
-		WHERE r.property_id = $3
+		WHERE f.property_id = $3
 		ORDER BY f.sort_order ASC, f.floor_number ASC, r.pos_y ASC, r.pos_x ASC`,
 		req.DateFrom, req.DateTo, req.PropertyID)
 	if err != nil {

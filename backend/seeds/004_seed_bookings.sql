@@ -16,7 +16,15 @@ BEGIN
     SELECT id INTO v_r101_id FROM rooms WHERE number = '101';
     SELECT id INTO v_r102_id FROM rooms WHERE number = '102';
     SELECT id INTO v_r103_id FROM rooms WHERE number = '103';
-    SELECT id INTO v_user_id FROM users LIMIT 1;
+    
+    INSERT INTO users (property_id, name, email, role) 
+    VALUES (v_prop_id, 'Admin User', 'admin@teren.dev', 'admin')
+    ON CONFLICT DO NOTHING
+    RETURNING id INTO v_user_id;
+
+    IF v_user_id IS NULL THEN
+        SELECT id INTO v_user_id FROM users LIMIT 1;
+    END IF;
 
     INSERT INTO guests (property_id, full_name, phone, nationality) VALUES (v_prop_id, 'Juan Pérez', '+62812345678', 'ESP') RETURNING id INTO v_guest1_id;
     INSERT INTO guests (property_id, full_name, phone, nationality) VALUES (v_prop_id, 'Maria Garcia', '+62812345679', 'MEX') RETURNING id INTO v_guest2_id;

@@ -39,11 +39,12 @@ func (r *ReportRepository) GetMetrics(ctx context.Context, req models.ReportRequ
 					(b.check_out - b.check_in)::numeric
 				), 0) AS revenue
 			FROM rooms r
+			JOIN floors f ON r.floor_id = f.id
 			LEFT JOIN bookings b ON b.room_id = r.id
 				AND b.status NOT IN ('cancelled', 'no_show')
 				AND b.check_in < $3::date
 				AND b.check_out > $2::date
-			WHERE r.property_id = $1
+			WHERE f.property_id = $1
 		)
 		SELECT
 			total_rooms,
@@ -90,8 +91,9 @@ func (r *ReportRepository) GetDailyBreakdown(ctx context.Context, req models.Rep
 	// Primero obtenemos el total de rooms (constante)
 	var totalRooms int
 	err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM rooms 
-		WHERE property_id = $1 AND status != 'inactive'
+		SELECT COUNT(*) FROM rooms r
+		JOIN floors f ON r.floor_id = f.id
+		WHERE f.property_id = $1 AND r.status != 'inactive'
 	`, req.PropertyID).Scan(&totalRooms)
 	if err != nil {
 		return nil, err
@@ -115,7 +117,7 @@ func (r *ReportRepository) GetDailyBreakdown(ctx context.Context, req models.Rep
 				), 0) AS daily_revenue
 			FROM date_series ds
 			LEFT JOIN bookings b ON b.room_id IN (
-				SELECT id FROM rooms WHERE property_id = $1
+				SELECT r.id FROM rooms r JOIN floors f ON r.floor_id = f.id WHERE f.property_id = $1
 			)
 			AND b.status NOT IN ('cancelled', 'no_show')
 			AND b.check_in <= ds.date AND b.check_out > ds.date
