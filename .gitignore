@@ -66,3 +66,7 @@ coverage/
 
 #playwright
 playwright-report/
+
+Docs/features/
+Docs/TEREN Brand Manifesto.md
+Docs/TEREN_DESIGN_SYSTEM.md
