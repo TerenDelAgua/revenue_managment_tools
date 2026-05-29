@@ -56,7 +56,7 @@ func main() {
 	allowedOrigins := []string{
 		"http://localhost:5173", 
 		"http://localhost:3000",
-		"https://teren-hotels-staging-frontend.up.railway.app", // Change for real frontend URL
+		"web-production-7af00.up.railway.app",
 		"https://hotels.teren.dev", // Production
 	}
 
