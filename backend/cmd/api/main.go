@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -55,10 +57,19 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	allowedOrigins := []string{
-		"http://localhost:5173", 
+		"http://localhost:5173",
 		"http://localhost:3000",
-		"web-production-7af00.up.railway.app",
-		"https://hotels.teren.dev", // Production
+	}
+
+	if envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); envOrigins != "" {
+		for _, origin := range strings.Split(envOrigins, ",") {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				allowedOrigins = append(allowedOrigins, origin)
+			}
+		}
+	} else {
+		allowedOrigins = append(allowedOrigins, "https://web-production-e9669.up.railway.app")
 	}
 
 	r.Use(cors.Handler(cors.Options{
