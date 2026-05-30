@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o run-migrations cm
 # Production stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata bash dos2unix
+RUN apk --no-cache add ca-certificates tzdata bash dos2unix postgresql-client
 
 WORKDIR /app
 
