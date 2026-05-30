@@ -1,6 +1,7 @@
 import type { MapResponse, CreateRoomBlockPayload, ReportResponse, DailyBreakdownResponse } from '$lib/types';
+import { env } from '$env/dynamic/public';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = env.PUBLIC_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 	const response = await fetch(`${API_BASE_URL}${endpoint}`, {
