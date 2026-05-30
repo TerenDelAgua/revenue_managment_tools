@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o run-migrations cm
 # Production stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata bash
+RUN apk --no-cache add ca-certificates tzdata bash dos2unix
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ COPY --from=builder /app/run-migrations .
 # Copy entrypoint script
 COPY entrypoint.sh .
 
-RUN chmod +x /app/api /app/run-migrations /app/entrypoint.sh
+RUN dos2unix entrypoint.sh && chmod +x /app/api /app/run-migrations /app/entrypoint.sh
 
 # Copy SQL migrations
 COPY --from=builder /app/migrations ./migrations
