@@ -60,22 +60,25 @@ func main() {
 		"http://localhost:3000",
 	}
 
-	if envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); envOrigins != "" {
+	if envOrigins := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS")); envOrigins != "" {
 		for _, origin := range strings.Split(envOrigins, ",") {
 			origin = strings.TrimSpace(origin)
+			origin = strings.Trim(origin, `"'`)
 			if origin != "" {
 				allowedOrigins = append(allowedOrigins, origin)
+				log.Printf("[CORS] Added origin: %s", origin)
 			}
 		}
-	} else {
-		allowedOrigins = append(allowedOrigins, "https://web-production-e9669.up.railway.app")
 	}
-
+	log.Printf("[CORS] Final allowed origins: %v", allowedOrigins)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Property-ID"},
-		ExposedHeaders:   []string{"Link"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
+		AllowedHeaders:   []string{
+			"Accept", "Authorization", "Content-Type", "X-CSRF-Token",
+			"X-Property-ID", "Accept-Encoding", "User-Agent", "Cache-Control", "Pragma"
+		},
+		ExposedHeaders:   []string{"Link", "Content-Length", "X-Request-Id"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
