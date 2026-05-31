@@ -18,6 +18,7 @@ desktop.ini
 .env
 .env.local
 .env.*.local
+.env.production
 *.pem
 *.key
 
