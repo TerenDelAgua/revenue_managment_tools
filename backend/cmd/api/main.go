@@ -72,11 +72,11 @@ func main() {
 	}
 	log.Printf("[CORS] Final allowed origins: %v", allowedOrigins)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
-		AllowedHeaders:   []string{
+		AllowedOrigins: allowedOrigins,
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
+		AllowedHeaders: []string{
 			"Accept", "Authorization", "Content-Type", "X-CSRF-Token",
-			"X-Property-ID", "Accept-Encoding", "User-Agent", "Cache-Control", "Pragma"
+			"X-Property-ID", "Accept-Encoding", "User-Agent", "Cache-Control", "Pragma",
 		},
 		ExposedHeaders:   []string{"Link", "Content-Length", "X-Request-Id"},
 		AllowCredentials: true,
