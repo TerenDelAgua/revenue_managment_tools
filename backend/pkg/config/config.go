@@ -12,7 +12,7 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	_ = godotenv.Load()
+	_ = godotenv.Overload()
 
 	return &Config{
 		Port:        getEnv("PORT", "8080"),

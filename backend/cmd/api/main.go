@@ -63,6 +63,7 @@ func main() {
 	if envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); envOrigins != "" {
 		for _, origin := range strings.Split(envOrigins, ",") {
 			origin = strings.TrimSpace(origin)
+			origin = strings.TrimSuffix(origin, "/") // Automágicamente quitar barra diagonal final si existe
 			if origin != "" {
 				allowedOrigins = append(allowedOrigins, origin)
 			}
