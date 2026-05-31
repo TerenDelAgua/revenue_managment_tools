@@ -79,7 +79,13 @@ func main() {
 			"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Session-Id", "X-Requested-With",
 			"X-Property-ID", "Accept-Encoding", "User-Agent", "Cache-Control", "Pragma", "Origin",
 		},
-		ExposedHeaders:   []string{"Link", "Content-Length", "X-Request-Id", "X-Session-Id"},
+		ExposedHeaders: []string{
+			"Link", "Content-Length", "X-Request-Id", "X-Session-Id",
+			"Accept-Encoding",
+			"User-Agent",
+			"Cache-Control",
+			"Pragma", "Origin",
+		},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
