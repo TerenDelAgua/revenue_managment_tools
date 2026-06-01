@@ -36,4 +36,4 @@ COPY --from=builder /app/migrations ./migrations
 # Expose API port
 EXPOSE 8080
 
-CMD ["./api"]
+CMD ["./entrypoint.sh"]
