@@ -10,9 +10,10 @@ RUN go mod download
 
 COPY . .
 
-# Build API server and migration runner
+# Build API server, migration runner, and seed tool
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api cmd/api/main.go
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o run-migrations cmd/migrations/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o seed cmd/seed/main.go
 
 # Production stage
 FROM alpine:latest
@@ -24,14 +25,16 @@ WORKDIR /app
 # Copy binaries
 COPY --from=builder /app/api .
 COPY --from=builder /app/run-migrations .
+COPY --from=builder /app/seed .
 
 # Copy entrypoint script
 COPY entrypoint.sh .
 
-RUN dos2unix entrypoint.sh && chmod +x /app/api /app/run-migrations /app/entrypoint.sh
+RUN dos2unix entrypoint.sh && chmod +x /app/api /app/run-migrations /app/seed /app/entrypoint.sh
 
-# Copy SQL migrations
+# Copy SQL migrations and seeds
 COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/seeds ./seeds
 
 # Expose API port
 EXPOSE 8080
