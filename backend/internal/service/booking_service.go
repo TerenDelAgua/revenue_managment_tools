@@ -320,7 +320,6 @@ func (s *BookingService) AssignRoom(ctx context.Context, bookingID, roomID uuid.
 	if booking.Status != "confirmed" {
 		return &BusinessError{Code: "INVALID_STATUS", Message: "Only confirmed bookings can have a room assigned"}
 	}
-
 	// Validar disponibilidad
 	overlapCount, err := s.bookingRepo.GetOverlapCount(ctx, roomID, booking.CheckIn, booking.CheckOut, &bookingID)
 	if err != nil {

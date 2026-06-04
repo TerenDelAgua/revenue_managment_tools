@@ -109,7 +109,6 @@ func (h *BookingHandler) List(w http.ResponseWriter, r *http.Request) {
 			page = p
 		}
 	}
-
 	limit := 50
 	if lStr := r.URL.Query().Get("limit"); lStr != "" {
 		if l, err := strconv.Atoi(lStr); err == nil && l > 0 {
