@@ -111,3 +111,112 @@ export interface BreadcrumbItem {
     href?: string;
     current?: boolean;
 }
+
+// === Guests & CRM ===
+export interface Guest {
+    id: string;
+    property_id: string;
+    full_name: string;
+    id_number: string | null;
+    phone: string;
+    email: string | null;
+    nationality: string | null;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CreateGuestPayload {
+    property_id: string;
+    full_name: string;
+    id_number: string | null;
+    phone: string;
+    email: string | null;
+    nationality: string | null;
+    notes: string | null;
+}
+
+export interface GuestBookingDTO {
+    id: string;
+    check_in: string;
+    check_out: string;
+    room_number: string | null;
+    status: string;
+    total_amount: number;
+}
+
+export interface GuestDetail extends Guest {
+    total_bookings: number;
+    total_revenue: number;
+    last_visit: string | null;
+    bookings: GuestBookingDTO[];
+}
+
+export interface GuestListDTO {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string | null;
+    nationality: string | null;
+    booking_count: number;
+    last_visit: string | null;
+}
+
+// === Bookings ===
+export interface Booking {
+    id: string;
+    property_id: string;
+    room_id: string | null;
+    guest_id: string;
+    created_by: string;
+    check_in: string;
+    check_out: string;
+    adults: number;
+    children: number;
+    original_amount: number;
+    original_currency: string;
+    exchange_rate: number;
+    total_amount: number;
+    payment_status: 'pending' | 'paid' | 'partial';
+    source: 'walk_in' | 'whatsapp' | 'phone' | 'booking_com' | 'airbnb' | 'agoda' | 'traveloka' | 'other';
+    status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled' | 'no_show';
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CreateBookingPayload {
+    property_id: string;
+    room_id: string | null;
+    guest_id?: string;
+    guest?: CreateGuestPayload;
+    confirm_guest_reuse?: boolean;
+    check_in: string;
+    check_out: string;
+    adults: number;
+    children: number;
+    original_amount: number;
+    original_currency?: string;
+    exchange_rate?: number;
+    total_amount?: number;
+    source: string;
+    notes?: string;
+    force_override?: boolean;
+}
+
+export interface BookingDetail extends Booking {
+    guest_name: string;
+    guest_phone: string;
+    guest_email: string | null;
+    guest_nationality: string | null;
+    guest_id_number: string | null;
+    guest_notes: string | null;
+    room_number: string | null;
+    room_type_name: string | null;
+    created_by_name: string;
+}
+
+export interface CreateBookingResponse {
+    booking: Booking;
+    guest_reused: boolean;
+}

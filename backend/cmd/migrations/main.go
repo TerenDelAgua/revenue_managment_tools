@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -22,6 +23,8 @@ type Migration struct {
 }
 
 func main() {
+	_ = godotenv.Overload()
+
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL environment variable is required")

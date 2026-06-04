@@ -34,6 +34,7 @@ func main() {
 	roomRepo := repository.NewRoomRepository(db.Pool)
 	roomBlockRepo := repository.NewRoomBlockRepository(db.Pool)
 	bookingRepo := repository.NewBookingRepository(db.Pool)
+	guestRepo := repository.NewGuestRepository(db.Pool)
 
 	propertyHandler := internalapi.NewPropertyHandler(propertyRepo)
 	floorHandler := internalapi.NewFloorHandler(floorRepo)
@@ -43,8 +44,11 @@ func main() {
 	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
 	roomBlockHandler := internalapi.NewRoomBlockHandler(inventoryService)
 
-	bookingService := service.NewBookingService(db.Pool, bookingRepo, inventoryService)
+	bookingService := service.NewBookingService(db.Pool, bookingRepo, guestRepo, inventoryService)
 	bookingHandler := internalapi.NewBookingHandler(bookingService)
+
+	guestService := service.NewGuestService(guestRepo)
+	guestHandler := internalapi.NewGuestHandler(guestService)
 
 	reportRepo := repository.NewReportRepository(db.Pool)
 	reportService := service.NewReportService(reportRepo)
@@ -133,10 +137,21 @@ func main() {
 
 		r.Route("/bookings", func(r chi.Router) {
 			r.Post("/", bookingHandler.Create)
+			r.Get("/", bookingHandler.List)
+			r.Get("/{id}", bookingHandler.GetByID)
+			r.Patch("/{id}", bookingHandler.Update)
 			r.Get("/pending", bookingHandler.GetPending)
-			r.Patch("/{id}", bookingHandler.Assign)
+			r.Patch("/{id}/assign", bookingHandler.Assign)
 			r.Post("/{id}/checkin", bookingHandler.CheckIn)
 			r.Post("/{id}/checkout", bookingHandler.CheckOut)
+			r.Post("/{id}/cancel", bookingHandler.Cancel)
+		})
+
+		r.Route("/guests", func(r chi.Router) {
+			r.Post("/", guestHandler.Create)
+			r.Get("/", guestHandler.List)
+			r.Get("/{id}", guestHandler.GetByID)
+			r.Patch("/{id}", guestHandler.Update)
 		})
 
 		r.Route("/reports", func(r chi.Router) {

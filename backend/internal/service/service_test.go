@@ -30,9 +30,10 @@ func setupTestDB(t *testing.T) (*pgxpool.Pool, *InventoryService, *BookingServic
 	roomRepo := repository.NewRoomRepository(db)
 	roomBlockRepo := repository.NewRoomBlockRepository(db)
 	bookingRepo := repository.NewBookingRepository(db)
+	guestRepo := repository.NewGuestRepository(db)
 
 	inventorySvc := NewInventoryService(db, roomRepo, roomBlockRepo)
-	bookingSvc := NewBookingService(db, bookingRepo, inventorySvc)
+	bookingSvc := NewBookingService(db, bookingRepo, guestRepo, inventorySvc)
 
 	return db, inventorySvc, bookingSvc
 }
@@ -92,8 +93,8 @@ func createTestFixture(ctx context.Context, t *testing.T, db *pgxpool.Pool) test
 
 	// Insert Guest
 	_, err = db.Exec(ctx, `
-		INSERT INTO guests (id, property_id, full_name)
-		VALUES ($1, $2, 'Test Guest')
+		INSERT INTO guests (id, property_id, full_name, phone)
+		VALUES ($1, $2, 'Test Guest', '+62812345678')
 	`, fixture.GuestID, fixture.PropertyID)
 	if err != nil {
 		t.Fatalf("failed to create guest: %v", err)
@@ -170,7 +171,7 @@ func TestGetMap_OccupiedRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'ota', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -207,7 +208,7 @@ func TestGetMap_PendingRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'ota', 'confirmed')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'confirmed')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -290,7 +291,7 @@ func TestGetMap_PriorityLogic(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'ota', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -335,7 +336,7 @@ func TestGetMap_InactiveRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'ota', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -371,15 +372,15 @@ func TestAssign_RoomAvailable(t *testing.T) {
 
 	// Assign to available room
 	booking, err := bookingSvc.CreateBooking(ctx, models.CreateBookingRequest{
-		PropertyID:  f.PropertyID,
-		RoomID:      roomID,
-		GuestID:     f.GuestID,
-		CreatedBy:   f.UserID,
-		CheckIn:     time.Now().Add(24 * time.Hour),
-		CheckOut:    time.Now().Add(48 * time.Hour),
-		TotalAmount: 200000,
-		Source:      "ota",
-		Status:      "confirmed",
+		PropertyID:     f.PropertyID,
+		RoomID:         &roomID,
+		GuestID:        &f.GuestID,
+		CreatedBy:      f.UserID,
+		CheckIn:        time.Now().Add(24 * time.Hour),
+		CheckOut:       time.Now().Add(48 * time.Hour),
+		OriginalAmount: 200000,
+		Source:         "booking_com",
+		Status:         "confirmed",
 	})
 	if err != nil {
 		t.Fatalf("expected successful booking assignment, got: %v", err)
@@ -402,7 +403,7 @@ func TestAssign_RoomOccupied(t *testing.T) {
 	// Create occupied booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 100000, 'ota', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 100000, 'booking_com', 'checked_in')
 	`, uuid.New(), f.PropertyID, roomID, f.GuestID, f.UserID, checkinStart, checkinEnd)
 	if err != nil {
 		t.Fatalf("failed to create active booking: %v", err)
@@ -410,24 +411,24 @@ func TestAssign_RoomOccupied(t *testing.T) {
 
 	// Try assigning during overlapping period
 	_, err = bookingSvc.CreateBooking(ctx, models.CreateBookingRequest{
-		PropertyID:  f.PropertyID,
-		RoomID:      roomID,
-		GuestID:     f.GuestID,
-		CreatedBy:   f.UserID,
-		CheckIn:     checkinStart.Add(1 * time.Hour),
-		CheckOut:    checkinEnd.Add(1 * time.Hour),
-		TotalAmount: 200000,
-		Source:      "ota",
-		Status:      "confirmed",
+		PropertyID:     f.PropertyID,
+		RoomID:         &roomID,
+		GuestID:        &f.GuestID,
+		CreatedBy:      f.UserID,
+		CheckIn:        checkinStart.Add(1 * time.Hour),
+		CheckOut:       checkinEnd.Add(1 * time.Hour),
+		OriginalAmount: 200000,
+		Source:         "ota",
+		Status:         "confirmed",
 	})
 
 	if err == nil {
-		t.Fatal("expected ROOM_UNAVAILABLE error, got success")
+		t.Fatal("expected ROOM_NOT_AVAILABLE error, got success")
 	}
 
 	var bErr *BusinessError
-	if !errors.As(err, &bErr) || bErr.Code != "ROOM_UNAVAILABLE" {
-		t.Fatalf("expected BusinessError with Code ROOM_UNAVAILABLE, got: %v", err)
+	if !errors.As(err, &bErr) || bErr.Code != "ROOM_NOT_AVAILABLE" {
+		t.Fatalf("expected BusinessError with Code ROOM_NOT_AVAILABLE, got: %v", err)
 	}
 }
 
@@ -451,24 +452,24 @@ func TestAssign_RoomBlocked(t *testing.T) {
 
 	// Try assigning booking during block
 	_, err = bookingSvc.CreateBooking(ctx, models.CreateBookingRequest{
-		PropertyID:  f.PropertyID,
-		RoomID:      roomID,
-		GuestID:     f.GuestID,
-		CreatedBy:   f.UserID,
-		CheckIn:     blockStart.Add(12 * time.Hour),
-		CheckOut:    blockStart.Add(36 * time.Hour),
-		TotalAmount: 200000,
-		Source:      "ota",
-		Status:      "confirmed",
+		PropertyID:     f.PropertyID,
+		RoomID:         &roomID,
+		GuestID:        &f.GuestID,
+		CreatedBy:      f.UserID,
+		CheckIn:        blockStart.Add(12 * time.Hour),
+		CheckOut:       blockStart.Add(36 * time.Hour),
+		OriginalAmount: 200000,
+		Source:         "ota",
+		Status:         "confirmed",
 	})
 
 	if err == nil {
-		t.Fatal("expected ROOM_UNAVAILABLE error on blocked room, got success")
+		t.Fatal("expected ROOM_NOT_AVAILABLE error on blocked room, got success")
 	}
 
 	var bErr *BusinessError
-	if !errors.As(err, &bErr) || bErr.Code != "ROOM_UNAVAILABLE" {
-		t.Fatalf("expected BusinessError with Code ROOM_UNAVAILABLE, got: %v", err)
+	if !errors.As(err, &bErr) || bErr.Code != "ROOM_NOT_AVAILABLE" {
+		t.Fatalf("expected BusinessError with Code ROOM_NOT_AVAILABLE, got: %v", err)
 	}
 }
 
@@ -482,7 +483,7 @@ func TestCheckIn_Flow(t *testing.T) {
 	// Insert confirmed booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 day', 100000, 'ota', 'confirmed')
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 day', 100000, 'booking_com', 'confirmed')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create confirmed booking: %v", err)
@@ -515,7 +516,7 @@ func TestCheckOut_Flow(t *testing.T) {
 	// Insert checked_in booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE, 100000, 'ota', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE, 100000, 'booking_com', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create checked_in booking: %v", err)
@@ -654,7 +655,7 @@ func TestAssignBookingAndPendingFilter(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, NULL, $3, $4, $5, $6, 100000, 'direct', 'confirmed')
+		VALUES ($1, $2, NULL, $3, $4, $5, $6, 100000, 'walk_in', 'confirmed')
 	`, bookingID, f.PropertyID, f.GuestID, f.UserID, 
 	   time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC), 
 	   time.Date(2026, 5, 30, 0, 0, 0, 0, time.UTC))

@@ -5,6 +5,7 @@ const defaultLocale = 'en';
 
 register('en', () => import('./locales/en.json'));
 register('id', () => import('./locales/id.json'));
+register('es', () => import('./locales/es.json'));
 
 export function setupI18n() {
 	let initialLocale = defaultLocale;

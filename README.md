@@ -42,6 +42,11 @@ docker compose up -d
 ```
 *(Migrations are applied automatically via `docker-entrypoint-initdb.d`)*
 
+To populate the database with initial test data, run the seeder script:
+```bash
+go run cmd/seed/main.go
+```
+
 ### 2. Start the Backend API
 ```bash
 cd backend
