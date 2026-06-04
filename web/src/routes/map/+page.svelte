@@ -237,13 +237,13 @@
 </script>
 
 <!-- Layout -->
-<div class="flex min-h-screen flex-col gap-4 bg-[#F5F4F1] p-6">
+<div class="flex min-h-screen flex-col gap-4 bg-[#F5F4F1] p-4 md:p-6">
 	<header class="flex flex-wrap items-center justify-between gap-4">
-		<h1 class="text-2xl font-semibold text-[#1C1917]">Hotel Floor Map</h1>
-		<div class="flex gap-2">
+		<h1 class="text-xl md:text-2xl font-semibold text-[#1C1917]">Hotel Floor Map</h1>
+		<div class="flex flex-wrap gap-2 items-end">
 			<button
 				onclick={() => (mode = mode === 'setup' ? 'ops' : 'setup')}
-				class="rounded-lg border border-[#E7E5E4] bg-[#FCFBFA] px-4 py-2 text-[#57534E] transition hover:bg-[#FFF7ED]"
+				class="rounded-lg border border-[#E7E5E4] bg-[#FCFBFA] px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm text-[#57534E] transition hover:bg-[#FFF7ED]"
 			>
 				{mode === 'setup' ? 'Vista Operaciones' : 'Modo Setup'}
 			</button>

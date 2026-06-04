@@ -1,4 +1,15 @@
-import type { MapResponse, CreateRoomBlockPayload, ReportResponse, DailyBreakdownResponse } from '$lib/types';
+import type {
+	MapResponse,
+	CreateRoomBlockPayload,
+	ReportResponse,
+	DailyBreakdownResponse,
+	Booking,
+	BookingDetail,
+	CreateBookingPayload,
+	GuestDetail,
+	GuestListDTO,
+	Guest
+} from '$lib/types';
 import { env } from '$env/dynamic/public';
 
 const API_BASE_URL = env.PUBLIC_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
@@ -13,7 +24,26 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 	});
 
 	if (!response.ok) {
-		throw new Error(`API Error: ${response.status}`);
+		let message = `API Error: ${response.status}`;
+		try {
+			const errBody = await response.json();
+			if (errBody && errBody.message) {
+				message = errBody.message;
+			} else if (errBody && errBody.error) {
+				if (typeof errBody.error === 'string') {
+					message = errBody.error;
+				} else if (errBody.error.message) {
+					message = errBody.error.message;
+				}
+			} else if (errBody && errBody.code) {
+				message = `${errBody.code}: ${errBody.message || ''}`;
+			}
+		} catch (_) {
+			// ignore JSON parse error, use fallback status message
+		}
+		const error = new Error(message) as any;
+		error.status = response.status;
+		throw error;
 	}
 
 	if (response.status === 204) {
@@ -137,6 +167,21 @@ export const api = {
 			})
 	},
 	bookings: {
+		list: (propertyId: string, status?: string, search?: string, page?: number, limit?: number) => {
+			const url = `/bookings?property_id=${propertyId}&status=${status || ''}&search=${encodeURIComponent(search || '')}&page=${page || 1}&limit=${limit || 50}`;
+			return request<{ bookings: BookingDetail[]; pagination: { page: number; limit: number; total: number } }>(url);
+		},
+		get: (id: string) => request<BookingDetail>(`/bookings/${id}`),
+		create: (data: CreateBookingPayload) =>
+			request<any>('/bookings', {
+				method: 'POST',
+				body: JSON.stringify(data)
+			}),
+		update: (id: string, data: any) =>
+			request<BookingDetail>(`/bookings/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify(data)
+			}),
 		pending: (propertyId: string) =>
 			request<any[]>(`/bookings/pending?property_id=${propertyId}`),
 		checkin: (bookingId: string, propertyId: string) =>
@@ -149,11 +194,33 @@ export const api = {
 				method: 'POST',
 				headers: { 'X-Property-ID': propertyId }
 			}),
+		cancel: (bookingId: string, reason: string) =>
+			request<any>(`/bookings/${bookingId}/cancel`, {
+				method: 'POST',
+				body: JSON.stringify({ reason })
+			}),
 		assign: (bookingId: string, roomId: string, propertyId: string) =>
-			request<any>(`/bookings/${bookingId}`, {
+			request<any>(`/bookings/${bookingId}/assign`, {
 				method: 'PATCH',
 				headers: { 'X-Property-ID': propertyId },
 				body: JSON.stringify({ room_id: roomId })
+			})
+	},
+	guests: {
+		list: (propertyId: string, search?: string, page?: number, limit?: number) => {
+			const url = `/guests?property_id=${propertyId}&search=${encodeURIComponent(search || '')}&page=${page || 1}&limit=${limit || 50}`;
+			return request<{ guests: GuestListDTO[]; pagination: { page: number; limit: number; total: number } }>(url);
+		},
+		get: (id: string) => request<GuestDetail>(`/guests/${id}`),
+		create: (data: any) =>
+			request<Guest>('/guests', {
+				method: 'POST',
+				body: JSON.stringify(data)
+			}),
+		update: (id: string, data: any) =>
+			request<Guest>(`/guests/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify(data)
 			})
 	},
 	roomBlocks: {
