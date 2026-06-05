@@ -215,6 +215,9 @@ export const api = {
 	roomTypes: {
 		list: (propertyId: string) => request<RoomType[]>(`/properties/${propertyId}/room-types`)
 	},
+	roomTypes: {
+		list: (propertyId: string) => request<RoomType[]>(`/properties/${propertyId}/room-types`)
+	},
 	map: {
 		get: (dateFrom: string, dateTo: string, propertyId: string) =>
 			request<MapResponse>(`/map?date_from=${dateFrom}&date_to=${dateTo}`, {
