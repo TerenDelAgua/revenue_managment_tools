@@ -111,6 +111,10 @@ func main() {
 			r.Get("/", floorHandler.ListByProperty)
 		})
 
+		r.Route("/properties/{propertyID}/room-types", func(r chi.Router) {
+			r.Get("/", roomHandler.ListRoomTypes)
+		})
+
 		r.Route("/floors", func(r chi.Router) {
 			r.Post("/", floorHandler.Create)
 			r.Get("/{id}", floorHandler.GetByID)
@@ -123,6 +127,8 @@ func main() {
 		r.Route("/rooms", func(r chi.Router) {
 			r.Post("/", roomHandler.Create)
 			r.Get("/{id}", roomHandler.GetByID)
+			r.Patch("/{id}", roomHandler.Update)
+			r.Delete("/{id}", roomHandler.Delete)
 			r.Put("/{id}/position", roomHandler.UpdatePosition)
 			// Housekeeping state transitions (Spec FMB-001 follow-up: cleaning)
 			r.Post("/{id}/cleaning", inventoryHandler.SetCleaning)

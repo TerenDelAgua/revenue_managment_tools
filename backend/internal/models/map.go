@@ -34,6 +34,7 @@ type RoomMap struct {
 	PosY             int         `json:"pos_y"`
 	RoomType         RoomTypeRef `json:"room_type"`
 	Availability     string      `json:"availability"`
+	HasBookings      bool        `json:"has_bookings"`
 	ActiveBookingID  *uuid.UUID  `json:"active_booking"`
 	PendingBookingID *uuid.UUID  `json:"pending_booking"`
 	BlockID          *uuid.UUID  `json:"block"`

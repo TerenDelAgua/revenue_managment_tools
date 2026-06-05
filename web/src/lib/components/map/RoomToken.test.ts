@@ -11,6 +11,7 @@ describe('RoomToken Component', () => {
 		pos_y: 0,
 		room_type: { id: 'type-id', name: 'Standard' },
 		availability,
+		has_bookings: false,
 		active_booking: null,
 		pending_booking: null,
 		block: null

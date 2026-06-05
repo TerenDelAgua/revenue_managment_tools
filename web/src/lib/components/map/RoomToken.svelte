@@ -18,7 +18,6 @@
 			bg: 'bg-[#44403C]',
 			text: 'text-[#FCFBFA]',
 			icon: '🔧',
-			// Patrón de rayas diagonal Spec §3
 			pattern:
 				'bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(255,255,255,0.1)_4px,rgba(255,255,255,0.1)_8px)]'
 		},
@@ -28,7 +27,7 @@
 		inactive: { bg: 'bg-[#A8A29E]', text: 'text-[#1C1917]', icon: '', pattern: 'opacity-60' }
 	};
 
-	const style = $derived(config[room.availability]);
+	const style = $derived(config[room.availability] || config.available);
 
 	function handleDragStart(e: DragEvent) {
 		if (mode !== 'setup') {

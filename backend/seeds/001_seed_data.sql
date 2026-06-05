@@ -22,10 +22,13 @@ UNION ALL SELECT id, 3, 'Second Floor', 3 FROM prop
 ON CONFLICT DO NOTHING;
 
 -- 3. Room type
+WITH prop AS (SELECT id FROM properties WHERE slug = 'teren-test-hotel')
 INSERT INTO room_types (property_id, name, max_occupancy)
-SELECT id, 'Standard Room', 2
-FROM properties WHERE slug = 'teren-test-hotel'
-ON CONFLICT DO NOTHING;
+SELECT prop.id, 'Standard Room', 2
+FROM prop
+WHERE NOT EXISTS (
+    SELECT 1 FROM room_types rt WHERE rt.property_id = prop.id AND rt.name = 'Standard Room'
+);
 
 -- 4. Rooms — coordenadas de GRID (no píxeles)
 -- Layout: filas horizontales empezando en (x=0, y=0)
