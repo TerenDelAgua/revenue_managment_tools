@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -19,15 +21,51 @@ func NewRoomRepository(db *pgxpool.Pool) *RoomRepository {
 }
 
 func (r *RoomRepository) Create(ctx context.Context, req *models.CreateRoomRequest) (*models.Room, error) {
+	// Auto-generate number if empty
+	if req.Number == "" {
+		var floorNum int
+		err := r.db.QueryRow(ctx, `SELECT floor_number FROM floors WHERE id = $1`, req.FloorID).Scan(&floorNum)
+		if err != nil {
+			return nil, err
+		}
+
+		rows, err := r.db.Query(ctx, `SELECT number FROM rooms WHERE floor_id = $1`, req.FloorID)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		existingNums := make(map[string]bool)
+		for rows.Next() {
+			var num string
+			if err := rows.Scan(&num); err == nil {
+				existingNums[num] = true
+			}
+		}
+
+		nextNum := ""
+		for yy := 1; yy <= 99; yy++ {
+			candidate := fmt.Sprintf("%d%02d", floorNum, yy)
+			if !existingNums[candidate] {
+				nextNum = candidate
+				break
+			}
+		}
+		if nextNum == "" {
+			return nil, fmt.Errorf("no available room numbers on floor %d", floorNum)
+		}
+		req.Number = nextNum
+	}
+
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO rooms (floor_id, room_type_id, number, status, pos_x, pos_y) 
-		VALUES ($1, $2, $3, $4, $5, $6) 
-		RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at`,
+		INSERT INTO rooms (floor_id, property_id, room_type_id, number, status, pos_x, pos_y) 
+		VALUES ($1, (SELECT property_id FROM floors WHERE id = $1), $2, $3, $4, $5, $6) 
+		RETURNING id, floor_id, property_id, room_type_id, number, status, pos_x, pos_y, false AS has_bookings, created_at, updated_at`,
 		req.FloorID, req.RoomTypeID, req.Number, req.Status, req.PosX, req.PosY,
 	).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
-		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
+		&room.ID, &room.FloorID, &room.PropertyID, &room.RoomTypeID, &room.Number, &room.Status,
+		&room.PosX, &room.PosY, &room.HasBookings, &room.CreatedAt, &room.UpdatedAt,
 	)
 	return &room, err
 }
@@ -35,10 +73,12 @@ func (r *RoomRepository) Create(ctx context.Context, req *models.CreateRoomReque
 func (r *RoomRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Room, error) {
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
-		SELECT id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at 
+		SELECT id, floor_id, property_id, room_type_id, number, status, pos_x, pos_y, 
+		       (SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $1)) AS has_bookings,
+		       created_at, updated_at 
 		FROM rooms WHERE id = $1`, id).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
-		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
+		&room.ID, &room.FloorID, &room.PropertyID, &room.RoomTypeID, &room.Number, &room.Status,
+		&room.PosX, &room.PosY, &room.HasBookings, &room.CreatedAt, &room.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -48,7 +88,9 @@ func (r *RoomRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Roo
 
 func (r *RoomRepository) ListByFloor(ctx context.Context, floorID uuid.UUID) ([]*models.Room, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at 
+		SELECT id, floor_id, property_id, room_type_id, number, status, pos_x, pos_y, 
+		       (SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = rooms.id)) AS has_bookings,
+		       created_at, updated_at 
 		FROM rooms WHERE floor_id = $1 ORDER BY number ASC`, floorID)
 	if err != nil {
 		return nil, err
@@ -58,7 +100,10 @@ func (r *RoomRepository) ListByFloor(ctx context.Context, floorID uuid.UUID) ([]
 	var rooms []*models.Room
 	for rows.Next() {
 		var room models.Room
-		if err := rows.Scan(&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status, &room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt); err != nil {
+		if err := rows.Scan(
+			&room.ID, &room.FloorID, &room.PropertyID, &room.RoomTypeID, &room.Number, &room.Status,
+			&room.PosX, &room.PosY, &room.HasBookings, &room.CreatedAt, &room.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		rooms = append(rooms, &room)
@@ -70,10 +115,13 @@ func (r *RoomRepository) UpdatePosition(ctx context.Context, id uuid.UUID, posX,
 	var room models.Room
 	err := r.db.QueryRow(ctx, `
 		UPDATE rooms SET pos_x = $1, pos_y = $2, updated_at = NOW() 
-		WHERE id = $3 RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at`,
+		WHERE id = $3 
+		RETURNING id, floor_id, property_id, room_type_id, number, status, pos_x, pos_y, 
+		          (SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $3)) AS has_bookings,
+		          created_at, updated_at`,
 		posX, posY, id).Scan(
-		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
-		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
+		&room.ID, &room.FloorID, &room.PropertyID, &room.RoomTypeID, &room.Number, &room.Status,
+		&room.PosX, &room.PosY, &room.HasBookings, &room.CreatedAt, &room.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -96,6 +144,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 				WHEN b_conf.id IS NOT NULL THEN 'pending'
 				ELSE 'available'
 			END AS availability_state,
+			(SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = r.id)) AS has_bookings,
 			b_in.id AS active_booking_id, 
 			b_conf.id AS pending_booking_id, 
 			rb.id AS block_id,
@@ -141,6 +190,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		var label, rNum, rtName, state string
 		var fNum, sOrder, posX, posY int
 		var rStatus string
+		var hasBookings bool
 		var abID, pbID, blID *uuid.UUID
 		var bReason, bNotes, bStart, bEnd *string
 
@@ -150,7 +200,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		var pendingGuestName, pendingGuestPhone, pendingGuestNationality *string
 		var pendingCheckIn, pendingCheckOut *string
 
-		if err := rows.Scan(&fID, &label, &fNum, &sOrder, &rID, &rNum, &posX, &posY, &rStatus, &rtID, &rtName, &state, &abID, &pbID, &blID,
+		if err := rows.Scan(&fID, &label, &fNum, &sOrder, &rID, &rNum, &posX, &posY, &rStatus, &rtID, &rtName, &state, &hasBookings, &abID, &pbID, &blID,
 			&bReason, &bNotes, &bStart, &bEnd,
 			&activeGuestName, &activeGuestPhone, &activeGuestNationality, &activeCheckIn, &activeCheckOut,
 			&pendingGuestName, &pendingGuestPhone, &pendingGuestNationality, &pendingCheckIn, &pendingCheckOut); err != nil {
@@ -168,6 +218,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 			roomMap[rID] = &models.RoomMap{
 				ID: rID, Number: rNum, PosX: posX, PosY: posY,
 				RoomType: models.RoomTypeRef{ID: rtID, Name: rtName},
+				HasBookings: hasBookings,
 			}
 			floorMap[fID].Rooms = append(floorMap[fID].Rooms, roomMap[rID])
 		}
@@ -234,4 +285,87 @@ func (r *RoomRepository) BatchUpdatePositions(ctx context.Context, updates []mod
 	}
 
 	return len(updates), tx.Commit(ctx)
+}
+
+func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, req *models.UpdateRoomRequest) (*models.Room, error) {
+	query := "UPDATE rooms SET "
+	args := []interface{}{}
+	idx := 1
+
+	if req.RoomTypeID != nil {
+		query += fmt.Sprintf("room_type_id = $%d, ", idx)
+		args = append(args, *req.RoomTypeID)
+		idx++
+	}
+	if req.Number != nil {
+		query += fmt.Sprintf("number = $%d, ", idx)
+		args = append(args, *req.Number)
+		idx++
+	}
+	if req.Status != nil {
+		query += fmt.Sprintf("status = $%d, ", idx)
+		args = append(args, *req.Status)
+		idx++
+	}
+	if req.PosX != nil {
+		query += fmt.Sprintf("pos_x = $%d, ", idx)
+		args = append(args, *req.PosX)
+		idx++
+	}
+	if req.PosY != nil {
+		query += fmt.Sprintf("pos_y = $%d, ", idx)
+		args = append(args, *req.PosY)
+		idx++
+	}
+
+	if len(args) == 0 {
+		return r.GetByID(ctx, id)
+	}
+
+	query += fmt.Sprintf("updated_at = NOW() WHERE id = $%d RETURNING id, floor_id, property_id, room_type_id, number, status, pos_x, pos_y, (SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $%d)) AS has_bookings, created_at, updated_at", idx, idx)
+	args = append(args, id)
+
+	var room models.Room
+	err := r.db.QueryRow(ctx, query, args...).Scan(
+		&room.ID, &room.FloorID, &room.PropertyID, &room.RoomTypeID, &room.Number, &room.Status,
+		&room.PosX, &room.PosY, &room.HasBookings, &room.CreatedAt, &room.UpdatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	return &room, err
+}
+
+func (r *RoomRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	var hasBookings bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $1)`, id).Scan(&hasBookings)
+	if err != nil {
+		return err
+	}
+	if hasBookings {
+		return errors.New("cannot delete room with booking history")
+	}
+
+	_, err = r.db.Exec(ctx, `DELETE FROM rooms WHERE id = $1`, id)
+	return err
+}
+
+func (r *RoomRepository) ListRoomTypes(ctx context.Context, propertyID uuid.UUID) ([]*models.RoomType, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, property_id, name, max_occupancy, created_at, updated_at 
+		FROM room_types WHERE property_id = $1 ORDER BY name ASC`, propertyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var roomTypes []*models.RoomType
+	for rows.Next() {
+		var rt models.RoomType
+		if err := rows.Scan(&rt.ID, &rt.PropertyID, &rt.Name, &rt.MaxOccupancy, &rt.CreatedAt, &rt.UpdatedAt); err != nil {
+			return nil, err
+		}
+		roomTypes = append(roomTypes, &rt)
+	}
+	return roomTypes, rows.Err()
 }

@@ -4,7 +4,7 @@
 	import FloorTabs from '$lib/components/map/FloorTabs.svelte';
 	import RoomPalette from '$lib/components/map/RoomPalette.svelte';
 	import RoomDrawer from '$lib/components/map/RoomDrawer.svelte';
-	import type { MapResponse, RoomMap } from '$lib/types';
+	import type { MapResponse, RoomMap, RoomType } from '$lib/types';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
@@ -21,6 +21,8 @@
 		}
 	}
 
+	import { onMount } from 'svelte';
+
 	let currentUser = $state({ role: 'owner' });
 	let mode = $state<'setup' | 'ops'>('ops');
 	let dateFrom = $state(new Date().toISOString().split('T')[0]);
@@ -31,6 +33,58 @@
 	let activeFloorId = $state('');
 	let drawerOpen = $state(false);
 	let selectedRoom = $state<RoomMap | null>(null);
+	let roomTypes = $state<RoomType[]>([]);
+
+	async function loadRoomTypes() {
+		try {
+			roomTypes = await api.roomTypes.list(propertyId);
+		} catch (err) {
+			console.error('Failed to load room types:', err);
+		}
+	}
+
+	onMount(() => {
+		loadRoomTypes();
+	});
+
+	function findFirstFreePosition(rooms: RoomMap[]): { x: number; y: number } {
+		const occupied = new Set(rooms.map((r) => `${r.pos_x},${r.pos_y}`));
+		for (let y = 0; y < 20; y++) {
+			for (let x = 0; x < 12; x++) {
+				if (!occupied.has(`${x},${y}`)) {
+					return { x, y };
+				}
+			}
+		}
+		return { x: 0, y: 0 };
+	}
+
+	async function handleRoomPaletteClick(type: RoomType) {
+		if (!activeFloorId) {
+			addToast('Por favor, selecciona un piso primero.', 'error');
+			return;
+		}
+
+		const activeFloor = mapData?.floors.find((f) => f.id === activeFloorId);
+		const currentRooms = activeFloor?.rooms || [];
+		const { x, y } = findFirstFreePosition(currentRooms);
+
+		try {
+			await api.rooms.create({
+				floor_id: activeFloorId,
+				room_type_id: type.id,
+				number: '', // Omit to trigger sequential auto-generation
+				status: 'active',
+				pos_x: x,
+				pos_y: y
+			});
+			addToast('Habitación añadida al mapa', 'success');
+			await loadMap();
+		} catch (err: any) {
+			console.error(err);
+			addToast(err?.message || 'Error al añadir habitación', 'error');
+		}
+	}
 
 	$effect(() => {
 		if (browser) {
@@ -68,6 +122,23 @@
 			// Auto-select first floor if none is active
 			if (mapData && mapData.floors.length > 0 && !activeFloorId) {
 				activeFloorId = mapData.floors[0].id;
+			}
+
+			// If selectedRoom is currently active, update its reference to the newly fetched room object
+			if (selectedRoom && mapData) {
+				const currentId = selectedRoom.id;
+				let found = false;
+				for (const floor of mapData.floors) {
+					const r = floor.rooms.find((r) => r.id === currentId);
+					if (r) {
+						selectedRoom = r;
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					selectedRoom = null;
+				}
 			}
 		} catch (err) {
 			console.error(err);
@@ -215,6 +286,20 @@
 					break;
 				}
 
+				case 'update_room': {
+					if (!payload) return;
+					await api.rooms.update(selectedRoom.id, payload);
+					addToast('Room updated successfully', 'success');
+					break;
+				}
+
+				case 'delete_room': {
+					await api.rooms.delete(selectedRoom.id);
+					addToast('Room deleted successfully', 'success');
+					drawerOpen = false;
+					break;
+				}
+
 				default:
 					throw new Error(`Unknown action: ${action}`);
 			}
@@ -259,7 +344,7 @@
 	<div class="flex flex-1 gap-4">
 		{#if mode === 'setup'}
 			<aside class="hidden w-64 md:block">
-				<RoomPalette roomTypes={[]} onDragStart={() => {}} />
+				<RoomPalette roomTypes={roomTypes} onDragStart={() => {}} onClick={handleRoomPaletteClick} />
 			</aside>
 		{/if}
 
@@ -291,4 +376,5 @@
 	isOpen={drawerOpen}
 	onClose={() => (drawerOpen = false)}
 	onAction={handleDrawerAction}
+	{mode}
 />

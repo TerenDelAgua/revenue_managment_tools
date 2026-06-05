@@ -28,6 +28,7 @@ export interface RoomMap {
     pos_y: number;
     room_type: { id: string; name: string };
     availability: RoomAvailability;
+    has_bookings: boolean;
     active_booking: string | null;
     pending_booking: string | null;
     block: string | null;

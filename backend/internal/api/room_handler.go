@@ -152,3 +152,73 @@ func (h *RoomHandler) BatchUpdatePositions(w http.ResponseWriter, r *http.Reques
 	}
 	api.JSON(w, http.StatusOK, map[string]int{"updated": updated})
 }
+
+func (h *RoomHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		api.BadRequest(w, "Invalid room ID")
+		return
+	}
+
+	var req models.UpdateRoomRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.BadRequest(w, "Invalid request body")
+		return
+	}
+	defer r.Body.Close()
+
+	if req.PosX != nil && (*req.PosX < 0 || *req.PosX > 11) {
+		api.JSON(w, http.StatusUnprocessableEntity, api.Error{Code: "OUT_OF_BOUNDS", Message: "pos_x must be 0-11"})
+		return
+	}
+	if req.PosY != nil && (*req.PosY < 0 || *req.PosY > 19) {
+		api.JSON(w, http.StatusUnprocessableEntity, api.Error{Code: "OUT_OF_BOUNDS", Message: "pos_y must be 0-19"})
+		return
+	}
+
+	room, err := h.repo.Update(r.Context(), id, &req)
+	if mapDBError(w, err, "Room number or position already exists in this floor/property", "Invalid room configuration") {
+		return
+	}
+	if room == nil {
+		api.NotFound(w, "Room not found")
+		return
+	}
+	api.JSON(w, http.StatusOK, room)
+}
+
+func (h *RoomHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		api.BadRequest(w, "Invalid room ID")
+		return
+	}
+
+	err = h.repo.Delete(r.Context(), id)
+	if err != nil {
+		if err.Error() == "cannot delete room with booking history" {
+			api.JSON(w, http.StatusConflict, api.Error{Code: "HAS_BOOKINGS", Message: "Cannot delete room with booking history"})
+			return
+		}
+		api.InternalServerError(w, "Failed to delete room")
+		return
+	}
+
+	api.JSON(w, http.StatusOK, map[string]string{"message": "Room deleted successfully"})
+}
+
+func (h *RoomHandler) ListRoomTypes(w http.ResponseWriter, r *http.Request) {
+	propertyID, err := uuid.Parse(chi.URLParam(r, "propertyID"))
+	if err != nil {
+		api.BadRequest(w, "Invalid property ID")
+		return
+	}
+
+	roomTypes, err := h.repo.ListRoomTypes(r.Context(), propertyID)
+	if err != nil {
+		api.InternalServerError(w, "Failed to list room types")
+		return
+	}
+
+	api.JSON(w, http.StatusOK, roomTypes)
+}

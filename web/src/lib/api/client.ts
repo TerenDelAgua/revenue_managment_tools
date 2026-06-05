@@ -152,11 +152,23 @@ export const api = {
 				method: 'POST',
 				body: JSON.stringify(data)
 			}),
+		update: (id: string, data: Partial<CreateRoomRequest>) =>
+			request<Room>(`/rooms/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify(data)
+			}),
+		delete: (id: string) =>
+			request<any>(`/rooms/${id}`, {
+				method: 'DELETE'
+			}),
 		updatePosition: (id: string, data: UpdateRoomPositionRequest) =>
 			request<Room>(`/rooms/${id}/position`, {
 				method: 'PUT',
 				body: JSON.stringify(data)
 			})
+	},
+	roomTypes: {
+		list: (propertyId: string) => request<RoomType[]>(`/properties/${propertyId}/room-types`)
 	},
 	map: {
 		get: (dateFrom: string, dateTo: string, propertyId: string) =>
