@@ -9,5 +9,8 @@ echo "========================================="
 echo "1. Running database migrations..."
 ./run-migrations
 
-echo "2. Starting Go API server..."
+echo "2. Running database seeds..."
+./seed
+
+echo "3. Starting Go API server..."
 exec ./api
