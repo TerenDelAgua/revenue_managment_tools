@@ -90,10 +90,14 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 			r.id AS room_id, r.number, r.pos_x, r.pos_y, r.status AS room_status,
 			rt.id AS room_type_id, rt.name AS room_type_name,
 			CASE
+				-- Jerarquía de prioridad: inactive > occupied > blocked > pending >
+				-- cleaning > available. "cleaning" es estado operacional de la
+				-- habitación (housekeeping en curso); no debe ser vendible.
 				WHEN r.status = 'inactive' THEN 'inactive'
 				WHEN b_in.id IS NOT NULL THEN 'occupied'
 				WHEN rb.id IS NOT NULL THEN 'blocked'
 				WHEN b_conf.id IS NOT NULL THEN 'pending'
+				WHEN r.status = 'cleaning' THEN 'cleaning'
 				ELSE 'available'
 			END AS availability_state,
 			b_in.id AS active_booking_id, 
@@ -118,8 +122,14 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		FROM rooms r
 		JOIN floors f ON r.floor_id = f.id
 		JOIN room_types rt ON r.room_type_id = rt.id
+		-- room_blocks: date-bound (mantaintenance/owner use son rangos planificados)
 		LEFT JOIN room_blocks rb ON rb.room_id = r.id AND rb.start_date < $2 AND rb.end_date > $1
-		LEFT JOIN bookings b_in ON b_in.room_id = r.id AND b_in.status = 'checked_in' AND b_in.check_in < $2 AND b_in.check_out > $1
+		-- b_in (checked_in): estado operacional ACTUAL. NO se filtra por fechas: un
+		-- huésped físicamente en la habitación ocupa el room sea cual sea el rango
+		-- consultado. Una reserva con check-in el 2 jun debe verse como occupied
+		-- aunque consultemos el mapa para 19-20 jun (BT-17).
+		LEFT JOIN bookings b_in ON b_in.room_id = r.id AND b_in.status = 'checked_in'
+		-- b_conf (confirmed): pendientes de check-in, sí filtran por fecha (plan futuro)
 		LEFT JOIN bookings b_conf ON b_conf.room_id = r.id AND b_conf.status = 'confirmed' AND b_conf.check_in < $2 AND b_conf.check_out > $1
 		LEFT JOIN guests g_in ON g_in.id = b_in.guest_id
 		LEFT JOIN guests g_conf ON g_conf.id = b_conf.guest_id

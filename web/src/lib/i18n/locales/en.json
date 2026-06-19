@@ -22,6 +22,7 @@
     "occupied": "Occupied",
     "pending": "Pending (Check-in)",
     "blocked": "Blocked",
+    "cleaning": "Cleaning",
     "inactive": "Inactive"
   },
   "drawer": {

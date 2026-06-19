@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,7 +45,32 @@ func (s *BookingService) CheckIn(ctx context.Context, bookingID uuid.UUID) error
 
 // CheckOut ejecuta el flujo de salida.
 func (s *BookingService) CheckOut(ctx context.Context, bookingID uuid.UUID) error {
-	return s.bookingRepo.CheckOut(ctx, bookingID)
+	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if booking.Status != "checked_in" {
+		return &BusinessError{Code: "INVALID_STATUS", Message: "Only checked-in bookings can be checked out"}
+	}
+	if err := s.bookingRepo.CheckOut(ctx, bookingID); err != nil {
+		return err
+	}
+
+	// Auto-cleaning: tras check-out la habitación pasa automáticamente a estado
+	// operacional `cleaning` (housekeeping en curso). El check-out ya está hecho
+	// (el huésped se fue físicamente), así que un fallo de cleaning NO debe
+	// revertirlo: lo logueamos y continuamos. Caso esperado de fallo: la room
+	// fue marcada inactive entre check-in y check-out (SetRoomCleaning devuelve
+	// ROOM_INACTIVE en ese caso, BR-TEREN-16).
+	if booking.RoomID != nil {
+		if _, cerr := s.inventorySvc.SetRoomCleaning(ctx, *booking.RoomID, true); cerr != nil {
+			log.Printf(
+				"auto-cleaning skipped for room %s after checkout of booking %s: %v",
+				*booking.RoomID, bookingID, cerr,
+			)
+		}
+	}
+	return nil
 }
 
 func (s *BookingService) GetPendingBookings(ctx context.Context, propertyID uuid.UUID) ([]*repository.PendingBookingDTO, error) {

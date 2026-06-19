@@ -29,7 +29,34 @@ _(Basado en la v1.1 estándar de diseño de TEREN)_
 | `primary-subtle`  | `#FFF7ED`             | Fondo muy suave para badges o etiquetas.                                  |
 | `text-main`       | `#1C1917`             | Texto principal, títulos. Gris casi negro para máximo contraste.          |
 | `text-muted`      | `#57534E`             | Texto secundario, notas. Más oscuro para garantizar legibilidad exterior. |
-| `border-subtle`   | `#E7E5E4`             | Bordes en estado inactivo. Visibles pero no distractivos.                 |
+| `border-subtle`   | `#E7E5E4`             | Bordes en estado inactivo. Visibles pero no distractores.                 |
+
+#### 2.1.0.1 Room Status Tokens (FMB-001)
+
+Los tokens persistentes/derivados de cada habitación en el mapa (`RoomToken`,
+`StatusLegend`). Reflejan la jerarquía de prioridad del repositorio:
+`inactive > occupied > blocked > pending > cleaning > available`.
+
+| Token              | Valor (Hex)  | Estado       | Icono | Uso                                                                    |
+| :----------------- | :----------- | :----------- | :---- | :--------------------------------------------------------------------- |
+| `status-available` | `#16A34A`    | `available`  | —     | Habitación limpia y vendible. Verde de "go".                           |
+| `status-occupied`  | `#DC2626`    | `occupied`   | 🛏️    | Huésped en la habitación. Rojo de "no tocar".                          |
+| `status-pending`   | `#D97706`    | `pending`    | ⏳    | Reserva confirmada con check-in futuro, esperando habitación.         |
+| `status-blocked`   | `#44403C`    | `blocked`    | 🔧 + stripe pattern | Bloqueo explícito (maintenance / owner use / out of service). |
+| `status-cleaning`  | `#0284C7`    | `cleaning`   | 🧹    | Housekeeping en curso. NO vendible. Sky-600 (frío/agua) para distinguir del verde de `available`. |
+| `status-inactive`  | `#A8A29E`    | `inactive`   | —     | Habitación dada de baja (60% opacity). Máximo nivel de prioridad.     |
+
+**Reglas de UX:**
+- `cleaning` es **estado operacional transitorio**: el housekeeping lo pone al
+  salir de la habitación y lo quita al terminar. Mientras está activo, la
+  habitación NO se puede vender (test BT-16 en `service_test.go`).
+- No usar `primary` (Sunrise Orange) para estados: el naranja es para
+  *acciones del usuario*, los estados son *observación del sistema*.
+- El emoji 🧹 migra a SVG `broom-stroke` en v1.1 (cuando se unifique la
+  iconografía a 1.5px stroke).
+- Contraste WCAG: `#0284C7` sobre `#FCFBFA` = 5.4:1 (AA), texto blanco sobre
+  `#0284C7` = 4.7:1 (AA para texto grande). Si la etiqueta se renderiza con
+  texto < 14px, usar `text-white` siempre.
 
 ### 2.1.1 Modo Oscuro (Black Theme v1.0)
 **Filosofía:** *No invertir colores, sino transformar la luz.* Evitamos el negro absoluto (`#000000`) para prevenir fatiga visual y optimizar el consumo en pantallas OLED, manteniendo siempre el subtono cálido de la marca.

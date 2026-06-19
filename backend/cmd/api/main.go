@@ -100,6 +100,9 @@ func main() {
 			r.Post("/", roomHandler.Create)
 			r.Get("/{id}", roomHandler.GetByID)
 			r.Put("/{id}/position", roomHandler.UpdatePosition)
+			// Housekeeping state transitions (Spec FMB-001 follow-up: cleaning)
+			r.Post("/{id}/cleaning", inventoryHandler.SetCleaning)
+			r.Delete("/{id}/cleaning", inventoryHandler.ClearCleaning)
 		})
 
 		r.Get("/map", inventoryHandler.GetMap)

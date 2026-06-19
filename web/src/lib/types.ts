@@ -1,7 +1,13 @@
 // src/lib/types.ts
 // Alineado con models/map.go y Spec FMB-001
 
-export type RoomAvailability = 'available' | 'occupied' | 'pending' | 'blocked' | 'inactive';
+export type RoomAvailability =
+    | 'available'
+    | 'occupied'
+    | 'pending'
+    | 'blocked'
+    | 'cleaning'
+    | 'inactive';
 export type AppMode = 'setup' | 'ops';
 export type BlockReason = 'maintenance' | 'owner_use' | 'out_of_service';
 
