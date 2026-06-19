@@ -235,9 +235,28 @@
 
 					await api.bookings.checkout(activeBookingId || backup.active_booking || '', propertyId);
 					addToast(
-						`${guestName || 'Guest'} checked out · Room ${selectedRoom.number} ready`,
+						`${guestName || 'Guest'} checked out · Room ${selectedRoom.number} ready for cleaning`,
 						'success'
 					);
+					break;
+				}
+
+				case 'set_cleaning': {
+					// BT-TEREN-16: housekeeping manual. La habitación pasa a estado
+					// operacional `cleaning`. No es vendible hasta que se libere.
+					selectedRoom.availability = 'cleaning';
+					drawerOpen = false;
+					await api.rooms.setCleaning(selectedRoom.id);
+					addToast(`Room ${selectedRoom.number} marked as cleaning`, 'success');
+					break;
+				}
+
+				case 'clear_cleaning': {
+					// BT-TEREN-16: housekeeping terminada. Vuelve a `active` (vendible).
+					selectedRoom.availability = 'available';
+					drawerOpen = false;
+					await api.rooms.clearCleaning(selectedRoom.id);
+					addToast(`Room ${selectedRoom.number} cleaning done · ready to sell`, 'success');
 					break;
 				}
 

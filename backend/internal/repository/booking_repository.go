@@ -63,7 +63,7 @@ func (r *BookingRepository) Create(ctx context.Context, req *models.CreateBookin
 func (r *BookingRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.BookingDetail, error) {
 	var detail models.BookingDetail
 	var checkIn, checkOut time.Time
-	
+
 	err := r.db.QueryRow(ctx, `
 		SELECT 
 			b.id, b.property_id, b.room_id, b.guest_id, b.created_by,
@@ -143,16 +143,16 @@ func (r *BookingRepository) CheckOut(ctx context.Context, bookingID uuid.UUID) e
 	return err
 }
 
+// AssignRoom asigna un ID de habitación a una reserva.
+func (r *BookingRepository) AssignRoom(ctx context.Context, bookingID, roomID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `UPDATE bookings SET room_id = $1, updated_at = NOW() WHERE id = $2`, roomID, bookingID)
+	return err
+}
+
 // Cancel cancela un booking.
 func (r *BookingRepository) Cancel(ctx context.Context, bookingID uuid.UUID, reason string) error {
 	notesUpdate := "[CANCELLED] reason: " + reason
 	_, err := r.db.Exec(ctx, `UPDATE bookings SET status = 'cancelled', notes = COALESCE(notes, '') || '\n' || $2, updated_at = NOW() WHERE id = $1 AND status IN ('confirmed', 'checked_in')`, bookingID, notesUpdate)
-	return err
-}
-
-// AssignRoom asigna un ID de habitación a una reserva.
-func (r *BookingRepository) AssignRoom(ctx context.Context, bookingID, roomID uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `UPDATE bookings SET room_id = $1, updated_at = NOW() WHERE id = $2`, roomID, bookingID)
 	return err
 }
 
@@ -181,15 +181,15 @@ func (r *BookingRepository) GetPendingByRoom(ctx context.Context, roomID uuid.UU
 }
 
 type PendingBookingDTO struct {
-	ID          uuid.UUID `json:"id"`
-	GuestName   string    `json:"guest_name"`
-	CheckIn     string    `json:"check_in"`
-	CheckOut    string    `json:"check_out"`
-	Source      string    `json:"source"`
-	Adults      int       `json:"adults"`
-	TotalAmount float64   `json:"total_amount"`
+	ID          uuid.UUID  `json:"id"`
+	GuestName   string     `json:"guest_name"`
+	CheckIn     string     `json:"check_in"`
+	CheckOut    string     `json:"check_out"`
+	Source      string     `json:"source"`
+	Adults      int        `json:"adults"`
+	TotalAmount float64    `json:"total_amount"`
 	RoomID      *uuid.UUID `json:"room_id"`
-	Status      string    `json:"status"`
+	Status      string     `json:"status"`
 }
 
 func (r *BookingRepository) GetPendingByProperty(ctx context.Context, propertyID uuid.UUID) ([]*PendingBookingDTO, error) {
@@ -237,24 +237,24 @@ type BookingListDTO struct {
 
 func (r *BookingRepository) List(ctx context.Context, propertyID uuid.UUID, status string, search string, page int, limit int) ([]*BookingListDTO, int, error) {
 	offset := (page - 1) * limit
-	
+
 	whereClause := "WHERE b.property_id = $1 "
 	args := []interface{}{propertyID}
 	paramIdx := 2
-	
+
 	if status != "" {
 		whereClause += fmt.Sprintf("AND b.status = $%d ", paramIdx)
 		args = append(args, status)
 		paramIdx++
 	}
-	
+
 	if search != "" {
 		whereClause += fmt.Sprintf("AND (g.full_name ILIKE $%d OR g.phone ILIKE $%d OR r.number ILIKE $%d) ", paramIdx, paramIdx, paramIdx)
 		searchPattern := "%" + search + "%"
 		args = append(args, searchPattern)
 		paramIdx++
 	}
-	
+
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*) 
 		FROM bookings b 
@@ -262,13 +262,13 @@ func (r *BookingRepository) List(ctx context.Context, propertyID uuid.UUID, stat
 		LEFT JOIN rooms r ON b.room_id = r.id
 		%s
 	`, whereClause)
-	
+
 	var total int
 	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
-	
+
 	query := fmt.Sprintf(`
 		SELECT b.id, b.room_id, r.number, g.full_name, g.phone, b.check_in, b.check_out, 
 		       (b.check_out - b.check_in) as nights, b.original_amount, b.original_currency, b.total_amount, b.status, b.source
@@ -279,15 +279,15 @@ func (r *BookingRepository) List(ctx context.Context, propertyID uuid.UUID, stat
 		ORDER BY b.check_in DESC
 		LIMIT $%d OFFSET $%d
 	`, whereClause, paramIdx, paramIdx+1)
-	
+
 	args = append(args, limit, offset)
-	
+
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer rows.Close()
-	
+
 	list := make([]*BookingListDTO, 0)
 	for rows.Next() {
 		var b BookingListDTO
@@ -299,7 +299,7 @@ func (r *BookingRepository) List(ctx context.Context, propertyID uuid.UUID, stat
 		b.CheckOut = checkOut.Format("2006-01-02")
 		list = append(list, &b)
 	}
-	
+
 	return list, total, rows.Err()
 }
 
@@ -316,7 +316,7 @@ func (r *BookingRepository) GetOverlapCount(ctx context.Context, roomID uuid.UUI
 		query += " AND id != $4"
 		args = append(args, *excludeBookingID)
 	}
-	
+
 	var count int
 	err := r.db.QueryRow(ctx, query, args...).Scan(&count)
 	return count, err

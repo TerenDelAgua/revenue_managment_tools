@@ -40,6 +40,8 @@
     "confirmBlock": "Confirm Block",
     "checkIn": "Check In",
     "checkOut": "Check Out",
+    "markCleaning": "Mark as Cleaning",
+    "cleaningDone": "Cleaning Done",
     "removeBlock": "Remove Block",
     "assignBooking": "Assign Booking",
     "availableTypes": "Available Types"

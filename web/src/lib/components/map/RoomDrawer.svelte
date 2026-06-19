@@ -18,8 +18,17 @@
 		isOpen: boolean;
 		onClose: () => void;
 		onAction: (
-			action: 'assign' | 'checkin' | 'checkout' | 'block' | 'unblock' | 'update_room' | 'delete_room',
-			payload?: any
+			action:
+				| 'assign'
+				| 'checkin'
+				| 'checkout'
+				| 'block'
+				| 'unblock'
+				| 'set_cleaning'
+				| 'clear_cleaning'
+				| 'update_room'
+				| 'delete_room',
+			payload?: Record<string, unknown>
 		) => void;
 		mode?: 'setup' | 'ops';
 	}
@@ -30,7 +39,8 @@
 	let showBlockForm = $state(false);
 	let showAssignList = $state(false);
 	let loadingBookings = $state(false);
-	let pendingBookings = $state<any[]>([]);
+	import type { Booking } from '$lib/types';
+	let pendingBookings = $state<Booking[]>([]);
 
 	// === Estados de Setup Mode ===
 	let editNumber = $state('');
@@ -44,6 +54,10 @@
 	let blockEnd = $state(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
 	let isDateValid = $state(true);
 	let showCheckoutConfirm = $state(false);
+
+	function isErrorWithMessage(error: unknown): error is { message?: string; status?: number } {
+		return typeof error === 'object' && error !== null;
+	}
 
 	// Reiniciar estados al cerrar el Drawer o cambiar de habitación
 	$effect(() => {
@@ -74,13 +88,13 @@
 		try {
 			await onAction('update_room', { number: trimmed });
 			numberError = null;
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error(err);
-			if (err.status === 409 || err.message?.includes('exists')) {
+			if (isErrorWithMessage(err) && (err.status === 409 || err.message?.includes('exists'))) {
 				numberError = 'Room number already exists';
 				editNumber = room.number;
 			} else {
-				numberError = err.message || 'Error updating room';
+				numberError = isErrorWithMessage(err) && err.message ? err.message : 'Error updating room';
 			}
 		}
 	}
@@ -96,7 +110,7 @@
 		
 		try {
 			await onAction('update_room', { status: nextStatus });
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error(err);
 			room.availability = oldAvailability;
 		}
@@ -157,6 +171,10 @@
 				return { labelKey: 'drawer.checkIn', color: 'bg-[#16A34A]', action: 'checkin' as const };
 			case 'occupied':
 				return { labelKey: 'drawer.checkOut', color: 'bg-[#1C1917]', action: 'checkout' as const };
+			case 'cleaning':
+				// BT-TEREN-16: la housekeeping pulsa "Cleaning Done" cuando termina.
+				// Devuelve la room a estado `active` (vendible).
+				return { labelKey: 'drawer.cleaningDone', color: 'bg-[#0284C7]', action: 'clear_cleaning' as const };
 			case 'blocked':
 				return {
 					labelKey: 'drawer.removeBlock',
@@ -259,7 +277,7 @@
 					
 					<!-- Room Number Input -->
 					<div class="space-y-1">
-						<label class="block text-xs font-semibold text-[#57534E]">Número de Habitación</label>
+						<label for="room-number-input" class="block text-xs font-semibold text-[#57534E]">Número de Habitación</label>
 						<div class="relative">
 							<input 
 								type="text" 
@@ -284,6 +302,7 @@
 						</div>
 						
 						<button
+							title={$_('drawer.toggleStatus')}
 							type="button"
 							onclick={toggleStatus}
 							class="relative h-6 w-11 rounded-full p-1 transition-colors cursor-pointer {room.availability === 'inactive' ? 'bg-stone-300' : 'bg-[#16A34A]'}"
@@ -424,6 +443,15 @@
 
 				<!-- Opción de Bloqueo si está disponible -->
 				{#if room.availability !== 'blocked' && room.availability !== 'inactive'}
+					<!-- Housekeeping manual: marcar como cleaning (solo si la room está available) -->
+					{#if room.availability === 'available'}
+						<button
+							onclick={() => onAction('set_cleaning')}
+							class="w-full rounded-lg bg-[#F0F9FF] py-2.5 text-xs font-medium text-[#0284C7] transition-colors hover:bg-[#E0F2FE] border border-[#0284C7]/20"
+						>
+							🧹 {$_('drawer.markCleaning')}
+						</button>
+					{/if}
 					<button
 						onclick={() => (showBlockForm = true)}
 						class="w-full rounded-lg bg-[#F5F4F1] py-2.5 text-xs font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4]"
@@ -438,8 +466,14 @@
 
 {#if showDeleteConfirm && room}
 	<!-- Destructive Deletion Confirmation Modal -->
-	<div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" onclick={() => showDeleteConfirm = false}>
-		<div class="w-full max-w-sm rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-6 shadow-xl" onclick={(e) => e.stopPropagation()}>
+	<div class="fixed inset-0 z-[100] flex items-center justify-center">
+		<button
+			type="button"
+			aria-label="Cerrar confirmacion de borrado"
+			class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+			onclick={() => (showDeleteConfirm = false)}
+		></button>
+		<div class="relative z-10 w-full max-w-sm rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-6 shadow-xl">
 			<h3 class="text-lg font-bold text-[#1C1917]">¿Eliminar habitación?</h3>
 			
 			<p class="mt-2 text-sm text-[#57534E] leading-relaxed">

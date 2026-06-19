@@ -165,7 +165,13 @@ export const api = {
 			request<Room>(`/rooms/${id}/position`, {
 				method: 'PUT',
 				body: JSON.stringify(data)
-			})
+			}),
+		// Housekeeping: marca la habitación como "cleaning" (POST) o la libera (DELETE).
+		// El backend maneja idempotencia y rechaza con 409 si la room es inactive.
+		setCleaning: (id: string) =>
+			request<Room>(`/rooms/${id}/cleaning`, { method: 'POST' }),
+		clearCleaning: (id: string) =>
+			request<Room>(`/rooms/${id}/cleaning`, { method: 'DELETE' })
 	},
 	roomTypes: {
 		list: (propertyId: string) => request<RoomType[]>(`/properties/${propertyId}/room-types`)

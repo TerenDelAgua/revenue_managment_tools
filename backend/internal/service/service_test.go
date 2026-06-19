@@ -1,4 +1,4 @@
-package service
+﻿package service
 
 import (
 	"context"
@@ -171,7 +171,7 @@ func TestGetMap_OccupiedRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -208,7 +208,7 @@ func TestGetMap_PendingRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'confirmed')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'confirmed')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -291,7 +291,7 @@ func TestGetMap_PriorityLogic(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -336,7 +336,7 @@ func TestGetMap_InactiveRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -372,15 +372,15 @@ func TestAssign_RoomAvailable(t *testing.T) {
 
 	// Assign to available room
 	booking, err := bookingSvc.CreateBooking(ctx, models.CreateBookingRequest{
-		PropertyID:     f.PropertyID,
-		RoomID:         &roomID,
-		GuestID:        &f.GuestID,
-		CreatedBy:      f.UserID,
-		CheckIn:        time.Now().Add(24 * time.Hour),
-		CheckOut:       time.Now().Add(48 * time.Hour),
-		OriginalAmount: 200000,
-		Source:         "booking_com",
-		Status:         "confirmed",
+		PropertyID:  f.PropertyID,
+		RoomID:      &roomID,
+		GuestID:     &f.GuestID,
+		CreatedBy:   f.UserID,
+		CheckIn:     time.Now().Add(24 * time.Hour),
+		CheckOut:    time.Now().Add(48 * time.Hour),
+		TotalAmount: 200000,
+		Source:      "other",
+		Status:      "confirmed",
 	})
 	if err != nil {
 		t.Fatalf("expected successful booking assignment, got: %v", err)
@@ -403,7 +403,7 @@ func TestAssign_RoomOccupied(t *testing.T) {
 	// Create occupied booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 100000, 'other', 'checked_in')
 	`, uuid.New(), f.PropertyID, roomID, f.GuestID, f.UserID, checkinStart, checkinEnd)
 	if err != nil {
 		t.Fatalf("failed to create active booking: %v", err)
@@ -483,7 +483,7 @@ func TestCheckIn_Flow(t *testing.T) {
 	// Insert confirmed booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 day', 100000, 'booking_com', 'confirmed')
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 day', 100000, 'other', 'confirmed')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create confirmed booking: %v", err)
@@ -516,7 +516,7 @@ func TestCheckOut_Flow(t *testing.T) {
 	// Insert checked_in booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE, 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE, 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create checked_in booking: %v", err)
@@ -720,7 +720,7 @@ func TestCheckOut_TransitionsRoomToCleaning(t *testing.T) {
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by,
 		                      check_in, check_out, total_amount, source, status)
 		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 days',
-		        100000, 'direct', 'checked_in')
+		        100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create checked_in booking: %v", err)
@@ -763,7 +763,7 @@ func TestCheckOut_StillSucceedsWhenRoomInactive(t *testing.T) {
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by,
 		                      check_in, check_out, total_amount, source, status)
 		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 days',
-		        100000, 'direct', 'checked_in')
+		        100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create checked_in booking: %v", err)

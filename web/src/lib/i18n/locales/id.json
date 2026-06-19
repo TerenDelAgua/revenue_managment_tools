@@ -40,6 +40,8 @@
     "confirmBlock": "Konfirmasi Blokir",
     "checkIn": "Check In",
     "checkOut": "Check Out",
+    "markCleaning": "Tandai Pembersihan",
+    "cleaningDone": "Pembersihan Selesai",
     "removeBlock": "Hapus Blokir",
     "assignBooking": "Tetapkan Pemesanan",
     "availableTypes": "Tipe Tersedia"

@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -227,7 +226,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		if _, exists := roomMap[rID]; !exists {
 			roomMap[rID] = &models.RoomMap{
 				ID: rID, Number: rNum, PosX: posX, PosY: posY,
-				RoomType: models.RoomTypeRef{ID: rtID, Name: rtName},
+				RoomType:    models.RoomTypeRef{ID: rtID, Name: rtName},
 				HasBookings: hasBookings,
 			}
 			floorMap[fID].Rooms = append(floorMap[fID].Rooms, roomMap[rID])
@@ -297,6 +296,10 @@ func (r *RoomRepository) BatchUpdatePositions(ctx context.Context, updates []mod
 	return len(updates), tx.Commit(ctx)
 }
 
+// Update - Actualización parcial de un room. Acepta cualquier subconjunto de los
+// campos editables de models.UpdateRoomRequest. Se usa desde el InventoryService
+// para transicionar el estado operacional (cleaning → active, etc.) sin tener
+// que conocer el SQL de UPDATE directamente.
 func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, req *models.UpdateRoomRequest) (*models.Room, error) {
 	query := "UPDATE rooms SET "
 	args := []interface{}{}
@@ -332,50 +335,16 @@ func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, req *models.U
 		return r.GetByID(ctx, id)
 	}
 
-	query += fmt.Sprintf("updated_at = NOW() WHERE id = $%d RETURNING id, floor_id, property_id, room_type_id, number, status, pos_x, pos_y, (SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $%d)) AS has_bookings, created_at, updated_at", idx, idx)
+	query += fmt.Sprintf("updated_at = NOW() WHERE id = $%d RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at", idx)
 	args = append(args, id)
 
 	var room models.Room
 	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&room.ID, &room.FloorID, &room.PropertyID, &room.RoomTypeID, &room.Number, &room.Status,
-		&room.PosX, &room.PosY, &room.HasBookings, &room.CreatedAt, &room.UpdatedAt,
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
+		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	return &room, err
-}
-
-func (r *RoomRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	var hasBookings bool
-	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $1)`, id).Scan(&hasBookings)
-	if err != nil {
-		return err
-	}
-	if hasBookings {
-		return errors.New("cannot delete room with booking history")
-	}
-
-	_, err = r.db.Exec(ctx, `DELETE FROM rooms WHERE id = $1`, id)
-	return err
-}
-
-func (r *RoomRepository) ListRoomTypes(ctx context.Context, propertyID uuid.UUID) ([]*models.RoomType, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT id, property_id, name, max_occupancy, created_at, updated_at 
-		FROM room_types WHERE property_id = $1 ORDER BY name ASC`, propertyID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var roomTypes []*models.RoomType
-	for rows.Next() {
-		var rt models.RoomType
-		if err := rows.Scan(&rt.ID, &rt.PropertyID, &rt.Name, &rt.MaxOccupancy, &rt.CreatedAt, &rt.UpdatedAt); err != nil {
-			return nil, err
-		}
-		roomTypes = append(roomTypes, &rt)
-	}
-	return roomTypes, rows.Err()
 }
