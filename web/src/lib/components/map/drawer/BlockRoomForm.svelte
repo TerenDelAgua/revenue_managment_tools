@@ -14,6 +14,11 @@
 		blockEnd = $bindable(),
 		isDateValid
 	}: Props = $props();
+
+	const blockReasonId = 'block-room-reason';
+	const blockStartId = 'block-room-start-date';
+	const blockEndId = 'block-room-end-date';
+	const blockNoteId = 'block-room-note';
 </script>
 
 <div
@@ -22,7 +27,9 @@
 	<h3 class="text-xs font-bold tracking-wide text-[#1C1917] uppercase">Block Room</h3>
 
 	<!-- Reason Selection -->
+	<label for={blockReasonId} class="mb-1 block text-xs font-medium text-[#57534E]">Reason</label>
 	<select
+		id={blockReasonId}
 		bind:value={blockReason}
 		class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] transition-all outline-none focus:border-[#FF8C42] focus:ring-2 focus:ring-[#FF8C42]/30"
 	>
@@ -34,8 +41,9 @@
 	<!-- Date Range -->
 	<div class="grid grid-cols-2 gap-3">
 		<div class="relative">
-			<label class="mb-1 block text-xs font-medium text-[#57534E]">Start Date</label>
+			<label for={blockStartId} class="mb-1 block text-xs font-medium text-[#57534E]">Start Date</label>
 			<input
+				id={blockStartId}
 				type="date"
 				bind:value={blockStart}
 				class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
@@ -45,8 +53,9 @@
 			{/if}
 		</div>
 		<div class="relative">
-			<label class="mb-1 block text-xs font-medium text-[#57534E]">End Date</label>
+			<label for={blockEndId} class="mb-1 block text-xs font-medium text-[#57534E]">End Date</label>
 			<input
+				id={blockEndId}
 				type="date"
 				bind:value={blockEnd}
 				class="w-full rounded-lg border border-[#E7E5E4] bg-white p-3 text-[#1C1917] outline-none focus:ring-2 focus:ring-[#FF8C42]/30"
@@ -61,8 +70,9 @@
 
 	<!-- Notes -->
 	<div>
-		<label class="mb-1 block text-xs font-medium text-[#57534E]">Notes (Optional)</label>
+		<label for={blockNoteId} class="mb-1 block text-xs font-medium text-[#57534E]">Notes (Optional)</label>
 		<textarea
+			id={blockNoteId}
 			bind:value={blockNote}
 			rows="2"
 			placeholder="Why is this room blocked?"

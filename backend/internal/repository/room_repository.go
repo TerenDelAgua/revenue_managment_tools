@@ -348,3 +348,59 @@ func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, req *models.U
 	}
 	return &room, err
 }
+
+func (r *RoomRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	var hasBookings bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $1)
+	`, id).Scan(&hasBookings)
+	if err != nil {
+		return err
+	}
+
+	if hasBookings {
+		return fmt.Errorf("cannot delete room with booking history")
+	}
+
+	commandTag, err := r.db.Exec(ctx, `DELETE FROM rooms WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+
+	if commandTag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *RoomRepository) ListRoomTypes(ctx context.Context, propertyID uuid.UUID) ([]*models.RoomType, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, property_id, name, max_occupancy, created_at, updated_at
+		FROM room_types
+		WHERE property_id = $1
+		ORDER BY name ASC
+	`, propertyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	roomTypes := make([]*models.RoomType, 0)
+	for rows.Next() {
+		var roomType models.RoomType
+		if err := rows.Scan(
+			&roomType.ID,
+			&roomType.PropertyID,
+			&roomType.Name,
+			&roomType.MaxOccupancy,
+			&roomType.CreatedAt,
+			&roomType.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		roomTypes = append(roomTypes, &roomType)
+	}
+
+	return roomTypes, rows.Err()
+}

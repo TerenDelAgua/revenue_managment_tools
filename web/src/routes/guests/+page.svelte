@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fade, slide, fly } from 'svelte/transition';
+	import { fly } from 'svelte/transition';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
 	import type { GuestListDTO, GuestDetail } from '$lib/types';
@@ -30,7 +30,7 @@
 	let editNotes = $state('');
 
 	// Timer de búsqueda (Debounce)
-	let searchTimeout: any;
+	let searchTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	// --- CARGA DE DATOS ---
 	async function loadGuests() {
@@ -206,7 +206,7 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-[#F5F4F1]">
-						{#each guests as guest}
+						{#each guests as guest (guest.id)}
 							{@const loyalty = getLoyaltyTier(guest.booking_count)}
 							<tr
 								onclick={() => openGuestDetails(guest.id)}
@@ -265,6 +265,7 @@
 	<!-- Backdrop -->
 	<button
 		type="button"
+		aria-label="Cerrar detalle del huesped"
 		class="fixed inset-0 z-40 bg-[#1C1917]/20 backdrop-blur-[1px] cursor-default w-full text-left"
 		onclick={() => isDrawerOpen = false}
 	></button>
@@ -317,8 +318,9 @@
 					
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div>
-							<label class="block text-xs font-semibold text-[#57534E] mb-1">Nombre Completo *</label>
+							<label for="guest-detail-full-name" class="block text-xs font-semibold text-[#57534E] mb-1">Nombre Completo *</label>
 							<input
+								id="guest-detail-full-name"
 								type="text"
 								required
 								bind:value={editFullName}
@@ -326,8 +328,9 @@
 							/>
 						</div>
 						<div>
-							<label class="block text-xs font-semibold text-[#57534E] mb-1">Teléfono de Contacto *</label>
+							<label for="guest-detail-phone" class="block text-xs font-semibold text-[#57534E] mb-1">Teléfono de Contacto *</label>
 							<input
+								id="guest-detail-phone"
 								type="text"
 								required
 								bind:value={editPhone}
@@ -335,8 +338,9 @@
 							/>
 						</div>
 						<div>
-							<label class="block text-xs font-semibold text-[#57534E] mb-1">Email</label>
+							<label for="guest-detail-email" class="block text-xs font-semibold text-[#57534E] mb-1">Email</label>
 							<input
+								id="guest-detail-email"
 								type="email"
 								bind:value={editEmail}
 								class="w-full rounded-lg border border-[#E7E5E4] bg-[#FCFBFA] px-3 py-2 text-xs text-[#1C1917] focus:outline-none"
@@ -344,8 +348,9 @@
 						</div>
 						<div class="grid grid-cols-2 gap-2">
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">Nacionalidad</label>
+								<label for="guest-detail-nationality" class="block text-xs font-semibold text-[#57534E] mb-1">Nacionalidad</label>
 								<input
+									id="guest-detail-nationality"
 									type="text"
 									placeholder="ESP, IDN..."
 									bind:value={editNationality}
@@ -353,8 +358,9 @@
 								/>
 							</div>
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">Doc. Pasaporte</label>
+								<label for="guest-detail-id-number" class="block text-xs font-semibold text-[#57534E] mb-1">Doc. Pasaporte</label>
 								<input
+									id="guest-detail-id-number"
 									type="text"
 									placeholder="Passport"
 									bind:value={editIdNumber}
@@ -365,8 +371,9 @@
 					</div>
 
 					<div>
-						<label class="block text-xs font-semibold text-[#57534E] mb-1">Observaciones / Preferencias Generales</label>
+						<label for="guest-detail-notes" class="block text-xs font-semibold text-[#57534E] mb-1">Observaciones / Preferencias Generales</label>
 						<textarea
+							id="guest-detail-notes"
 							bind:value={editNotes}
 							placeholder="Notas sobre desayuno, almohadas, historial médico..."
 							class="w-full rounded-lg border border-[#E7E5E4] bg-[#FCFBFA] px-3 py-2 text-xs text-[#1C1917] h-20 resize-none focus:outline-none"
@@ -401,7 +408,7 @@
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-[#F5F4F1]">
-									{#each selectedGuest.bookings as visit}
+									{#each selectedGuest.bookings as visit (visit.id)}
 										<tr>
 											<td class="p-3 font-medium">
 												{formatDateString(visit.check_in)} - {formatDateString(visit.check_out)}

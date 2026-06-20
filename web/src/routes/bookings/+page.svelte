@@ -425,9 +425,10 @@
 						
 						<!-- Phone search first -->
 						<div>
-							<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.mobilePhone')}</label>
+							<label for="guest-phone" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.mobilePhone')}</label>
 							<div class="relative">
 								<input
+									id="guest-phone"
 									type="tel"
 									required
 									pattern={"^\\+?[0-9\\s\\-]{6,20}$"}
@@ -452,7 +453,7 @@
 						{#if showGuestSuggestions && guestSearchResults.length > 0}
 							<div class="bg-white border border-[#E7E5E4] rounded-xl shadow-lg p-2 max-h-40 overflow-y-auto space-y-1">
 								<p class="text-[10px] font-bold text-[#A8A29E] px-2 py-1">{$_('bookingsForm.historicalGuests')}</p>
-								{#each guestSearchResults as guest}
+								{#each guestSearchResults as guest (guest.id)}
 									<button
 										type="button"
 										onclick={() => linkGuest(guest)}
@@ -470,8 +471,9 @@
 
 						<!-- Name -->
 						<div>
-							<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.fullName')}</label>
+							<label for="guest-name" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.fullName')}</label>
 							<input
+								id="guest-name"
 								type="text"
 								required
 								disabled={selectedGuestId !== null}
@@ -483,8 +485,9 @@
 
 						<!-- Email -->
 						<div>
-							<label class="block text-xs font-semibold text-[#57534E] mb-1">Email</label>
+							<label for="guest-email" class="block text-xs font-semibold text-[#57534E] mb-1">Email</label>
 							<input
+								id="guest-email"
 								type="email"
 								disabled={selectedGuestId !== null}
 								placeholder="{$_('bookingsForm.emailPlaceholder')}"
@@ -496,8 +499,9 @@
 
 						<div class="grid grid-cols-2 gap-4">
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.documentPassport')}</label>
+								<label for="guest-document" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.documentPassport')}</label>
 								<input
+									id="guest-document"
 									type="text"
 									disabled={selectedGuestId !== null}
 									placeholder="{$_('bookingsForm.idPlaceholder')}"
@@ -506,8 +510,9 @@
 								/>
 							</div>
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.nationality')}</label>
+								<label for="guest-nationality" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.nationality')}</label>
 								<input
+									id="guest-nationality"
 									type="text"
 									disabled={selectedGuestId !== null}
 									placeholder="{$_('bookingsForm.nationalityPlaceholder')}"
@@ -540,8 +545,9 @@
 						
 						<div class="grid grid-cols-2 gap-4">
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">Check-in</label>
+								<label for="booking-check-in" class="block text-xs font-semibold text-[#57534E] mb-1">Check-in</label>
 								<input
+									id="booking-check-in"
 									type="date"
 									required
 									bind:value={checkIn}
@@ -549,8 +555,9 @@
 								/>
 							</div>
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">Check-out</label>
+								<label for="booking-check-out" class="block text-xs font-semibold text-[#57534E] mb-1">Check-out</label>
 								<input
+									id="booking-check-out"
 									type="date"
 									required
 									bind:value={checkOut}
@@ -561,8 +568,9 @@
 
 						<div class="grid grid-cols-3 gap-2">
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.adults')}</label>
+								<label for="booking-adults" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.adults')}</label>
 								<input
+									id="booking-adults"
 									type="number"
 									min="1"
 									required
@@ -571,8 +579,9 @@
 								/>
 							</div>
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.children')}</label>
+								<label for="booking-children" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.children')}</label>
 								<input
+									id="booking-children"
 									type="number"
 									min="0"
 									required
@@ -581,8 +590,8 @@
 								/>
 							</div>
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.nights')}</label>
-								<div class="w-full bg-[#F5F4F1] border border-[#E7E5E4] rounded-lg px-3 py-2 text-sm text-[#57534E] text-center font-semibold">
+								<span id="booking-nights-label" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.nights')}</span>
+								<div aria-labelledby="booking-nights-label" class="w-full bg-[#F5F4F1] border border-[#E7E5E4] rounded-lg px-3 py-2 text-sm text-[#57534E] text-center font-semibold">
 									{$_('bookingsForm.nightsCount', { values: { count: stayNights } })}
 								</div>
 							</div>
@@ -590,20 +599,22 @@
 
 						<div class="grid grid-cols-2 gap-4">
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.physicalRoom')}</label>
+								<label for="booking-room" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.physicalRoom')}</label>
 								<select
+									id="booking-room"
 									bind:value={selectedRoomId}
 									class="w-full rounded-lg border border-[#E7E5E4] bg-[#FCFBFA] px-3 py-2.5 text-sm text-[#1C1917] focus:outline-none focus:border-[#FF8C42]"
 								>
 									<option value={null}>{$_('bookingsForm.unassigned')}</option>
-									{#each allRooms as room}
+									{#each allRooms as room (room.id)}
 										<option value={room.id}>{$_('bookingsForm.roomNumber', { values: { number: room.number } })} ({room.room_type.name})</option>
 									{/each}
 								</select>
 							</div>
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.bookingSource')}</label>
+								<label for="booking-source" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.bookingSource')}</label>
 								<select
+									id="booking-source"
 									bind:value={source}
 									class="w-full rounded-lg border border-[#E7E5E4] bg-[#FCFBFA] px-3 py-2.5 text-sm text-[#1C1917] focus:outline-none focus:border-[#FF8C42]"
 								>
@@ -621,10 +632,11 @@
 
 						<div class="grid grid-cols-1 gap-2">
 							<div>
-								<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.originalAmount', { values: { count: stayNights } })}</label>
+								<label for="booking-original-amount" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.originalAmount', { values: { count: stayNights } })}</label>
 								<div class="relative">
 									<span class="absolute left-3 top-2 text-sm text-[#57534E] font-bold">IDR</span>
 									<input
+										id="booking-original-amount"
 										type="number"
 										required
 										min="0"
@@ -636,8 +648,9 @@
 						</div>
 
 						<div>
-							<label class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.observations')}</label>
+							<label for="booking-notes" class="block text-xs font-semibold text-[#57534E] mb-1">{$_('bookingsForm.observations')}</label>
 							<textarea
+								id="booking-notes"
 								placeholder="{$_('bookingsForm.observationsPlaceholder')}"
 								bind:value={notes}
 								class="w-full rounded-lg border border-[#E7E5E4] bg-[#FCFBFA] px-3 py-2 text-sm text-[#1C1917] focus:outline-none focus:border-[#FF8C42] h-16 resize-none"
@@ -741,7 +754,7 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-[#F5F4F1]">
-						{#each filteredBookings as booking}
+						{#each filteredBookings as booking (booking.id)}
 							<tr
 								onclick={() => openBookingDetails(booking)}
 								class="hover:bg-[#FCFBFA] cursor-pointer transition"
@@ -814,6 +827,7 @@
 	<!-- Backdrop -->
 	<button
 		type="button"
+		aria-label="Cerrar detalle de reserva"
 		class="fixed inset-0 z-40 bg-[#1C1917]/20 backdrop-blur-[1px] cursor-default w-full text-left"
 		onclick={() => isDrawerOpen = false}
 	></button>
@@ -894,7 +908,7 @@
 							class="flex-1 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs text-[#1C1917] focus:outline-none"
 						>
 							<option value={null}>[Dejar Sin Asignar]</option>
-							{#each allRooms as room}
+							{#each allRooms as room (room.id)}
 								<option value={room.id}>Hab. {room.number} - {room.room_type.name}</option>
 							{/each}
 						</select>

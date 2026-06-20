@@ -4,24 +4,15 @@
 	import FloorTabs from '$lib/components/map/FloorTabs.svelte';
 	import RoomPalette from '$lib/components/map/RoomPalette.svelte';
 	import RoomDrawer from '$lib/components/map/RoomDrawer.svelte';
-	import type { MapResponse, RoomMap, RoomType } from '$lib/types';
+	import type { BlockReason, MapResponse, RoomMap, RoomType } from '$lib/types';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
 	import OccupancyBar from '$lib/components/map/OccupancyBar.svelte';
+	import { onMount } from 'svelte';
+	import { SvelteDate } from 'svelte/reactivity';
 
 	const propertyId = '89ce1655-d0c6-417a-8c69-3ad59241e0d0'; // UUID de prueba actual
-
-	async function parseError(res: Response): Promise<Error> {
-		try {
-			const data = await res.json();
-			return new Error(data.message || `API Error: ${res.status}`);
-		} catch {
-			return new Error(`API Error: ${res.status}`);
-		}
-	}
-
-	import { onMount } from 'svelte';
 
 	let currentUser = $state({ role: 'owner' });
 	let mode = $state<'setup' | 'ops'>('ops');
@@ -34,6 +25,58 @@
 	let drawerOpen = $state(false);
 	let selectedRoom = $state<RoomMap | null>(null);
 	let roomTypes = $state<RoomType[]>([]);
+
+	type DrawerAction =
+		| 'assign'
+		| 'checkin'
+		| 'checkout'
+		| 'block'
+		| 'unblock'
+		| 'set_cleaning'
+		| 'clear_cleaning'
+		| 'update_room'
+		| 'delete_room';
+
+	type AssignPayload = {
+		booking_id: string;
+	};
+
+	type BlockPayload = {
+		reason: BlockReason;
+		notes?: string;
+		start_date: string;
+		end_date: string;
+	};
+
+	type UpdateRoomPayload = Parameters<typeof api.rooms.update>[1];
+
+	function isRecord(value: unknown): value is Record<string, unknown> {
+		return typeof value === 'object' && value !== null;
+	}
+
+	function isAssignPayload(value: unknown): value is AssignPayload {
+		return isRecord(value) && typeof value.booking_id === 'string' && value.booking_id.length > 0;
+	}
+
+	function isBlockPayload(value: unknown): value is BlockPayload {
+		return (
+			isRecord(value) &&
+			(value.reason === 'maintenance' ||
+				value.reason === 'owner_use' ||
+				value.reason === 'out_of_service') &&
+			typeof value.start_date === 'string' &&
+			typeof value.end_date === 'string' &&
+			(value.notes === undefined || typeof value.notes === 'string')
+		);
+	}
+
+	function isUpdateRoomPayload(value: unknown): value is UpdateRoomPayload {
+		return isRecord(value);
+	}
+
+	function getErrorMessage(error: unknown, fallback: string): string {
+		return error instanceof Error ? error.message : fallback;
+	}
 
 	async function loadRoomTypes() {
 		try {
@@ -80,9 +123,9 @@
 			});
 			addToast('Habitación añadida al mapa', 'success');
 			await loadMap();
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error(err);
-			addToast(err?.message || 'Error al añadir habitación', 'error');
+			addToast(getErrorMessage(err, 'Error al añadir habitación'), 'error');
 		}
 	}
 
@@ -104,7 +147,7 @@
 			const from = new Date(dateFrom);
 			const to = new Date(dateTo);
 			if (from >= to) {
-				const nextDay = new Date(from);
+				const nextDay = new SvelteDate(from);
 				nextDay.setDate(nextDay.getDate() + 1);
 				dateTo = nextDay.toISOString().split('T')[0];
 			}
@@ -185,8 +228,9 @@
 		drawerOpen = true;
 	}
 
-	async function handleDrawerAction(action: string, payload?: any) {
+	async function handleDrawerAction(action: DrawerAction | string, payload?: unknown) {
 		if (!selectedRoom) return;
+		const normalizedAction = action.trim() as DrawerAction;
 
 		// 1. Guardar estado original para rollback
 		const backup = {
@@ -199,7 +243,7 @@
 		};
 
 		try {
-			switch (action) {
+			switch (normalizedAction) {
 				case 'checkin': {
 					// Validación: necesitamos un booking pending o active
 					const bookingId = selectedRoom.pending_booking || selectedRoom.active_booking;
@@ -261,6 +305,10 @@
 				}
 
 				case 'block': {
+					if (!isBlockPayload(payload)) {
+						throw new Error('Invalid block payload');
+					}
+
 					// Optimistic
 					selectedRoom.availability = 'blocked';
 					drawerOpen = false;
@@ -268,8 +316,8 @@
 					// Formatear fechas a RFC3339 para deserialización en Go (time.Time)
 					const formattedPayload = {
 						...payload,
-						start_date: payload.start_date ? `${payload.start_date}T00:00:00Z` : undefined,
-						end_date: payload.end_date ? `${payload.end_date}T00:00:00Z` : undefined
+						start_date: `${payload.start_date}T00:00:00Z`,
+						end_date: `${payload.end_date}T00:00:00Z`
 					};
 
 					await api.roomBlocks.create({
@@ -294,7 +342,10 @@
 				}
 
 				case 'assign': {
-					if (!payload?.booking_id) throw new Error('No booking selected');
+					if (!isAssignPayload(payload)) {
+						throw new Error('No booking selected');
+					}
+
 					// Optimistic UI
 					selectedRoom.availability = 'pending';
 					selectedRoom.pending_booking = payload.booking_id;
@@ -306,7 +357,7 @@
 				}
 
 				case 'update_room': {
-					if (!payload) return;
+					if (!isUpdateRoomPayload(payload)) return;
 					await api.rooms.update(selectedRoom.id, payload);
 					addToast('Room updated successfully', 'success');
 					break;
@@ -320,20 +371,20 @@
 				}
 
 				default:
-					throw new Error(`Unknown action: ${action}`);
+					throw new Error(`Unknown action: ${normalizedAction}`);
 			}
 
 			// Sync final con datos reales
 			await loadMap();
-		} catch (error: any) {
-			console.error(`[Drawer] Action '${action}' failed:`, error);
+		} catch (error: unknown) {
+			console.error(`[Drawer] Action '${normalizedAction}' failed:`, error);
 
 			// Rollback
 			Object.assign(selectedRoom, backup);
 			drawerOpen = true;
 
 			addToast(
-				error?.message || `Failed to ${action}. Connection lost or conflict detected.`,
+				getErrorMessage(error, `Failed to ${normalizedAction}. Connection lost or conflict detected.`),
 				'error'
 			);
 		}
