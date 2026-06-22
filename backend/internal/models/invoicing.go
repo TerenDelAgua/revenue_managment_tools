@@ -32,6 +32,10 @@ const (
 	PaymentStatusPartial  PaymentStatus = "partial"
 	PaymentStatusPaid     PaymentStatus = "paid"
 	PaymentStatusOverpaid PaymentStatus = "overpaid"
+	// PaymentStatusVoid mirrors the invoice lifecycle when the invoice is
+	// voided (no payments can occur). Surfaced via the same field so the
+	// UI doesn't need a separate status for the void case.
+	PaymentStatusVoid PaymentStatus = "void"
 )
 
 // PaymentMethod follows the spec §2.1 enumeration.

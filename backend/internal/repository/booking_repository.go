@@ -8,10 +8,20 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/terendelagua/teren-hotels-backend/internal/models"
 )
+
+// Querier is the minimal subset of pgx methods shared by *pgxpool.Pool
+// and pgx.Tx. Repos accept this so the service layer can pass either
+// (non-tx reads use the pool; tx-wrapped writes use the tx).
+type Querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
 
 type BookingRepository struct {
 	db *pgxpool.Pool
@@ -31,14 +41,21 @@ func scanBooking(row pgx.Row, b *models.Booking) error {
 }
 
 func (r *BookingRepository) Create(ctx context.Context, req *models.CreateBookingRequest) (*models.Booking, error) {
+	return r.CreateWithTx(ctx, r.db, req)
+}
+
+// CreateWithTx inserts a booking using the provided querier (pool or tx).
+// Used by BookingService to share a transaction with InvoiceService
+// (BR-INV-001: booking + invoice creation is atomic).
+func (r *BookingRepository) CreateWithTx(ctx context.Context, q Querier, req *models.CreateBookingRequest) (*models.Booking, error) {
 	if req.CreatedBy == uuid.Nil {
 		var userID uuid.UUID
-		err := r.db.QueryRow(ctx, "SELECT id FROM users WHERE property_id = $1 LIMIT 1", req.PropertyID).Scan(&userID)
+		err := q.QueryRow(ctx, "SELECT id FROM users WHERE property_id = $1 LIMIT 1", req.PropertyID).Scan(&userID)
 		if err == nil {
 			req.CreatedBy = userID
 		} else {
 			// Si no hay usuarios en la DB (raro), podemos intentar crear uno por defecto o buscar el primero globalmente
-			err = r.db.QueryRow(ctx, "SELECT id FROM users LIMIT 1").Scan(&userID)
+			err = q.QueryRow(ctx, "SELECT id FROM users LIMIT 1").Scan(&userID)
 			if err == nil {
 				req.CreatedBy = userID
 			}
@@ -46,7 +63,7 @@ func (r *BookingRepository) Create(ctx context.Context, req *models.CreateBookin
 	}
 
 	var booking models.Booking
-	err := r.db.QueryRow(ctx, `
+	err := q.QueryRow(ctx, `
 		INSERT INTO bookings (property_id, room_id, guest_id, created_by, check_in, check_out, adults, children, original_amount, original_currency, exchange_rate, total_amount, payment_status, source, status, notes)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING id, property_id, room_id, guest_id, created_by, check_in, check_out, adults, children, original_amount, original_currency, exchange_rate, total_amount, payment_status, source, status, notes, created_at, updated_at

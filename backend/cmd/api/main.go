@@ -35,6 +35,7 @@ func main() {
 	roomBlockRepo := repository.NewRoomBlockRepository(db.Pool)
 	bookingRepo := repository.NewBookingRepository(db.Pool)
 	guestRepo := repository.NewGuestRepository(db.Pool)
+	invoiceRepo := repository.NewInvoiceRepository(db.Pool)
 
 	propertyHandler := internalapi.NewPropertyHandler(propertyRepo)
 	floorHandler := internalapi.NewFloorHandler(floorRepo)
@@ -44,7 +45,11 @@ func main() {
 	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
 	roomBlockHandler := internalapi.NewRoomBlockHandler(inventoryService)
 
-	bookingService := service.NewBookingService(db.Pool, bookingRepo, guestRepo, inventoryService)
+	// InvoiceService wired without a PDFGenerator (B5 will inject it).
+	// Until then, the service falls back to "pdf_url NULL, regenerable later"
+	// per spec §8.1.
+	invoiceService := service.NewInvoiceService(db.Pool, invoiceRepo, bookingRepo, nil)
+	bookingService := service.NewBookingService(db.Pool, bookingRepo, guestRepo, inventoryService, invoiceService)
 	bookingHandler := internalapi.NewBookingHandler(bookingService)
 
 	guestService := service.NewGuestService(guestRepo)
