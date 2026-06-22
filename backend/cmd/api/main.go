@@ -15,6 +15,8 @@ import (
 	"github.com/terendelagua/teren-hotels-backend/internal/service"
 	"github.com/terendelagua/teren-hotels-backend/pkg/config"
 	"github.com/terendelagua/teren-hotels-backend/pkg/database"
+	"github.com/terendelagua/teren-hotels-backend/pkg/pdfgen"
+	"github.com/terendelagua/teren-hotels-backend/pkg/pdfstore"
 )
 
 func main() {
@@ -45,10 +47,21 @@ func main() {
 	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
 	roomBlockHandler := internalapi.NewRoomBlockHandler(inventoryService)
 
-	// InvoiceService wired without a PDFGenerator (B5 will inject it).
-	// Until then, the service falls back to "pdf_url NULL, regenerable later"
-	// per spec §8.1.
-	invoiceService := service.NewInvoiceService(db.Pool, invoiceRepo, bookingRepo, nil)
+	// InvoiceService wired with a PDFGenerator (B5).
+	// The generator uses gofpdf for rendering and uploads via the
+	// configured ObjectStore (R2 in prod, local FS in dev).
+	pdfStore, err := pdfstore.NewStore(cfg)
+	if err != nil {
+		log.Fatalf("init pdf store: %v", err)
+	}
+	pdfGen := pdfgen.NewInvoicePDFGenerator(invoiceRepo, pdfStore)
+	if cfg.UseR2() {
+		log.Printf("PDF store: R2 bucket=%s", cfg.R2Bucket)
+	} else {
+		log.Printf("PDF store: local FS dir=%s (no R2 credentials configured)", cfg.LocalPDFDir)
+	}
+
+	invoiceService := service.NewInvoiceService(db.Pool, invoiceRepo, bookingRepo, pdfGen)
 	bookingService := service.NewBookingService(db.Pool, bookingRepo, guestRepo, inventoryService, invoiceService)
 	bookingHandler := internalapi.NewBookingHandler(bookingService)
 	invoiceHandler := internalapi.NewInvoiceHandler(invoiceService)
