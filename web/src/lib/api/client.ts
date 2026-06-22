@@ -8,7 +8,14 @@ import type {
 	CreateBookingPayload,
 	GuestDetail,
 	GuestListDTO,
-	Guest
+	Guest,
+	InvoiceDetail,
+	InvoiceListResponse,
+	ListInvoicesFilter,
+	RegisterPaymentPayload,
+	Payment,
+	DailySummary,
+	MonthlyTaxReport
 } from '$lib/types';
 import { env } from '$env/dynamic/public';
 
@@ -261,5 +268,78 @@ export const api = {
 			request<ReportResponse>(`/reports/metrics?property_id=${propertyId}&date_from=${dateFrom}&date_to=${dateTo}`),
 		daily: (propertyId: string, dateFrom: string, dateTo: string) =>
 			request<DailyBreakdownResponse>(`/reports/daily?property_id=${propertyId}&date_from=${dateFrom}&date_to=${dateTo}`)
+	},
+	invoices: {
+		// Read — spec §4.1, §4.2
+		getByID: (id: string) => request<InvoiceDetail>(`/invoices/${id}`),
+		getByBooking: (bookingId: string) => request<InvoiceDetail>(`/invoices/by-booking/${bookingId}`),
+
+		// List — spec §4.7. Filters are optional; backend applies them as AND.
+		list: (filter: ListInvoicesFilter) => {
+			const qs = new URLSearchParams();
+			qs.set('property_id', filter.property_id);
+			if (filter.status) qs.set('status', filter.status);
+			if (filter.date_from) qs.set('date_from', filter.date_from);
+			if (filter.date_to) qs.set('date_to', filter.date_to);
+			if (filter.search) qs.set('search', filter.search);
+			if (filter.page) qs.set('page', String(filter.page));
+			if (filter.limit) qs.set('limit', String(filter.limit));
+			return request<InvoiceListResponse>(`/invoices?${qs.toString()}`);
+		},
+
+		// Aggregations — spec §4.9, §4.11
+		dailySummary: (propertyId: string, date?: string, tz?: string) => {
+			const qs = new URLSearchParams({ property_id: propertyId });
+			if (date) qs.set('date', date);
+			if (tz) qs.set('tz', tz);
+			return request<DailySummary>(`/invoices/daily-summary?${qs.toString()}`);
+		},
+		taxReport: (propertyId: string, year: number, month?: number) => {
+			const qs = new URLSearchParams({ property_id: propertyId, year: String(year) });
+			if (month) qs.set('month', String(month));
+			return request<MonthlyTaxReport>(`/invoices/tax-report?${qs.toString()}`);
+		},
+
+		// Write — spec §4.3 (R-01 reference required, R-06 Idempotency-Key)
+		// Pass an idempotencyKey (UUID v4) to opt-in to dedup.
+		registerPayment: (
+			invoiceId: string,
+			payload: RegisterPaymentPayload,
+			propertyId: string,
+			receivedBy: string,
+			idempotencyKey?: string
+		) => {
+			const headers: Record<string, string> = {
+				'X-Property-ID': propertyId,
+				'X-User-ID': receivedBy
+			};
+			if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+			return request<Payment>(`/invoices/${invoiceId}/payments`, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify(payload)
+			});
+		},
+
+		// Write — spec §4.4
+		void: (invoiceId: string, reason: string, voidedBy: string) =>
+			request<InvoiceDetail>(`/invoices/${invoiceId}/void`, {
+				method: 'POST',
+				headers: { 'X-User-ID': voidedBy },
+				body: JSON.stringify({ reason })
+			}),
+
+		// Write — spec §4.5
+		updateNotes: (invoiceId: string, notes: string) =>
+			request<InvoiceDetail>(`/invoices/${invoiceId}/notes`, {
+				method: 'PATCH',
+				body: JSON.stringify({ notes })
+			}),
+
+		// Write — spec §4.6
+		regeneratePDF: (invoiceId: string) =>
+			request<{ pdf_url: string }>(`/invoices/${invoiceId}/regenerate-pdf`, {
+				method: 'POST'
+			})
 	}
 };

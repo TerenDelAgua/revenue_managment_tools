@@ -11,6 +11,7 @@
 	import CheckoutConfirmCard from './drawer/CheckoutConfirmCard.svelte';
 	import PendingBookingsList from './drawer/PendingBookingsList.svelte';
 	import BlockRoomForm from './drawer/BlockRoomForm.svelte';
+	import InvoiceWidget from '$lib/components/invoice/InvoiceWidget.svelte';
 
 	interface Props {
 		room: RoomMap | null;
@@ -343,6 +344,13 @@
 				<!-- Ficha de Huésped (Hospedado o Entrante) -->
 				{#if room.active_booking || room.pending_booking}
 					<GuestDetailsCard {room} />
+
+					<!-- Factura del booking (B6). El widget carga por sí mismo
+					     vía api.invoices.getByBooking y maneja 404 → estado vacío. -->
+					<InvoiceWidget
+						bookingId={room.active_booking ?? room.pending_booking}
+						{propertyId}
+					/>
 				{/if}
 
 				<!-- Ficha de Detalles del Bloqueo -->

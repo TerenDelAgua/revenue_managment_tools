@@ -227,3 +227,152 @@ export interface CreateBookingResponse {
     booking: Booking;
     guest_reused: boolean;
 }
+
+// === Invoicing & Payments ===
+// Spec ref: Docs/Features/TEREN_Hotels_Invoicing_Spec_v1.1.md §4
+
+export type InvoiceStatus = 'active' | 'void';
+export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'void';
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'qris' | 'card';
+
+export interface InvoiceLineItem {
+    id: string;
+    invoice_id: string;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+    sort_order: number;
+    created_at: string;
+}
+
+export interface Payment {
+    id: string;
+    invoice_id: string;
+    property_id: string;
+    method: PaymentMethod;
+    amount: number; // > 0 = cobro, < 0 = refund
+    original_currency: string;
+    exchange_rate: number;
+    reference: string | null;
+    notes: string | null;
+    is_reversal: boolean;
+    reversal_of: string | null;
+    received_by: string;
+    received_at: string;
+    created_at: string;
+}
+
+export interface Invoice {
+    id: string;
+    property_id: string;
+    booking_id: string;
+    invoice_number: string;
+    subtotal: number;
+    tax_amount: number;
+    ppn_rate_snapshot: number; // e.g. 0.11 for 11% PPN
+    total: number;
+    original_currency: string;
+    exchange_rate: number;
+    status: InvoiceStatus;
+    issued_at: string;
+    paid_at: string | null;
+    voided_at: string | null;
+    voided_by: string | null;
+    void_reason: string | null;
+    created_by: string;
+    pdf_url: string | null;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface InvoiceDetail extends Invoice {
+    line_items: InvoiceLineItem[];
+    payments: Payment[];
+    total_paid: number;
+    total_refunded: number;
+    balance: number;
+    effective_status: PaymentStatus;
+}
+
+export interface InvoiceSummary {
+    id: string;
+    invoice_number: string;
+    booking_id: string;
+    subtotal: number;
+    tax_amount: number;
+    total: number;
+    total_paid: number;
+    balance: number;
+    status: InvoiceStatus;
+    effective_status: PaymentStatus;
+    issued_at: string;
+    paid_at: string | null;
+    voided_at: string | null;
+    guest_name: string | null;
+    room_number: string | null;
+}
+
+export interface InvoiceListResponse {
+    invoices: InvoiceSummary[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+    };
+}
+
+export interface ListInvoicesFilter {
+    property_id: string;
+    status?: PaymentStatus;
+    date_from?: string;
+    date_to?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+}
+
+export interface RegisterPaymentPayload {
+    method: PaymentMethod;
+    amount: number;
+    reference?: string;
+    notes?: string;
+    is_reversal?: boolean;
+    reversal_of?: string;
+}
+
+export interface DailySummary {
+    date: string;
+    property_id: string;
+    invoices_issued: number;
+    invoices_paid: number;
+    invoices_partial: number;
+    invoices_unpaid: number;
+    invoices_void: number;
+    invoices_overpaid: number;
+    total_revenue: number;
+    total_collected: number;
+    total_refunded: number;
+    total_pending: number;
+    by_method: Partial<Record<PaymentMethod, number>>;
+    tax_collected: number;
+    staff_breakdown: Array<{
+        user_id: string;
+        user_name: string;
+        payments_count: number;
+        amount_collected: number;
+    }>;
+}
+
+export interface MonthlyTaxReport {
+    property_id: string;
+    year: number;
+    month?: number;
+    total_subtotal: number;
+    total_tax: number;
+    invoices_count: number;
+    void_count: number;
+    refunds_total: number;
+    net_tax_collected: number;
+}

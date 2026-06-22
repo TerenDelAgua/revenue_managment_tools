@@ -151,7 +151,62 @@
       "assignError": "Error al asignar habitación.",
       "cancelMissingReason": "Por favor indica un motivo para la cancelación.",
       "cancelSuccess": "Reserva cancelada correctamente.",
-      "cancelError": "Error al cancelar la reserva."
+      "cancelError": "Error al cancelar reserva."
+    }
+  },
+  "invoiceWidget": {
+    "title": "Factura",
+    "loading": "Cargando factura…",
+    "loadError": "No se pudo cargar la factura.",
+    "noInvoice": "Aún no hay factura para esta reserva.",
+    "invoiceNumber": "Factura {number}",
+    "issuedAt": "Emitida el {date}",
+    "status": {
+      "paid": "Pagada",
+      "partial": "Parcial",
+      "unpaid": "Pendiente",
+      "overpaid": "Sobrepagada",
+      "void": "Anulada"
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "tax": "Impuesto (PPN {rate}%)",
+      "total": "Total",
+      "paid": "Pagado",
+      "balance": "Saldo",
+      "refunded": "Reembolsado"
+    },
+    "actions": {
+      "openPdf": "Abrir PDF",
+      "regeneratePdf": "Regenerar PDF",
+      "registerPayment": "Registrar pago",
+      "void": "Anular factura",
+      "viewAll": "Ver todas las facturas"
+    },
+    "void": {
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "¿Por qué se anula esta factura?",
+      "confirm": "Anular factura",
+      "cancel": "Cancelar",
+      "missingReason": "Por favor indica un motivo."
+    },
+    "payments": {
+      "title": "Pagos",
+      "none": "Aún no hay pagos registrados.",
+      "count": "{count, plural, =0 {Sin pagos} =1 {1 pago} other {# pagos}}",
+      "method": {
+        "cash": "Efectivo",
+        "bank_transfer": "Transferencia",
+        "qris": "QRIS",
+        "card": "Tarjeta"
+      },
+      "refund": "Reembolso"
+    },
+    "toasts": {
+      "regenerateSuccess": "PDF regenerado.",
+      "regenerateError": "No se pudo regenerar el PDF.",
+      "voidSuccess": "Factura anulada.",
+      "voidError": "No se pudo anular la factura."
     }
   }
 }

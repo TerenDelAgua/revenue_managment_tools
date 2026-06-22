@@ -153,5 +153,60 @@
       "cancelSuccess": "Pemesanan berhasil dibatalkan.",
       "cancelError": "Kesalahan membatalkan pemesanan."
     }
+  },
+  "invoiceWidget": {
+    "title": "Faktur",
+    "loading": "Memuat faktur…",
+    "loadError": "Tidak dapat memuat faktur.",
+    "noInvoice": "Belum ada faktur untuk pemesanan ini.",
+    "invoiceNumber": "Faktur {number}",
+    "issuedAt": "Diterbitkan {date}",
+    "status": {
+      "paid": "Lunas",
+      "partial": "Sebagian",
+      "unpaid": "Belum Bayar",
+      "overpaid": "Kelebihan Bayar",
+      "void": "Dibatalkan"
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "tax": "Pajak (PPN {rate}%)",
+      "total": "Total",
+      "paid": "Dibayar",
+      "balance": "Sisa",
+      "refunded": "Dikembalikan"
+    },
+    "actions": {
+      "openPdf": "Buka PDF",
+      "regeneratePdf": "Buat Ulang PDF",
+      "registerPayment": "Catat Pembayaran",
+      "void": "Batalkan Faktur",
+      "viewAll": "Lihat semua faktur"
+    },
+    "void": {
+      "reasonLabel": "Alasan",
+      "reasonPlaceholder": "Mengapa faktur ini dibatalkan?",
+      "confirm": "Batalkan faktur",
+      "cancel": "Batal",
+      "missingReason": "Harap berikan alasan."
+    },
+    "payments": {
+      "title": "Pembayaran",
+      "none": "Belum ada pembayaran tercatat.",
+      "count": "{count, plural, =0 {Tanpa pembayaran} =1 {1 pembayaran} other {# pembayaran}}",
+      "method": {
+        "cash": "Tunai",
+        "bank_transfer": "Transfer Bank",
+        "qris": "QRIS",
+        "card": "Kartu"
+      },
+      "refund": "Pengembalian"
+    },
+    "toasts": {
+      "regenerateSuccess": "PDF dibuat ulang.",
+      "regenerateError": "Tidak dapat membuat ulang PDF.",
+      "voidSuccess": "Faktur dibatalkan.",
+      "voidError": "Tidak dapat membatalkan faktur."
+    }
   }
 }

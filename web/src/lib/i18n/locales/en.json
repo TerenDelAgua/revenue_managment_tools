@@ -153,5 +153,60 @@
       "cancelSuccess": "Booking cancelled successfully.",
       "cancelError": "Error cancelling booking."
     }
+  },
+  "invoiceWidget": {
+    "title": "Invoice",
+    "loading": "Loading invoice…",
+    "loadError": "Could not load invoice.",
+    "noInvoice": "No invoice yet for this booking.",
+    "invoiceNumber": "Invoice {number}",
+    "issuedAt": "Issued {date}",
+    "status": {
+      "paid": "Paid",
+      "partial": "Partial",
+      "unpaid": "Unpaid",
+      "overpaid": "Overpaid",
+      "void": "Void"
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "tax": "Tax (PPN {rate}%)",
+      "total": "Total",
+      "paid": "Paid",
+      "balance": "Balance",
+      "refunded": "Refunded"
+    },
+    "actions": {
+      "openPdf": "Open PDF",
+      "regeneratePdf": "Regenerate PDF",
+      "registerPayment": "Register payment",
+      "void": "Void invoice",
+      "viewAll": "View all invoices"
+    },
+    "void": {
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Why is this invoice being voided?",
+      "confirm": "Void invoice",
+      "cancel": "Cancel",
+      "missingReason": "Please provide a reason."
+    },
+    "payments": {
+      "title": "Payments",
+      "none": "No payments registered yet.",
+      "count": "{count, plural, =0 {No payments} =1 {1 payment} other {# payments}}",
+      "method": {
+        "cash": "Cash",
+        "bank_transfer": "Bank transfer",
+        "qris": "QRIS",
+        "card": "Card"
+      },
+      "refund": "Refund"
+    },
+    "toasts": {
+      "regenerateSuccess": "PDF regenerated.",
+      "regenerateError": "Could not regenerate the PDF.",
+      "voidSuccess": "Invoice voided.",
+      "voidError": "Could not void the invoice."
+    }
   }
 }
