@@ -88,14 +88,14 @@ func (h *BookingHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	status := r.URL.Query().Get("status")
 	search := r.URL.Query().Get("search")
-	
+
 	page := 1
 	if pStr := r.URL.Query().Get("page"); pStr != "" {
 		if p, err := strconv.Atoi(pStr); err == nil && p > 0 {
 			page = p
 		}
 	}
-	
+
 	limit := 50
 	if lStr := r.URL.Query().Get("limit"); lStr != "" {
 		if l, err := strconv.Atoi(lStr); err == nil && l > 0 {

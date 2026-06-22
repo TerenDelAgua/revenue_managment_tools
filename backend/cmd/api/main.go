@@ -51,6 +51,7 @@ func main() {
 	invoiceService := service.NewInvoiceService(db.Pool, invoiceRepo, bookingRepo, nil)
 	bookingService := service.NewBookingService(db.Pool, bookingRepo, guestRepo, inventoryService, invoiceService)
 	bookingHandler := internalapi.NewBookingHandler(bookingService)
+	invoiceHandler := internalapi.NewInvoiceHandler(invoiceService)
 
 	guestService := service.NewGuestService(guestRepo)
 	guestHandler := internalapi.NewGuestHandler(guestService)
@@ -157,6 +158,21 @@ func main() {
 			r.Post("/{id}/checkin", bookingHandler.CheckIn)
 			r.Post("/{id}/checkout", bookingHandler.CheckOut)
 			r.Post("/{id}/cancel", bookingHandler.Cancel)
+			// Invoicing module (spec §4) — invoice under booking.
+			r.Get("/{id}/invoice", invoiceHandler.GetByBookingID)
+		})
+
+		// Invoicing module (spec §4)
+		r.Route("/invoices", func(r chi.Router) {
+			r.Get("/", invoiceHandler.List)
+			r.Get("/daily-summary", invoiceHandler.DailySummary)
+			r.Get("/tax-report", invoiceHandler.MonthlyTaxReport)
+			r.Get("/by-booking/{bookingId}", invoiceHandler.GetByBookingID)
+			r.Get("/{id}", invoiceHandler.GetByID)
+			r.Patch("/{id}/notes", invoiceHandler.UpdateNotes)
+			r.Post("/{id}/void", invoiceHandler.Void)
+			r.Post("/{id}/payments", invoiceHandler.RegisterPayment)
+			r.Post("/{id}/regenerate-pdf", invoiceHandler.RegeneratePDF)
 		})
 
 		r.Route("/guests", func(r chi.Router) {
