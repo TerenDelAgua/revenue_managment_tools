@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     void_reason TEXT,
     created_by UUID NOT NULL REFERENCES users(id),
     pdf_url TEXT,
+    notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     -- Integridad: total = subtotal + tax_amount (la app calcula, la DB valida)

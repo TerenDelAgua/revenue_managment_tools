@@ -360,9 +360,9 @@ func TestPaymentRefundRequiresOriginal(t *testing.T) {
 
 	// Verify refund is linked correctly
 	var (
-		refundAmount  float64
-		refundIsRev   bool
-		refundPoints  uuid.UUID
+		refundAmount float64
+		refundIsRev  bool
+		refundPoints uuid.UUID
 	)
 	if err := db.QueryRow(ctx, `
 		SELECT amount, is_reversal, reversal_of FROM payments WHERE id = $1
