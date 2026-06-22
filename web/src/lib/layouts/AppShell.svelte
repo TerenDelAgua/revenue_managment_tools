@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
+
 	import { onMount } from 'svelte';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import { _ } from 'svelte-i18n';
 
 	interface Props {
@@ -16,7 +19,7 @@
 		{ icon: '📅', labelKey: 'nav.bookings', href: '/bookings' },
 		{ icon: '👥', labelKey: 'nav.guests', href: '/guests' },
 		{ icon: '⚙️', labelKey: 'nav.settings', href: '/settings' }
-	];
+	] as const;
 
 	let isCollapsed = $state(false);
 
@@ -76,12 +79,12 @@
 
 		<!-- Nav items -->
 		<nav class="flex-1 space-y-1 p-2 md:p-3">
-			{#each navItems as item}
+			{#each navItems as item (item.labelKey)}
 				<a
-					href={item.href}
+					href={resolve(item.href)}
 					class="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200
 					{isCollapsed ? 'justify-center px-0' : ''}
-					{$page.url.pathname === item.href || ($page.url.pathname.startsWith(item.href) && item.href !== '/')
+					{page.url.pathname === item.href || (page.url.pathname.startsWith(item.href) && item.href !== '/')
 						? 'bg-[#FF8C42]/10 font-semibold text-[#FF8C42]'
 						: 'text-[#A8A29E] hover:bg-[#3F3D38] hover:text-[#FCFBFA]'}"
 					title={isCollapsed ? $_(item.labelKey) : ''}
@@ -125,6 +128,7 @@
 			</div>
 			<div class="flex items-center gap-2 md:gap-3 shrink-0">
 				<LanguageSwitcher />
+				<ThemeToggle />
 				<button class="rounded-lg p-2 text-[#57534E] transition hover:bg-[#F5F4F1] relative">
 					🔔
 					<span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#FF8C42]"></span>

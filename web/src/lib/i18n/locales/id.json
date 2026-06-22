@@ -11,6 +11,14 @@
     "properties": "Properti",
     "hotelOwner": "Pemilik Hotel"
   },
+  "theme": {
+    "toggle": {
+      "label": "Ganti tema",
+      "light": "Tema terang",
+      "dark": "Tema gelap",
+      "system": "Ikuti tema sistem"
+    }
+  },
   "roomTypes": {
     "Standard Room": "Kamar Standar",
     "Superior Room": "Kamar Superior",

@@ -11,6 +11,14 @@
     "properties": "Properties",
     "hotelOwner": "Hotel Owner"
   },
+  "theme": {
+    "toggle": {
+      "label": "Switch theme",
+      "light": "Light theme",
+      "dark": "Dark theme",
+      "system": "Follow system theme"
+    }
+  },
   "roomTypes": {
     "Standard Room": "Standard Room",
     "Superior Room": "Superior Room",

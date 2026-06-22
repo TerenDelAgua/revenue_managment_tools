@@ -1,50 +1,58 @@
 {
   "nav": {
-    "dashboard": "Dasbor",
-    "floorMap": "Peta Lantai",
-    "bookings": "Pemesanan",
-    "guests": "Tamu",
-    "settings": "Pengaturan"
+    "dashboard": "Panel",
+    "floorMap": "Mapa de Plantas",
+    "bookings": "Reservas",
+    "guests": "Huéspedes",
+    "settings": "Configuración"
   },
   "header": {
-    "subtitle": "Hotel · Manajemen Pendapatan",
-    "properties": "Properti",
-    "hotelOwner": "Pemilik Hotel"
+    "subtitle": "Hotel · Gestión de Ingresos",
+    "properties": "Propiedades",
+    "hotelOwner": "Propietario del Hotel"
+  },
+  "theme": {
+    "toggle": {
+      "label": "Cambiar tema",
+      "light": "Tema claro",
+      "dark": "Tema oscuro",
+      "system": "Seguir el tema del sistema"
+    }
   },
   "roomTypes": {
-    "Standard Room": "Kamar Standar",
-    "Superior Room": "Kamar Superior",
-    "Deluxe Room": "Kamar Deluxe",
-    "Suite": "Kamar Suite"
+    "Standard Room": "Habitación Estándar",
+    "Superior Room": "Habitación Superior",
+    "Deluxe Room": "Habitación Deluxe",
+    "Suite": "Suite"
   },
   "status": {
-    "available": "Tersedia",
-    "occupied": "Terisi",
-    "pending": "Tertunda (Check-in)",
-    "blocked": "Diblokir",
+    "available": "Disponible",
+    "occupied": "Ocupada",
+    "pending": "Pendiente (Check-in)",
+    "blocked": "Bloqueada",
     "cleaning": "Limpieza",
-    "inactive": "Tidak Aktif"
+    "inactive": "Inactiva"
   },
   "drawer": {
-    "details": "Detail",
-    "type": "Tipe",
+    "details": "Detalles",
+    "type": "Tipo",
     "ref": "Ref",
-    "pendingBookings": "Pemesanan Tertunda",
-    "cancel": "Batal",
-    "noPending": "Tidak ada pemesanan tertunda untuk periode ini.",
+    "pendingBookings": "Reservas pendientes",
+    "cancel": "Cancelar",
+    "noPending": "No hay reservas pendientes para este período.",
     "pax": "pax",
-    "blockRoom": "Blokir Kamar",
-    "maintenance": "Pemeliharaan",
-    "ownerUse": "Penggunaan Pemilik",
-    "outOfService": "Di Luar Layanan",
-    "confirmBlock": "Konfirmasi Blokir",
-    "checkIn": "Check In",
-    "checkOut": "Check Out",
-    "markCleaning": "Marcar en Limpieza",
-    "cleaningDone": "Limpieza Completa",
-    "removeBlock": "Hapus Blokir",
-    "assignBooking": "Tetapkan Pemesanan",
-    "availableTypes": "Tipe Tersedia"
+    "blockRoom": "Bloquear habitación",
+    "maintenance": "Mantenimiento",
+    "ownerUse": "Uso del propietario",
+    "outOfService": "Fuera de servicio",
+    "confirmBlock": "Confirmar bloqueo",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "markCleaning": "Marcar en limpieza",
+    "cleaningDone": "Limpieza completada",
+    "removeBlock": "Quitar bloqueo",
+    "assignBooking": "Asignar reserva",
+    "availableTypes": "Tipos disponibles"
   },
   "bookingsForm": {
     "title": "Terminal de Reservas",
