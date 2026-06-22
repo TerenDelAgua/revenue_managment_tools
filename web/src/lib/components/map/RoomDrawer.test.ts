@@ -41,23 +41,20 @@ describe('RoomDrawer Component', () => {
 		expect(container).toHaveTextContent('101');
 		expect(container).toHaveTextContent('Standard Suite · Ocupada');
 
-		// The footer button must be present. RoomDrawer renders "Check Out Guest"
-		// as a hardcoded label here (not yet i18n'd — tracked as follow-up).
+		// The footer button must be present and display "Check-out" (es)
 		const buttons = container.querySelectorAll('button');
 		let primaryButton: HTMLButtonElement | null = null;
 		buttons.forEach((btn) => {
-			if (btn.textContent?.includes('Check Out Guest')) {
+			if (btn.textContent?.includes('Check-out')) {
 				primaryButton = btn;
 			}
 		});
 
 		expect(primaryButton).toBeInTheDocument();
-		// TODO(tokenize): RoomDrawer.svelte still uses bg-[#1C1917] directly.
-		// Migrate the drawer to bg-teren-text-main in a follow-up PR.
-		expect(primaryButton).toHaveClass('bg-[#1C1917]');
+		expect(primaryButton).toHaveClass('bg-teren-text-main');
 	});
 
-	it('FT-06: opens drawer for available room and renders "Assign Booking" primary action button', () => {
+	it('FT-06: opens drawer for available room and renders "Asignar reserva" primary action button', () => {
 		const room = mockRoom('available');
 		const { container } = render(RoomDrawer, {
 			props: {
@@ -75,14 +72,12 @@ describe('RoomDrawer Component', () => {
 		let primaryButton: HTMLButtonElement | null = null;
 		buttons.forEach((btn) => {
 			// es.json → "Asignar reserva"
-			if (btn.textContent?.trim() === 'Asignar reserva') {
+			if (btn.textContent?.includes('Asignar reserva')) {
 				primaryButton = btn;
 			}
 		});
 
 		expect(primaryButton).toBeInTheDocument();
-		// TODO(tokenize): RoomDrawer.svelte still uses bg-[#FF8C42] directly.
-		// Migrate the drawer to bg-teren-primary in a follow-up PR.
-		expect(primaryButton).toHaveClass('bg-[#FF8C42]');
+		expect(primaryButton).toHaveClass('bg-teren-primary');
 	});
 });
