@@ -46,23 +46,23 @@
 	}
 </script>
 
-<div class="flex h-screen bg-[#F5F4F1] font-sans text-[#1C1917]">
-	<!-- Sidebar -->
+<div class="flex h-screen bg-teren-background-base font-sans text-teren-text-main">
+	<!-- Sidebar — intentionally inverted surface, stays dark in both themes -->
 	<aside
-		class="z-20 flex flex-col bg-[#1C1917] text-[#FCFBFA] shadow-xl transition-all duration-300 ease-in-out shrink-0
+		class="z-20 flex flex-col bg-teren-sidebar-bg text-teren-sidebar-fg shadow-xl transition-all duration-300 ease-in-out shrink-0
 		{isCollapsed ? 'w-16' : 'w-64'}"
 	>
 		<!-- Header / Logo -->
-		<div class="border-b border-[#3F3D38] p-4 flex items-center h-16 transition-all duration-300 {isCollapsed ? 'justify-center' : 'justify-between'}">
+		<div class="border-b border-teren-sidebar-border p-4 flex items-center h-16 transition-all duration-300 {isCollapsed ? 'justify-center' : 'justify-between'}">
 			{#if !isCollapsed}
 				<div class="flex flex-col whitespace-nowrap overflow-hidden">
-					<h1 class="text-xl font-bold tracking-tight text-[#FF8C42]">TEREN</h1>
-					<p class="text-[9px] text-[#A8A29E]">{$_('header.subtitle')}</p>
+					<h1 class="text-xl font-bold tracking-tight text-teren-primary">TEREN</h1>
+					<p class="text-[9px] text-teren-sidebar-muted">{$_('header.subtitle')}</p>
 				</div>
 			{/if}
 			<button
 				onclick={toggleSidebar}
-				class="rounded-lg p-1.5 hover:bg-[#3F3D38] text-[#A8A29E] hover:text-[#FCFBFA] transition-colors"
+				class="rounded-lg p-1.5 hover:bg-teren-sidebar-hover text-teren-sidebar-muted hover:text-teren-sidebar-fg transition-colors"
 				aria-label="Toggle Sidebar"
 			>
 				{#if isCollapsed}
@@ -85,8 +85,8 @@
 					class="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200
 					{isCollapsed ? 'justify-center px-0' : ''}
 					{page.url.pathname === item.href || (page.url.pathname.startsWith(item.href) && item.href !== '/')
-						? 'bg-[#FF8C42]/10 font-semibold text-[#FF8C42]'
-						: 'text-[#A8A29E] hover:bg-[#3F3D38] hover:text-[#FCFBFA]'}"
+						? 'bg-teren-primary/10 font-semibold text-teren-primary'
+						: 'text-teren-sidebar-muted hover:bg-teren-sidebar-hover hover:text-teren-sidebar-fg'}"
 					title={isCollapsed ? $_(item.labelKey) : ''}
 				>
 					<span class="text-lg transition-transform duration-200 hover:scale-110 shrink-0">{item.icon}</span>
@@ -98,17 +98,17 @@
 		</nav>
 
 		<!-- Footer / Profile -->
-		<div class="border-t border-[#3F3D38] p-3 bg-[#141211] transition-all duration-300">
+		<div class="border-t border-teren-sidebar-border p-3 bg-teren-sidebar-footer-bg transition-all duration-300">
 			<div class="flex items-center gap-3 {isCollapsed ? 'justify-center' : ''}">
 				<div
-					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF8C42] text-sm font-bold text-white shadow-sm"
+					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teren-primary text-sm font-bold text-white shadow-sm"
 				>
 					JD
 				</div>
 				{#if !isCollapsed}
 					<div class="overflow-hidden whitespace-nowrap">
 						<p class="text-sm font-medium">Juan Del Agua</p>
-						<p class="text-xs text-[#A8A29E] overflow-hidden text-ellipsis">{$_('header.hotelOwner')}</p>
+						<p class="text-xs text-teren-sidebar-muted overflow-hidden text-ellipsis">{$_('header.hotelOwner')}</p>
 					</div>
 				{/if}
 			</div>
@@ -119,21 +119,21 @@
 	<main class="flex flex-1 flex-col overflow-hidden">
 		<!-- Topbar -->
 		<header
-			class="flex h-16 items-center justify-between border-b border-[#E7E5E4] bg-[#FCFBFA] px-4 md:px-6 shadow-sm shrink-0"
+			class="flex h-16 items-center justify-between border-b border-teren-border-subtle bg-teren-surface-base px-4 md:px-6 shadow-sm shrink-0"
 		>
-			<div class="flex items-center gap-2 text-xs md:text-sm text-[#57534E] overflow-hidden whitespace-nowrap text-ellipsis mr-2">
+			<div class="flex items-center gap-2 text-xs md:text-sm text-teren-text-muted overflow-hidden whitespace-nowrap text-ellipsis mr-2">
 				<span class="hidden sm:inline">{$_('header.properties')}</span>
 				<span class="hidden sm:inline">/</span>
-				<span class="font-medium text-[#1C1917] truncate">TEREN Test Hotel</span>
+				<span class="font-medium text-teren-text-main truncate">TEREN Test Hotel</span>
 			</div>
 			<div class="flex items-center gap-2 md:gap-3 shrink-0">
 				<LanguageSwitcher />
 				<ThemeToggle />
-				<button class="rounded-lg p-2 text-[#57534E] transition hover:bg-[#F5F4F1] relative">
+				<button class="rounded-lg p-2 text-teren-text-muted transition hover:bg-teren-background-base relative">
 					🔔
-					<span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#FF8C42]"></span>
+					<span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-teren-primary"></span>
 				</button>
-				<button class="rounded-lg p-2 text-[#57534E] transition hover:bg-[#F5F4F1]">❓</button>
+				<button class="rounded-lg p-2 text-teren-text-muted transition hover:bg-teren-background-base">❓</button>
 			</div>
 		</header>
 
@@ -145,4 +145,3 @@
 		</div>
 	</main>
 </div>
-

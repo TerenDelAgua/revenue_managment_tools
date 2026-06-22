@@ -53,6 +53,19 @@
 	--color-teren-warning-subtle: #fef3c7;
 	--color-teren-warning-hover: #b45309;
 
+	/*
+	 * Sidebar surface (DS follow-up candidate for v1.2).
+	 * The sidebar is an intentionally inverted surface — it stays dark in
+	 * both light and dark modes for high-contrast navigation. These tokens
+	 * intentionally do NOT swap with the theme.
+	 */
+	--color-teren-sidebar-bg: #1c1917;
+	--color-teren-sidebar-fg: #fcfbfa;
+	--color-teren-sidebar-muted: #a8a29e;
+	--color-teren-sidebar-border: #3f3d38;
+	--color-teren-sidebar-hover: #3f3d38;
+	--color-teren-sidebar-footer-bg: #141211;
+
 	/* Typography */
 	--font-sans: 'Inter', 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
 }
@@ -144,6 +157,13 @@
 	--color-teren-warning-base: var(--color-teren-warning-base);
 	--color-teren-warning-subtle: var(--color-teren-warning-subtle);
 	--color-teren-warning-hover: var(--color-teren-warning-hover);
+
+	--color-teren-sidebar-bg: var(--color-teren-sidebar-bg);
+	--color-teren-sidebar-fg: var(--color-teren-sidebar-fg);
+	--color-teren-sidebar-muted: var(--color-teren-sidebar-muted);
+	--color-teren-sidebar-border: var(--color-teren-sidebar-border);
+	--color-teren-sidebar-hover: var(--color-teren-sidebar-hover);
+	--color-teren-sidebar-footer-bg: var(--color-teren-sidebar-footer-bg);
 
 	--font-sans: var(--font-sans);
 }
