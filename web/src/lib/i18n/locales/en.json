@@ -4,6 +4,7 @@
     "floorMap": "Floor Map",
     "bookings": "Bookings",
     "guests": "Guests",
+    "reports": "Reports",
     "settings": "Settings"
   },
   "header": {
@@ -230,6 +231,94 @@
     },
     "toasts": {
       "success": "Payment registered."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Daily cash-closing and monthly tax reports.",
+    "loading": "Loading…",
+    "errors": {
+      "loadFailed": "Could not load the report."
+    },
+    "toasts": {
+      "exported": "Report exported."
+    },
+    "tabs": {
+      "daily": "Daily cash-closing",
+      "tax": "Monthly tax"
+    },
+    "daily": {
+      "title": "Daily cash-closing",
+      "subtitle": "Invoices and payments for the selected day.",
+      "dateLabel": "Date",
+      "export": "Export CSV",
+      "noPayments": "No payments recorded for this day.",
+      "noStaff": "No staff payments recorded.",
+      "byMethod": "By payment method",
+      "byStaff": "By staff",
+      "counts": {
+        "issued": "Issued",
+        "paid": "Paid",
+        "partial": "Partial",
+        "unpaid": "Unpaid",
+        "overpaid": "Overpaid",
+        "void": "Void"
+      },
+      "financials": {
+        "collected": "Total collected",
+        "refunded": "Total refunded",
+        "pending": "Total pending",
+        "tax": "Tax collected"
+      },
+      "csv": {
+        "metric": "Metric",
+        "value": "Value",
+        "invoicesIssued": "Invoices issued",
+        "invoicesPaid": "Invoices paid",
+        "invoicesPartial": "Invoices partial",
+        "invoicesUnpaid": "Invoices unpaid",
+        "invoicesOverpaid": "Invoices overpaid",
+        "invoicesVoid": "Invoices void",
+        "totalRevenue": "Total revenue",
+        "totalCollected": "Total collected",
+        "totalRefunded": "Total refunded",
+        "totalPending": "Total pending",
+        "taxCollected": "Tax collected",
+        "methodHeader": "By payment method",
+        "method": "Method",
+        "amount": "Amount",
+        "staffHeader": "By staff",
+        "staffName": "Staff",
+        "paymentsCount": "Payments",
+        "amountCollected": "Amount collected"
+      }
+    },
+    "tax": {
+      "title": "Monthly tax (PPN)",
+      "subtitle": "Aggregated tax collected for the selected period.",
+      "yearLabel": "Year",
+      "monthLabel": "Month",
+      "wholeYear": "Whole year",
+      "export": "Export CSV",
+      "metrics": {
+        "invoicesCount": "Invoices",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Tax (PPN)",
+        "refundsTotal": "Refunds",
+        "voidCount": "Voided",
+        "netTax": "Net tax collected"
+      },
+      "csv": {
+        "metric": "Metric",
+        "value": "Value",
+        "period": "Period",
+        "invoicesCount": "Invoices",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Tax",
+        "refundsTotal": "Refunds",
+        "voidCount": "Voided",
+        "netTaxCollected": "Net tax collected"
+      }
     }
   }
 }

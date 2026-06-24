@@ -4,6 +4,7 @@
     "floorMap": "Peta Lantai",
     "bookings": "Pemesanan",
     "guests": "Tamu",
+    "reports": "Laporan",
     "settings": "Pengaturan"
   },
   "header": {
@@ -230,6 +231,94 @@
     },
     "toasts": {
       "success": "Pembayaran tercatat."
+    }
+  },
+  "reports": {
+    "title": "Laporan",
+    "subtitle": "Tutup kas harian dan laporan pajak bulanan.",
+    "loading": "Memuat…",
+    "errors": {
+      "loadFailed": "Tidak dapat memuat laporan."
+    },
+    "toasts": {
+      "exported": "Laporan diekspor."
+    },
+    "tabs": {
+      "daily": "Tutup kas harian",
+      "tax": "Pajak bulanan"
+    },
+    "daily": {
+      "title": "Tutup kas harian",
+      "subtitle": "Faktur dan pembayaran untuk hari yang dipilih.",
+      "dateLabel": "Tanggal",
+      "export": "Ekspor CSV",
+      "noPayments": "Tidak ada pembayaran tercatat hari ini.",
+      "noStaff": "Tidak ada pembayaran staf.",
+      "byMethod": "Per metode pembayaran",
+      "byStaff": "Per staf",
+      "counts": {
+        "issued": "Diterbitkan",
+        "paid": "Lunas",
+        "partial": "Sebagian",
+        "unpaid": "Belum Bayar",
+        "overpaid": "Kelebihan Bayar",
+        "void": "Dibatalkan"
+      },
+      "financials": {
+        "collected": "Total diterima",
+        "refunded": "Total dikembalikan",
+        "pending": "Total tertunda",
+        "tax": "Pajak diterima"
+      },
+      "csv": {
+        "metric": "Metrik",
+        "value": "Nilai",
+        "invoicesIssued": "Faktur diterbitkan",
+        "invoicesPaid": "Faktur lunas",
+        "invoicesPartial": "Faktur sebagian",
+        "invoicesUnpaid": "Faktur belum bayar",
+        "invoicesOverpaid": "Faktur kelebihan bayar",
+        "invoicesVoid": "Faktur dibatalkan",
+        "totalRevenue": "Total pendapatan",
+        "totalCollected": "Total diterima",
+        "totalRefunded": "Total dikembalikan",
+        "totalPending": "Total tertunda",
+        "taxCollected": "Pajak diterima",
+        "methodHeader": "Per metode pembayaran",
+        "method": "Metode",
+        "amount": "Jumlah",
+        "staffHeader": "Per staf",
+        "staffName": "Staf",
+        "paymentsCount": "Pembayaran",
+        "amountCollected": "Jumlah diterima"
+      }
+    },
+    "tax": {
+      "title": "Pajak bulanan (PPN)",
+      "subtitle": "Pajak agregat untuk periode yang dipilih.",
+      "yearLabel": "Tahun",
+      "monthLabel": "Bulan",
+      "wholeYear": "Sepanjang tahun",
+      "export": "Ekspor CSV",
+      "metrics": {
+        "invoicesCount": "Faktur",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Pajak (PPN)",
+        "refundsTotal": "Pengembalian",
+        "voidCount": "Dibatalkan",
+        "netTax": "Pajak bersih"
+      },
+      "csv": {
+        "metric": "Metrik",
+        "value": "Nilai",
+        "period": "Periode",
+        "invoicesCount": "Faktur",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Pajak",
+        "refundsTotal": "Pengembalian",
+        "voidCount": "Dibatalkan",
+        "netTaxCollected": "Pajak bersih"
+      }
     }
   }
 }

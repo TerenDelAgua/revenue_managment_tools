@@ -4,6 +4,7 @@
     "floorMap": "Mapa de Plantas",
     "bookings": "Reservas",
     "guests": "Huéspedes",
+    "reports": "Informes",
     "settings": "Configuración"
   },
   "header": {
@@ -230,6 +231,94 @@
     },
     "toasts": {
       "success": "Pago registrado."
+    }
+  },
+  "reports": {
+    "title": "Informes",
+    "subtitle": "Cierre diario de caja e informes mensuales de impuestos.",
+    "loading": "Cargando…",
+    "errors": {
+      "loadFailed": "No se pudo cargar el informe."
+    },
+    "toasts": {
+      "exported": "Informe exportado."
+    },
+    "tabs": {
+      "daily": "Cierre diario de caja",
+      "tax": "Impuestos mensuales"
+    },
+    "daily": {
+      "title": "Cierre diario de caja",
+      "subtitle": "Facturas y pagos del día seleccionado.",
+      "dateLabel": "Fecha",
+      "export": "Exportar CSV",
+      "noPayments": "No hay pagos registrados este día.",
+      "noStaff": "No hay pagos por personal.",
+      "byMethod": "Por método de pago",
+      "byStaff": "Por personal",
+      "counts": {
+        "issued": "Emitidas",
+        "paid": "Pagadas",
+        "partial": "Parciales",
+        "unpaid": "Pendientes",
+        "overpaid": "Sobrepagadas",
+        "void": "Anuladas"
+      },
+      "financials": {
+        "collected": "Total cobrado",
+        "refunded": "Total reembolsado",
+        "pending": "Total pendiente",
+        "tax": "Impuestos cobrados"
+      },
+      "csv": {
+        "metric": "Métrica",
+        "value": "Valor",
+        "invoicesIssued": "Facturas emitidas",
+        "invoicesPaid": "Facturas pagadas",
+        "invoicesPartial": "Facturas parciales",
+        "invoicesUnpaid": "Facturas pendientes",
+        "invoicesOverpaid": "Facturas sobrepagadas",
+        "invoicesVoid": "Facturas anuladas",
+        "totalRevenue": "Ingresos totales",
+        "totalCollected": "Total cobrado",
+        "totalRefunded": "Total reembolsado",
+        "totalPending": "Total pendiente",
+        "taxCollected": "Impuestos cobrados",
+        "methodHeader": "Por método de pago",
+        "method": "Método",
+        "amount": "Importe",
+        "staffHeader": "Por personal",
+        "staffName": "Personal",
+        "paymentsCount": "Pagos",
+        "amountCollected": "Importe cobrado"
+      }
+    },
+    "tax": {
+      "title": "Impuestos mensuales (PPN)",
+      "subtitle": "Impuesto agregado del período seleccionado.",
+      "yearLabel": "Año",
+      "monthLabel": "Mes",
+      "wholeYear": "Año completo",
+      "export": "Exportar CSV",
+      "metrics": {
+        "invoicesCount": "Facturas",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Impuesto (PPN)",
+        "refundsTotal": "Reembolsos",
+        "voidCount": "Anuladas",
+        "netTax": "Impuesto neto"
+      },
+      "csv": {
+        "metric": "Métrica",
+        "value": "Valor",
+        "period": "Período",
+        "invoicesCount": "Facturas",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Impuesto",
+        "refundsTotal": "Reembolsos",
+        "voidCount": "Anuladas",
+        "netTaxCollected": "Impuesto neto"
+      }
     }
   }
 }
