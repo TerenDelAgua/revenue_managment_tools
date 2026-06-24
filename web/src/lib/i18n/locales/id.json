@@ -208,5 +208,28 @@
       "voidSuccess": "Faktur dibatalkan.",
       "voidError": "Tidak dapat membatalkan faktur."
     }
+  },
+  "paymentForm": {
+    "amountLabel": "Jumlah",
+    "balanceHint": "Sisa tagihan: {balance}",
+    "methodLabel": "Metode",
+    "referenceLabel": "Referensi",
+    "referencePlaceholder": "ID transaksi, 4 digit terakhir kartu…",
+    "referenceHint": "Wajib untuk metode non-tunai (BR-INV-005).",
+    "notesLabel": "Catatan",
+    "notesPlaceholder": "Konteks opsional…",
+    "maxButton": "Penuh",
+    "submit": "Catat Pembayaran",
+    "submitting": "Mencatat…",
+    "cancel": "Batal",
+    "errors": {
+      "amountRequired": "Masukkan jumlah.",
+      "amountPositive": "Jumlah harus lebih besar dari nol.",
+      "amountExceeds": "Jumlah melebihi sisa tagihan.",
+      "generic": "Tidak dapat mencatat pembayaran."
+    },
+    "toasts": {
+      "success": "Pembayaran tercatat."
+    }
   }
 }

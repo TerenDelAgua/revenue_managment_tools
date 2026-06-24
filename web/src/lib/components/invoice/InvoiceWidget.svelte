@@ -22,12 +22,18 @@
 	import { _ } from 'svelte-i18n';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
+	import PaymentForm from './PaymentForm.svelte';
 	import type {
 		InvoiceDetail,
 		Payment,
 		PaymentMethod,
 		PaymentStatus
 	} from '$lib/types';
+
+	// Dev auth fallback — UUID of the seeded "Admin User" (role=admin).
+	// In production this will come from a real session; until then, the
+	// backend uses this to attribute the payment to a valid user.
+	const DEV_USER_ID = 'd3b04521-2cc4-4e6b-b3b2-b6d673d31ca1';
 
 	interface Props {
 		bookingId: string | null;
@@ -47,6 +53,7 @@
 	let voidReason = $state('');
 	let submittingVoid = $state(false);
 	let regeneratingPdf = $state(false);
+	let showPaymentForm = $state(false);
 
 	// === Derived ===
 	const isVoid = $derived(invoice?.effective_status === 'void');
@@ -104,6 +111,7 @@
 			invoice = null;
 			loadError = null;
 			showVoidForm = false;
+			showPaymentForm = false;
 			voidReason = '';
 		}
 	});
@@ -213,6 +221,17 @@
 	function paymentIsRefund(p: Payment): boolean {
 		return p.is_reversal || p.amount < 0;
 	}
+
+	async function handlePaymentSuccess() {
+		// B7: refetch the invoice so the breakdown + balance + status pill
+		// reflect the new payment. The PaymentForm is dismissed and a calm
+		// toast confirms the operation.
+		showPaymentForm = false;
+		addToast($_('paymentForm.toasts.success'), 'success');
+		if (bookingId) await loadInvoice(bookingId);
+		onChange?.();
+	}
+
 </script>
 
 <section
@@ -419,6 +438,18 @@
 			</div>
 		{/if}
 
+		<!-- Payment form (inline progressive disclosure, no modal) -->
+		{#if showPaymentForm && invoice}
+			<PaymentForm
+				invoiceId={invoice.id}
+				{propertyId}
+				balance={invoice.balance}
+				receivedBy={DEV_USER_ID}
+				onSuccess={handlePaymentSuccess}
+				onCancel={() => (showPaymentForm = false)}
+			/>
+		{/if}
+
 		<!-- Actions -->
 		{#if !isVoid}
 			<footer class="flex flex-wrap gap-2 border-t border-teren-background-base px-5 py-4">
@@ -440,6 +471,16 @@
 						data-testid="invoice-regenerate-pdf"
 					>
 						{regeneratingPdf ? '…' : $_('invoiceWidget.actions.regeneratePdf')}
+					</button>
+				{/if}
+				{#if invoice.balance > 0 && !showPaymentForm}
+					<button
+						type="button"
+						onclick={() => (showPaymentForm = true)}
+						class="rounded-lg border border-teren-success-base/40 bg-teren-success-subtle px-3 py-2 text-xs font-semibold text-teren-success-hover transition-colors hover:bg-teren-success-subtle/70 dark:text-teren-success-base cursor-pointer"
+						data-testid="invoice-payment-toggle"
+					>
+						{$_('invoiceWidget.actions.registerPayment')}
 					</button>
 				{/if}
 				{#if !showVoidForm}

@@ -223,4 +223,44 @@ describe('InvoiceWidget', () => {
 		// Pill carries the line-through styling.
 		expect(container.querySelector('[data-status="void"]')?.className).toContain('line-through');
 	});
+
+	it('IT-06 (B7): shows the payment toggle only when balance > 0 and toggles the PaymentForm', async () => {
+		mockFetchOnce({ ...baseInvoice, effective_status: 'unpaid', balance: 111000 });
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => {
+			expect(getByTestId('invoice-payment-toggle')).toBeInTheDocument();
+		});
+
+		// Form is not rendered until the toggle is clicked.
+		expect(queryByTestId('payment-form')).toBeNull();
+
+		await fireEvent.click(getByTestId('invoice-payment-toggle'));
+		await waitFor(() => {
+			expect(getByTestId('payment-form')).toBeInTheDocument();
+		});
+		// Amount pre-filled with the remaining balance.
+		const amount = getByTestId('payment-amount') as HTMLInputElement;
+		expect(amount.value).toBe('111000');
+	});
+
+	it('IT-07 (B7): hides the payment toggle when balance is 0', async () => {
+		mockFetchOnce({
+			...baseInvoice,
+			effective_status: 'paid',
+			total_paid: 111000,
+			balance: 0
+		});
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => {
+			expect(getByTestId('invoice-status-pill').getAttribute('data-status')).toBe('paid');
+		});
+		// No balance ⇒ no payment toggle.
+		expect(queryByTestId('invoice-payment-toggle')).toBeNull();
+	});
 });

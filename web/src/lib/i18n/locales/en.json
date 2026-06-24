@@ -208,5 +208,28 @@
       "voidSuccess": "Invoice voided.",
       "voidError": "Could not void the invoice."
     }
+  },
+  "paymentForm": {
+    "amountLabel": "Amount",
+    "balanceHint": "Balance: {balance}",
+    "methodLabel": "Method",
+    "referenceLabel": "Reference",
+    "referencePlaceholder": "Transaction ID, last 4 of card…",
+    "referenceHint": "Required for non-cash methods (BR-INV-005).",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional context…",
+    "maxButton": "Max",
+    "submit": "Register payment",
+    "submitting": "Registering…",
+    "cancel": "Cancel",
+    "errors": {
+      "amountRequired": "Enter an amount.",
+      "amountPositive": "Amount must be greater than zero.",
+      "amountExceeds": "Amount exceeds the remaining balance.",
+      "generic": "Could not register the payment."
+    },
+    "toasts": {
+      "success": "Payment registered."
+    }
   }
 }

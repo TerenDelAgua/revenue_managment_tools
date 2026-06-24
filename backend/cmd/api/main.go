@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/cors"
 
 	internalapi "github.com/terendelagua/teren-hotels-backend/internal/api"
+	apimw "github.com/terendelagua/teren-hotels-backend/internal/api/middleware"
 	"github.com/terendelagua/teren-hotels-backend/internal/repository"
 	"github.com/terendelagua/teren-hotels-backend/internal/service"
 	"github.com/terendelagua/teren-hotels-backend/pkg/config"
@@ -78,6 +79,11 @@ func main() {
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	// Dev auth + idempotency: production will replace these with a real
+	// JWT middleware that pulls user/role from claims and the
+	// Idempotency-Key from a signed header.
+	r.Use(apimw.AuthContext)
+	r.Use(apimw.IdempotencyKey)
 
 	allowedOrigins := []string{
 		"http://localhost:5173",
@@ -100,7 +106,8 @@ func main() {
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
 		AllowedHeaders: []string{
 			"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Session-Id", "X-Requested-With",
-			"X-Property-ID", "Accept-Encoding", "User-Agent", "Cache-Control", "Pragma", "Origin",
+			"X-Property-ID", "X-User-ID", "X-User-Role", "Idempotency-Key",
+			"Accept-Encoding", "User-Agent", "Cache-Control", "Pragma", "Origin",
 		},
 		ExposedHeaders: []string{
 			"Link", "Content-Length", "X-Request-Id", "X-Session-Id",

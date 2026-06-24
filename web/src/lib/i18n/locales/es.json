@@ -208,5 +208,28 @@
       "voidSuccess": "Factura anulada.",
       "voidError": "No se pudo anular la factura."
     }
+  },
+  "paymentForm": {
+    "amountLabel": "Importe",
+    "balanceHint": "Saldo pendiente: {balance}",
+    "methodLabel": "Método",
+    "referenceLabel": "Referencia",
+    "referencePlaceholder": "ID de transacción, últimos 4 de tarjeta…",
+    "referenceHint": "Obligatoria para métodos no efectivo (BR-INV-005).",
+    "notesLabel": "Notas",
+    "notesPlaceholder": "Contexto opcional…",
+    "maxButton": "Total",
+    "submit": "Registrar pago",
+    "submitting": "Registrando…",
+    "cancel": "Cancelar",
+    "errors": {
+      "amountRequired": "Introduce un importe.",
+      "amountPositive": "El importe debe ser mayor que cero.",
+      "amountExceeds": "El importe supera el saldo pendiente.",
+      "generic": "No se pudo registrar el pago."
+    },
+    "toasts": {
+      "success": "Pago registrado."
+    }
   }
 }
