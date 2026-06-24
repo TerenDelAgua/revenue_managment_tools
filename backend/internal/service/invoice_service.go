@@ -35,8 +35,12 @@ import (
 // Implementation deferred to B5; the service treats this as best-effort
 // (a nil generator or a failed call leaves pdf_url NULL but the invoice
 // remains valid — spec §8.1, R-04 in Ratification Log).
+//
+// locale is a BCP-47-like tag (e.g. "en", "es", "id"). The generator
+// uses it to pick the user-facing copy in the PDF. An empty or unknown
+// tag falls back to English inside the generator.
 type PDFGenerator interface {
-	Generate(ctx context.Context, invoiceID uuid.UUID) (url string, err error)
+	Generate(ctx context.Context, invoiceID uuid.UUID, locale string) (url string, err error)
 }
 
 // UserRole is the role string used to authorize refunds. Values: "owner",
@@ -353,14 +357,19 @@ func (s *InvoiceService) VoidInvoice(
 
 // RegeneratePDF is the public hook for §4.6. Tries the configured PDF
 // generator and stores the URL on success. Returns the new URL.
-func (s *InvoiceService) RegeneratePDF(ctx context.Context, invoiceID uuid.UUID) (string, error) {
+//
+// locale (B7-validation): the SPA's current language is read from the
+// Accept-Language header by the handler and forwarded here, so the
+// generated PDF matches whatever the user is reading the dashboard in.
+// Empty locale → English fallback inside the generator.
+func (s *InvoiceService) RegeneratePDF(ctx context.Context, invoiceID uuid.UUID, locale string) (string, error) {
 	if s.pdfGen == nil {
 		return "", &BusinessError{
 			Code:    "PDF_NOT_CONFIGURED",
 			Message: "PDF generator is not configured (B5 pending)",
 		}
 	}
-	url, err := s.pdfGen.Generate(ctx, invoiceID)
+	url, err := s.pdfGen.Generate(ctx, invoiceID, locale)
 	if err != nil {
 		return "", &BusinessError{
 			Code:    "PDF_STORAGE_FAILED",
@@ -443,7 +452,7 @@ func (s *InvoiceService) regeneratePDFQuietly(ctx context.Context, invoiceID uui
 		// Detached context: don't tie to the request lifecycle.
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		url, err := s.pdfGen.Generate(bgCtx, invoiceID)
+		url, err := s.pdfGen.Generate(bgCtx, invoiceID, "") // locale empty → English fallback for async regen
 		if err != nil {
 			log.Printf("PDF regen failed for invoice %s: %v", invoiceID, err)
 			return

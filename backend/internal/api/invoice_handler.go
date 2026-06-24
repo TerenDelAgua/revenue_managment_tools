@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -367,13 +368,18 @@ func (h *InvoiceHandler) UpdateNotes(w http.ResponseWriter, r *http.Request) {
 }
 
 // RegeneratePDF — spec §4.6
+//
+// Reads Accept-Language so the PDF comes out in the same language the
+// user is reading the dashboard in. Empty/missing header → English
+// fallback inside the generator.
 func (h *InvoiceHandler) RegeneratePDF(w http.ResponseWriter, r *http.Request) {
 	invoiceID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		api.JSON(w, http.StatusBadRequest, api.Error{Code: "INVALID_ID", Message: "Invalid invoice ID"})
 		return
 	}
-	url, err := h.svc.RegeneratePDF(r.Context(), invoiceID)
+	locale := primaryLanguage(r.Header.Get("Accept-Language"))
+	url, err := h.svc.RegeneratePDF(r.Context(), invoiceID, locale)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -422,4 +428,54 @@ func parseDate(s string) (time.Time, error) {
 		return t, nil
 	}
 	return time.Parse(time.RFC3339, s)
+}
+
+// primaryLanguage picks the most-preferred language from an
+// Accept-Language header. The format is a comma-separated list of
+// tags with optional q-values:
+//
+//	Accept-Language: en-US,en;q=0.9,id;q=0.8
+//
+// We don't pull in golang.org/x/text/language — we only ship three
+// locales (en/es/id) so a tiny splitter is enough. Returns "" when
+// the header is missing or empty.
+func primaryLanguage(header string) string {
+	if header == "" {
+		return ""
+	}
+	best := ""
+	bestQ := -1.0
+	for _, raw := range strings.Split(header, ",") {
+		tag, q := tagAndQ(strings.TrimSpace(raw))
+		if tag == "" {
+			continue
+		}
+		if q > bestQ {
+			bestQ = q
+			best = tag
+		}
+	}
+	// Strip region/script suffix: "en-US" → "en", "id-ID" → "id".
+	if i := strings.IndexByte(best, '-'); i > 0 {
+		best = best[:i]
+	}
+	return strings.ToLower(best)
+}
+
+// tagAndQ splits one entry of an Accept-Language list into its tag
+// and q-value (default 1.0 when missing).
+func tagAndQ(entry string) (string, float64) {
+	parts := strings.SplitN(entry, ";", 2)
+	tag := strings.TrimSpace(parts[0])
+	q := 1.0
+	if len(parts) == 2 {
+		// parts[1] looks like "q=0.8"
+		qStr := strings.TrimSpace(parts[1])
+		if strings.HasPrefix(strings.ToLower(qStr), "q=") {
+			if v, err := strconv.ParseFloat(qStr[2:], 64); err == nil {
+				q = v
+			}
+		}
+	}
+	return tag, q
 }

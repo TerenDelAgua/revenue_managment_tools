@@ -7,11 +7,25 @@
 // fontstyle, linestyle, pagesize, etc.) and in flux, which makes the
 // wrapper unstable. gofpdf is the underlying engine of maroto v1/v2
 // anyway, so the output is equivalent and the API is stable.
+//
+// Locale & encoding note (B7-validation fix):
+//   - gofpdf's bundled fonts (Helvetica, Times, Courier) are Type 1
+//     PostScript with WinAnsi (CP1252) encoding. UTF-8 multi-byte
+//     sequences render as mojibake ("Habitación" → "HabitaciÃ³n").
+//   - To avoid that without pulling a TrueType font, every literal
+//     string passed to gofpdf goes through sanitize() which forces
+//     the result into 7-bit ASCII — safe for any PDF viewer and
+//     keeps the PDF language-agnostic (English by default).
+//   - When we need proper Unicode (e.g. a hotel name in Bahasa
+//     Indonesia with diacritics), we'll load a TTF via
+//     pdf.AddUTF8FontFromBytes. Out of scope for MVP.
 package pdfgen
 
 import (
 	"context"
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/jung-kurt/gofpdf"
@@ -39,14 +53,18 @@ func NewInvoicePDFGenerator(invoiceRepo *repository.InvoiceRepository, store pdf
 
 // Generate implements the service.PDFGenerator interface. It loads
 // the full invoice detail (header + line items + payments) from the
-// repo, builds the PDF, and uploads it via the store. Returns the
-// public URL on success.
-func (g *InvoicePDFGenerator) Generate(ctx context.Context, invoiceID uuid.UUID) (string, error) {
+// repo, builds the PDF in the requested locale, and uploads it via
+// the store. Returns the public URL on success.
+//
+// locale is a BCP-47 primary subtag ("en", "es", "id") or empty for
+// the English fallback. Unknown tags also fall back to English.
+func (g *InvoicePDFGenerator) Generate(ctx context.Context, invoiceID uuid.UUID, locale string) (string, error) {
 	d, err := g.invoiceRepo.GetInvoiceByID(ctx, invoiceID)
 	if err != nil {
 		return "", fmt.Errorf("load invoice: %w", err)
 	}
-	bytes, err := buildPDF(d)
+	labels := LabelsFor(locale)
+	bytes, err := buildPDF(d, labels)
 	if err != nil {
 		return "", err
 	}
@@ -132,91 +150,169 @@ func idrPct(rate float64) string {
 	return fmt.Sprintf("PPN %.0f%%", rate*100)
 }
 
+// sanitize forces a string into 7-bit ASCII so gofpdf's bundled fonts
+// (WinAnsi-encoded) render it without mojibake. Diacritics are folded
+// to their base ASCII letter ("Habitación" → "Habitacion"); anything
+// that can't be folded becomes '?' so we never emit non-ASCII bytes.
+//
+// Every string passed to gofpdf in this file MUST go through sanitize
+// (or be ASCII by construction). The lint is in pkg/pdfgen/generator_test.go.
+func sanitize(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case r <= 0x7F:
+			// Pure ASCII — pass through unchanged.
+			b.WriteRune(r)
+		case r == '\u2018' || r == '\u2019':
+			// Smart single quotes — fold to ASCII apostrophe.
+			b.WriteByte('\'')
+		case r == '\u201C' || r == '\u201D':
+			// Smart double quotes — fold to ASCII quote.
+			b.WriteByte('"')
+		case r == '\u2013' || r == '\u2014':
+			// En/em dashes — fold to ASCII hyphen-minus.
+			b.WriteByte('-')
+		case r == '\u2026':
+			b.WriteString("...")
+		case r == '\u00B7':
+			// Middle dot — fold to ASCII hyphen so "IDR · UTC+8" becomes
+			// "IDR - UTC+8" instead of "IDR ? UTC+8".
+			b.WriteByte('-')
+		case unicode.Is(unicode.Mn, r):
+			// Combining marks are dropped (base char already in stream).
+			continue
+		default:
+			if base, ok := diacriticFold[r]; ok {
+				b.WriteRune(base)
+			} else {
+				b.WriteByte('?')
+			}
+		}
+	}
+	return b.String()
+}
+
+// diacriticFold maps common Latin diacritics to their ASCII base.
+// Limited to the chars we actually see in our domain (Latin American
+// Spanish, Indonesian, French). Anything not in the map → '?'.
+var diacriticFold = map[rune]rune{
+	// Lowercase
+	'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'æ': 'a',
+	'ç': 'c',
+	'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+	'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+	'ñ': 'n',
+	'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o', 'œ': 'o',
+	'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+	'ý': 'y', 'ÿ': 'y',
+	'ß': 's', 'ð': 'd', 'þ': 't',
+	// Uppercase
+	'À': 'A', 'Á': 'A', 'Â': 'A', 'Ã': 'A', 'Ä': 'A', 'Å': 'A', 'Æ': 'A',
+	'Ç': 'C',
+	'È': 'E', 'É': 'E', 'Ê': 'E', 'Ë': 'E',
+	'Ì': 'I', 'Í': 'I', 'Î': 'I', 'Ï': 'I',
+	'Ñ': 'N',
+	'Ò': 'O', 'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ö': 'O', 'Ø': 'O', 'Œ': 'O',
+	'Ù': 'U', 'Ú': 'U', 'Û': 'U', 'Ü': 'U',
+	'Ý': 'Y',
+}
+
 // buildPDF constructs the A4 portrait PDF for the given invoice detail.
 // Pure function (no I/O). The caller is responsible for uploading.
-func buildPDF(d models.InvoiceDetail) ([]byte, error) {
+//
+// Layout (B7-validation 2): the previous version hardcoded the footer
+// at Y=282mm, which overflowed to a second page when content was short.
+// Now the footer flows naturally after the last content row, and we
+// trim some vertical spacings so a single invoice (header + line items
+// + totals + 1-2 payments) fits in one A4 page (~297mm).
+//
+// Locale: every user-visible string is taken from `labels`. The
+// handler resolves `labels` from the Accept-Language header.
+func buildPDF(d models.InvoiceDetail, labels Labels) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(10, 10, 10)
-	pdf.SetAutoPageBreak(true, 12)
+	pdf.SetAutoPageBreak(true, 10) // smaller bottom margin = more headroom
 	pdf.AddPage()
 
 	const w float64 = 210 // A4 width mm
 	const leftMargin float64 = 10
 	const contentW float64 = w - 2*leftMargin
 
-	// --- Header
-	pdf.SetFont("Helvetica", "B", 24)
+	// --- Header (TEREN + Title + invoice number)
+	pdf.SetFont("Helvetica", "B", 22)
 	pdf.SetTextColor(colorPrimary.r, colorPrimary.g, colorPrimary.b)
-	pdf.Cell(0, 12, "TEREN")
+	pdf.Cell(0, 10, "TEREN")
 	pdf.Ln(-1)
 
-	pdf.SetFont("Helvetica", "B", 18)
+	pdf.SetFont("Helvetica", "B", 16)
 	pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
 	pdf.SetX(leftMargin + contentW - 60)
-	pdf.CellFormat(60, 10, "FACTURA", "", 0, "R", false, 0, "")
+	pdf.CellFormat(60, 8, sanitize(labels.Title), "", 0, "R", false, 0, "")
 	pdf.Ln(-1)
 
-	pdf.SetFont("Helvetica", "", 10)
+	pdf.SetFont("Helvetica", "", 9)
 	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
 	pdf.SetX(leftMargin + contentW - 60)
-	pdf.CellFormat(60, 6, d.InvoiceNumber, "", 0, "R", false, 0, "")
-	pdf.Ln(8)
+	pdf.CellFormat(60, 5, sanitize(d.InvoiceNumber), "", 0, "R", false, 0, "")
+	pdf.Ln(6)
 
 	// --- Two columns: Property (left) | Guest (right)
 	colW := (contentW - 4) / 2
 	yStart := pdf.GetY()
 
-	pdf.SetFont("Helvetica", "B", 9)
+	pdf.SetFont("Helvetica", "B", 8)
 	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
-	pdf.CellFormat(colW, 4, "Emitida por", "", 0, "L", false, 0, "")
+	pdf.CellFormat(colW, 4, sanitize(labels.IssuedBy), "", 0, "L", false, 0, "")
 	pdf.SetX(leftMargin + colW + 4)
-	pdf.CellFormat(colW, 4, "Datos del huésped", "", 0, "L", false, 0, "")
-	pdf.Ln(5)
+	pdf.CellFormat(colW, 4, sanitize(labels.GuestDetails), "", 0, "L", false, 0, "")
+	pdf.Ln(4)
 
 	pdf.SetFont("Helvetica", "", 9)
 	pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
-	pdf.MultiCell(colW, 4, propertyBlock(), "", "L", false)
+	pdf.MultiCell(colW, 4, sanitize(propertyBlock(labels)), "", "L", false)
 	leftEndY := pdf.GetY()
 	pdf.SetXY(leftMargin+colW+4, yStart+4)
-	pdf.MultiCell(colW, 4, guestBlock(d), "", "L", false)
+	pdf.MultiCell(colW, 4, sanitize(guestBlock(d, labels)), "", "L", false)
 	rightEndY := pdf.GetY()
-	pdf.SetY(max(leftEndY, rightEndY) + 4)
+	pdf.SetY(max(leftEndY, rightEndY) + 3)
 
 	// --- Dates row (only if any line item exists, otherwise skip)
 	if len(d.LineItems) > 0 {
-		pdf.SetFont("Helvetica", "B", 9)
+		pdf.SetFont("Helvetica", "B", 8)
 		pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
-		pdf.CellFormat(contentW/3, 4, "Check-in", "", 0, "L", false, 0, "")
-		pdf.CellFormat(contentW/3, 4, "Check-out", "", 0, "L", false, 0, "")
-		pdf.CellFormat(contentW/3, 4, "Habitación", "", 0, "L", false, 0, "")
+		pdf.CellFormat(contentW/3, 4, sanitize(labels.CheckIn), "", 0, "L", false, 0, "")
+		pdf.CellFormat(contentW/3, 4, sanitize(labels.CheckOut), "", 0, "L", false, 0, "")
+		pdf.CellFormat(contentW/3, 4, sanitize(labels.Room), "", 0, "L", false, 0, "")
 		pdf.Ln(4)
 		pdf.SetFont("Helvetica", "", 9)
 		pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
 		// MVP: dates are unavailable on the model; we render empty.
-		pdf.CellFormat(contentW/3, 4, "—", "", 0, "L", false, 0, "")
-		pdf.CellFormat(contentW/3, 4, "—", "", 0, "L", false, 0, "")
-		pdf.CellFormat(contentW/3, 4, "—", "", 0, "L", false, 0, "")
-		pdf.Ln(4)
+		pdf.CellFormat(contentW/3, 4, "-", "", 0, "L", false, 0, "")
+		pdf.CellFormat(contentW/3, 4, "-", "", 0, "L", false, 0, "")
+		pdf.CellFormat(contentW/3, 4, "-", "", 0, "L", false, 0, "")
+		pdf.Ln(3)
 	}
 
 	// --- Line items table
-	drawTableHeader(pdf, leftMargin, contentW)
+	drawTableHeader(pdf, leftMargin, contentW, labels)
 	for _, li := range d.LineItems {
-		drawTableRow(pdf, leftMargin, contentW, li.Description,
+		drawTableRow(pdf, leftMargin, contentW, sanitize(li.Description),
 			fmt.Sprintf("%.2f", li.Quantity),
 			idr(li.UnitPrice),
 			idr(li.Total))
 	}
 
 	// --- Totals (right-aligned)
-	pdf.Ln(2)
+	pdf.Ln(1)
 	right := leftMargin + contentW
 	rowLabelW := right - 60
 	rowValueW := 60.0
 
 	pdf.SetFont("Helvetica", "", 9)
 	pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
-	drawTotalRow(pdf, leftMargin, rowLabelW, rowValueW, "Subtotal", idr(d.Subtotal), false, false)
+	drawTotalRow(pdf, leftMargin, rowLabelW, rowValueW, sanitize(labels.Subtotal), idr(d.Subtotal), false, false)
 
 	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
 	drawTotalRow(pdf, leftMargin, rowLabelW, rowValueW, idrPct(d.PPNRateSnapshot), idr(d.TaxAmount), false, false)
@@ -228,27 +324,28 @@ func buildPDF(d models.InvoiceDetail) ([]byte, error) {
 
 	pdf.SetFont("Helvetica", "B", 11)
 	pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
-	drawTotalRow(pdf, leftMargin, rowLabelW, rowValueW, "TOTAL", idr(d.Total), true, false)
+	drawTotalRow(pdf, leftMargin, rowLabelW, rowValueW, sanitize(labels.Total), idr(d.Total), true, false)
 
 	// --- Payments breakdown
 	if len(d.Payments) > 0 {
-		pdf.Ln(6)
-		pdf.SetFont("Helvetica", "B", 10)
-		pdf.CellFormat(contentW, 5, "Pagos registrados", "", 0, "L", false, 0, "")
-		pdf.Ln(5)
+		pdf.Ln(4)
+		pdf.SetFont("Helvetica", "B", 9)
+		pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
+		pdf.CellFormat(contentW, 4, sanitize(labels.Payments), "", 0, "L", false, 0, "")
+		pdf.Ln(4)
 		for _, p := range d.Payments {
 			sign := ""
 			if p.IsReversal || p.Amount < 0 {
-				sign = " (refund)"
+				sign = "  " + sanitize(labels.RefundSuffix)
 			}
 			ref := ""
 			if p.Reference != nil && *p.Reference != "" {
-				ref = "  Ref: " + *p.Reference
+				ref = "  Ref: " + sanitize(*p.Reference)
 			}
 			// 4 columns: method | date | amount | ref
 			pdf.SetFont("Helvetica", "", 9)
 			pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
-			pdf.CellFormat(contentW*0.33, 4, string(p.Method), "", 0, "L", false, 0, "")
+			pdf.CellFormat(contentW*0.33, 4, sanitize(string(p.Method)), "", 0, "L", false, 0, "")
 			pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
 			pdf.CellFormat(contentW*0.20, 4, p.ReceivedAt.Format("02 Jan 15:04"), "", 0, "L", false, 0, "")
 			pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
@@ -260,32 +357,33 @@ func buildPDF(d models.InvoiceDetail) ([]byte, error) {
 	}
 
 	// --- VOID watermark
-	// gofpdf's TransformRotate conflicts with SetAutoPageBreak in v1.16
-	// (TransformEnd fails with "out of sequence" if the current page
-	// is full). We work around it by drawing the watermark in a new
-	// page break before any new content would be needed. Simpler: a
-	// single horizontal red row near the totals.
 	if d.Status == models.InvoiceStatusVoid {
 		pdf.Ln(2)
-		pdf.SetFont("Helvetica", "B", 32)
+		pdf.SetFont("Helvetica", "B", 28)
 		pdf.SetTextColor(colorError.r, colorError.g, colorError.b)
-		pdf.CellFormat(contentW, 12, "VOID", "", 0, "C", false, 0, "")
-		pdf.Ln(8)
+		pdf.CellFormat(contentW, 10, sanitize(labels.Void), "", 0, "C", false, 0, "")
+		pdf.Ln(4)
 	}
 
-	// --- Footer
-	pdf.SetY(282)
-	pdf.SetFont("Helvetica", "", 8)
-	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
-	pdf.CellFormat(0, 4,
-		fmt.Sprintf("Emitida: %s — Por: %s",
-			d.IssuedAt.Format("02 Jan 2006 15:04"), d.CreatedBy),
-		"", 0, "L", false, 0, "")
+	// --- Footer (B7-validation 2): flows naturally after content, on
+	// the same page whenever possible. If we are very close to the
+	// page bottom, SetAutoPageBreak pushes us to a new page — the
+	// footer follows and stays at the bottom of the *last* page.
 	pdf.Ln(4)
+	pdf.SetFont("Helvetica", "", 7)
+	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
+	pdf.CellFormat(0, 3,
+		fmt.Sprintf("%s: %s  -  %s: %s",
+			sanitize(labels.IssuedAt),
+			d.IssuedAt.Format("02 Jan 2006 15:04"),
+			sanitize(labels.By),
+			sanitize(d.CreatedBy.String())),
+		"", 0, "L", false, 0, "")
+	pdf.Ln(3)
 	pdf.SetFont("Helvetica", "I", 9)
 	pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
-	pdf.CellFormat(0, 4, "Gracias por su estancia.", "", 0, "L", false, 0, "")
-	pdf.Ln(4)
+	pdf.CellFormat(0, 4, sanitize(labels.ThankYou), "", 0, "L", false, 0, "")
+	pdf.Ln(3)
 	pdf.SetFont("Helvetica", "", 7)
 	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
 	pdf.CellFormat(0, 3, `"Built with intention. Designed for flow. Owned by TEREN."`,
@@ -305,33 +403,38 @@ func max(a, b float64) float64 {
 	return b
 }
 
-func propertyBlock() string {
+func propertyBlock(labels Labels) string {
 	return "TEREN Test Hotel\n" +
 		"Jl. Pantai Kuta 88\n" +
 		"Bali, Indonesia\n" +
-		"IDR · UTC+8"
+		labels.CurrencySuffix
 }
 
-func guestBlock(d models.InvoiceDetail) string {
+func guestBlock(d models.InvoiceDetail, labels Labels) string {
 	// MVP: BookingDetail (which we'd need for the full guest info)
 	// isn't loaded on the PDF; we render a stable label from the booking ID.
 	short := d.BookingID.String()[:8]
-	return fmt.Sprintf("Reserva: %s\n", short)
+	return fmt.Sprintf("%s: %s\n", labels.BookingLabel, short)
 }
 
 // =============================================================================
 // table helpers
 // =============================================================================
 
-func drawTableHeader(pdf *gofpdf.Fpdf, left, w float64) {
+func drawTableHeader(pdf *gofpdf.Fpdf, left, w float64, labels Labels) {
 	pdf.SetFont("Helvetica", "B", 9)
 	pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
 	pdf.SetFillColor(colorBorder.r, colorBorder.g, colorBorder.b)
 	pdf.SetDrawColor(colorBorder.r, colorBorder.g, colorBorder.b)
 
-	// 4 columns: Concepto 6/12, Cant 2/12, Precio 2/12, Total 2/12
+	// 4 columns: Description 6/12, Qty 2/12, Price 2/12, Total 2/12
 	colWidths := []float64{w * 6 / 12, w * 2 / 12, w * 2 / 12, w * 2 / 12}
-	headers := []string{"Concepto", "Cant", "Precio", "Total"}
+	headers := []string{
+		sanitize(labels.Description),
+		sanitize(labels.Qty),
+		sanitize(labels.Price),
+		sanitize(labels.Total),
+	}
 	aligns := []string{"L", "R", "R", "R"}
 	y := pdf.GetY()
 	x := left

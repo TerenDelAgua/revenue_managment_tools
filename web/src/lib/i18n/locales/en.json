@@ -3,6 +3,7 @@
     "dashboard": "Dashboard",
     "floorMap": "Floor Map",
     "bookings": "Bookings",
+    "invoices": "Invoices",
     "guests": "Guests",
     "reports": "Reports",
     "settings": "Settings"
@@ -319,6 +320,69 @@
         "voidCount": "Voided",
         "netTaxCollected": "Net tax collected"
       }
+    }
+  },
+  "invoicesPage": {
+    "title": "Invoices",
+    "subtitle": "All invoices issued for this property."
+  },
+  "invoicesList": {
+    "searchLabel": "Search",
+    "searchPlaceholder": "Number, guest or room…",
+    "statusLabel": "Status",
+    "statusAll": "All",
+    "statusPaid": "Paid",
+    "statusPartial": "Partial",
+    "statusUnpaid": "Unpaid",
+    "statusOverpaid": "Overpaid",
+    "statusVoid": "Void",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "clearFilters": "Clear",
+    "export": "Export",
+    "loading": "Loading invoices…",
+    "errors": {
+      "loadFailed": "Could not load the invoice list."
+    },
+    "empty": {
+      "title": "No invoices found",
+      "hint": "Try changing the filters or register a booking."
+    },
+    "columns": {
+      "number": "Number",
+      "guest": "Guest",
+      "room": "Room",
+      "total": "Total",
+      "balance": "Balance",
+      "status": "Status",
+      "issued": "Issued"
+    },
+    "pagination": {
+      "summary": "{from}–{to} of {total}",
+      "prev": "Prev",
+      "next": "Next"
+    },
+    "toasts": {
+      "exportComingSoon": "List CSV export is coming in a future iteration."
+    }
+  },
+  "invoiceDrawer": {
+    "title": "Invoice detail",
+    "close": "Close drawer",
+    "loading": "Loading invoice…",
+    "loadError": "Could not load this invoice.",
+    "fields": {
+      "id": "ID",
+      "copy": "Copy",
+      "booking": "Booking",
+      "created": "Created",
+      "paidAt": "Paid at",
+      "voidedAt": "Voided at",
+      "total": "Total"
+    },
+    "toasts": {
+      "copied": "ID copied to clipboard.",
+      "copyFailed": "Could not copy the ID."
     }
   }
 }

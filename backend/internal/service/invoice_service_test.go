@@ -471,7 +471,7 @@ func TestRegeneratePDF_NotConfigured(t *testing.T) {
 	f := createServiceFixture(t, db)
 
 	svc := newInvoiceServiceForTest(db) // no PDF gen
-	_, err := svc.RegeneratePDF(ctx, f.invoiceID)
+	_, err := svc.RegeneratePDF(ctx, f.invoiceID, "en")
 	if err == nil {
 		t.Fatal("expected error when no PDF gen")
 	}

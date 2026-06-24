@@ -23,6 +23,12 @@ type Config struct {
 	R2PublicURL string // base URL for the R2 bucket (used to build pdf_url)
 
 	LocalPDFDir string // used when R2Endpoint is empty
+
+	// PDFBaseURL is the public HTTP base from which local PDFs are
+	// served. The dev PDF handler exposes them at
+	// {PDFBaseURL}/{object-key}. Default points at the local API on 8080.
+	// In production (R2), this field is ignored — R2 has its own CDN.
+	PDFBaseURL string
 }
 
 // Load reads .env (if present) and returns a Config with sensible
@@ -41,6 +47,7 @@ func Load() (*Config, error) {
 		R2PublicURL: strings.TrimRight(getEnv("R2_PUBLIC_URL", ""), "/"),
 
 		LocalPDFDir: getEnv("LOCAL_PDF_DIR", "./tmp/pdfs"),
+		PDFBaseURL:  strings.TrimRight(getEnv("PDF_BASE_URL", "http://localhost:8080/api/v1/pdfs"), "/"),
 	}, nil
 }
 

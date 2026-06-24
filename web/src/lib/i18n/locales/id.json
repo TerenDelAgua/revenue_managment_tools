@@ -3,6 +3,7 @@
     "dashboard": "Dasbor",
     "floorMap": "Peta Lantai",
     "bookings": "Pemesanan",
+    "invoices": "Faktur",
     "guests": "Tamu",
     "reports": "Laporan",
     "settings": "Pengaturan"
@@ -319,6 +320,69 @@
         "voidCount": "Dibatalkan",
         "netTaxCollected": "Pajak bersih"
       }
+    }
+  },
+  "invoicesPage": {
+    "title": "Faktur",
+    "subtitle": "Semua faktur yang diterbitkan untuk properti ini."
+  },
+  "invoicesList": {
+    "searchLabel": "Cari",
+    "searchPlaceholder": "Nomor, tamu atau kamar…",
+    "statusLabel": "Status",
+    "statusAll": "Semua",
+    "statusPaid": "Lunas",
+    "statusPartial": "Sebagian",
+    "statusUnpaid": "Belum Bayar",
+    "statusOverpaid": "Kelebihan Bayar",
+    "statusVoid": "Dibatalkan",
+    "fromLabel": "Dari",
+    "toLabel": "Hingga",
+    "clearFilters": "Hapus",
+    "export": "Ekspor",
+    "loading": "Memuat faktur…",
+    "errors": {
+      "loadFailed": "Tidak dapat memuat daftar faktur."
+    },
+    "empty": {
+      "title": "Tidak ada faktur",
+      "hint": "Coba ubah filter atau daftarkan pemesanan."
+    },
+    "columns": {
+      "number": "Nomor",
+      "guest": "Tamu",
+      "room": "Kamar",
+      "total": "Total",
+      "balance": "Sisa",
+      "status": "Status",
+      "issued": "Diterbitkan"
+    },
+    "pagination": {
+      "summary": "{from}–{to} dari {total}",
+      "prev": "Sebelumnya",
+      "next": "Berikutnya"
+    },
+    "toasts": {
+      "exportComingSoon": "Ekspor CSV daftar akan datang di iterasi berikutnya."
+    }
+  },
+  "invoiceDrawer": {
+    "title": "Detail faktur",
+    "close": "Tutup panel",
+    "loading": "Memuat faktur…",
+    "loadError": "Tidak dapat memuat faktur ini.",
+    "fields": {
+      "id": "ID",
+      "copy": "Salin",
+      "booking": "Pemesanan",
+      "created": "Dibuat",
+      "paidAt": "Dibayar pada",
+      "voidedAt": "Dibatalkan pada",
+      "total": "Total"
+    },
+    "toasts": {
+      "copied": "ID disalin ke papan klip.",
+      "copyFailed": "Tidak dapat menyalin ID."
     }
   }
 }

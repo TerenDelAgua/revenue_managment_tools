@@ -18,15 +18,37 @@ import type {
 	MonthlyTaxReport
 } from '$lib/types';
 import { env } from '$env/dynamic/public';
+import { get } from 'svelte/store';
+import { locale } from 'svelte-i18n';
 
 const API_BASE_URL = env.PUBLIC_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
+/**
+ * currentLocale reads the active svelte-i18n locale synchronously.
+ * Falls back to 'en' when svelte-i18n hasn't initialised yet (SSR
+ * bootstrap) so the header is always populated.
+ */
+function currentLocale(): string {
+	try {
+		const l = get(locale);
+		return typeof l === 'string' && l ? l : 'en';
+	} catch {
+		return 'en';
+	}
+}
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+		// B7-validation: send the user's current i18n locale so the
+		// backend can render the PDF (and other localised payloads)
+		// in the same language the SPA is using. The handler reads
+		// Accept-Language and falls back to English if absent.
+		'Accept-Language': currentLocale(),
+		...(options?.headers as Record<string, string> | undefined)
+	};
 	const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-		headers: {
-			'Content-Type': 'application/json',
-			...options?.headers
-		},
+		headers,
 		...options
 	});
 

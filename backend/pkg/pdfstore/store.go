@@ -44,8 +44,8 @@ func NewStore(cfg *config.Config) (Store, error) {
 // =============================================================================
 
 type LocalStore struct {
-	dir     string
-	urlBase string
+	dir       string
+	publicURL string
 }
 
 // NewLocalStore is the public constructor (exported so it can be
@@ -54,10 +54,16 @@ func NewLocalStore(cfg *config.Config) (*LocalStore, error) {
 	if err := os.MkdirAll(cfg.LocalPDFDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create local pdf dir: %w", err)
 	}
-	// URL base for the file:// scheme so generated URLs are usable in
-	// dev mode (most browsers block file:// from JS, so this is mainly
-	// a placeholder for hand-off via curl/scp).
-	return &LocalStore{dir: cfg.LocalPDFDir, urlBase: "file://" + cfg.LocalPDFDir}, nil
+	// publicURL is the HTTP base where the API serves local PDFs from.
+	// Default (when the env var isn't set) points at the bundled dev
+	// handler: http://localhost:8080/api/v1/pdfs.
+	// We never return file:// URLs — browsers block them from JS and
+	// the SPA needs to fetch the PDF as a normal same-origin resource.
+	publicURL := cfg.PDFBaseURL
+	if publicURL == "" {
+		publicURL = "http://localhost:8080/api/v1/pdfs"
+	}
+	return &LocalStore{dir: cfg.LocalPDFDir, publicURL: publicURL}, nil
 }
 
 func (s *LocalStore) Put(_ context.Context, key string, data []byte) (string, error) {
@@ -71,7 +77,10 @@ func (s *LocalStore) Put(_ context.Context, key string, data []byte) (string, er
 	if err := os.WriteFile(full, data, 0o644); err != nil {
 		return "", fmt.Errorf("write pdf: %w", err)
 	}
-	return s.urlBase + "/" + key, nil
+	// Return an HTTP URL the SPA can fetch without security warnings.
+	// Always forward-slash — Go's URL parser doesn't honour OS-specific
+	// separators here and we want a stable, portable URL.
+	return s.publicURL + "/" + filepath.ToSlash(key), nil
 }
 
 // =============================================================================

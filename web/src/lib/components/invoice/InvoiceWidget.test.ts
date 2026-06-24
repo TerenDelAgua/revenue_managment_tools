@@ -221,7 +221,142 @@ describe('InvoiceWidget', () => {
 		expect(queryByTestId('invoice-open-pdf')).toBeNull();
 
 		// Pill carries the line-through styling.
-		expect(container.querySelector('[data-status="void"]')?.className).toContain('line-through');
+		expect(container.querySelector('[data-status="void"]')?.classList.contains('line-through')).toBe(true);
+	});
+
+	it('IT-08 (B7-validation 4): void submits POST with a valid X-User-ID header', async () => {
+		// First fetch: initial invoice load (returns a non-void invoice).
+		// Second fetch: the void endpoint returning the voided invoice.
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify(baseInvoice), { status: 200 })
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...baseInvoice, status: 'void', effective_status: 'void' }), {
+				status: 200
+			})
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => {
+			expect(getByTestId('invoice-void-toggle')).toBeInTheDocument();
+		});
+
+		// Open the void form, fill the reason, confirm.
+		await fireEvent.click(getByTestId('invoice-void-toggle'));
+		await fireEvent.input(getByTestId('invoice-void-reason'), {
+			target: { value: 'test void' }
+		});
+		await fireEvent.click(getByTestId('invoice-void-confirm'));
+
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+		});
+
+		// Inspect the second call (the void POST).
+		const [url, init] = fetchMock.mock.calls[1];
+		expect(url).toContain('/invoices/');
+		expect(url).toContain('/void');
+		const headers = (init?.headers ?? {}) as Record<string, string>;
+		expect(headers['X-User-ID']).toBeTruthy();
+		expect(headers['X-User-ID']).not.toBe('');
+		// Must be a valid UUID — matches the dev seed user pattern (8-4-4-4-12 hex).
+		expect(headers['X-User-ID']).toMatch(
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+		);
+		const body = JSON.parse(init?.body as string);
+		expect(body).toEqual({ reason: 'test void' });
+	});
+
+	it('IT-09 (B7-validation 5): missing reason shows inline error and skips the API', async () => {
+		// First fetch: invoice load. No second fetch should happen.
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify(baseInvoice), { status: 200 })
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+		await waitFor(() => {
+			expect(getByTestId('invoice-void-toggle')).toBeInTheDocument();
+		});
+
+		// Open the void form and click confirm with an empty reason.
+		await fireEvent.click(getByTestId('invoice-void-toggle'));
+		await fireEvent.click(getByTestId('invoice-void-confirm'));
+
+		// Inline error renders, textarea gets the error styling, and the
+		// API was NOT called (only the initial load fired).
+		await waitFor(() => {
+			expect(getByTestId('invoice-void-error')).toBeInTheDocument();
+		});
+		const textarea = getByTestId('invoice-void-reason') as HTMLTextAreaElement;
+		expect(textarea.getAttribute('aria-invalid')).toBe('true');
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		// Typing into the textarea clears the error.
+		await fireEvent.input(textarea, { target: { value: 'now filled' } });
+		await waitFor(() => {
+			expect(queryByTestId('invoice-void-error')).toBeNull();
+		});
+		expect(textarea.getAttribute('aria-invalid')).toBe('false');
+	});
+
+	it('IT-10 (B7-validation 5): successful void re-fetches the invoice so .payments is preserved', async () => {
+		// First fetch: initial invoice load.
+		// Second fetch: POST /void (returns models.Invoice, no .payments).
+		// Third fetch: re-load via getByBooking (returns InvoiceDetail with payments).
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify(baseInvoice), { status: 200 })
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...baseInvoice, status: 'void', effective_status: 'void' }), {
+				status: 200
+			})
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response(
+				JSON.stringify({
+					...baseInvoice,
+					status: 'void',
+					effective_status: 'void',
+					balance: 0
+				}),
+				{ status: 200 }
+			)
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => {
+			expect(getByTestId('invoice-void-toggle')).toBeInTheDocument();
+		});
+
+		await fireEvent.click(getByTestId('invoice-void-toggle'));
+		await fireEvent.input(getByTestId('invoice-void-reason'), {
+			target: { value: 'duplicate charge' }
+		});
+		await fireEvent.click(getByTestId('invoice-void-confirm'));
+
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalledTimes(3);
+		});
+
+		// The 3rd call must be the re-fetch via getByBooking — otherwise
+		// the payments list would render with undefined.length.
+		const [reFetchURL] = fetchMock.mock.calls[2];
+		expect(reFetchURL).toContain('/invoices/by-booking/book-1');
+		expect(getByTestId('invoice-widget')).toBeInTheDocument();
 	});
 
 	it('IT-06 (B7): shows the payment toggle only when balance > 0 and toggles the PaymentForm', async () => {

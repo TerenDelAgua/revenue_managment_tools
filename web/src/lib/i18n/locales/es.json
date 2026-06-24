@@ -3,6 +3,7 @@
     "dashboard": "Panel",
     "floorMap": "Mapa de Plantas",
     "bookings": "Reservas",
+    "invoices": "Facturas",
     "guests": "Huéspedes",
     "reports": "Informes",
     "settings": "Configuración"
@@ -319,6 +320,69 @@
         "voidCount": "Anuladas",
         "netTaxCollected": "Impuesto neto"
       }
+    }
+  },
+  "invoicesPage": {
+    "title": "Facturas",
+    "subtitle": "Todas las facturas emitidas en esta propiedad."
+  },
+  "invoicesList": {
+    "searchLabel": "Buscar",
+    "searchPlaceholder": "Número, huésped o habitación…",
+    "statusLabel": "Estado",
+    "statusAll": "Todas",
+    "statusPaid": "Pagadas",
+    "statusPartial": "Parciales",
+    "statusUnpaid": "Pendientes",
+    "statusOverpaid": "Sobrepagadas",
+    "statusVoid": "Anuladas",
+    "fromLabel": "Desde",
+    "toLabel": "Hasta",
+    "clearFilters": "Limpiar",
+    "export": "Exportar",
+    "loading": "Cargando facturas…",
+    "errors": {
+      "loadFailed": "No se pudo cargar la lista de facturas."
+    },
+    "empty": {
+      "title": "Sin facturas",
+      "hint": "Prueba cambiando los filtros o registra una reserva."
+    },
+    "columns": {
+      "number": "Número",
+      "guest": "Huésped",
+      "room": "Habitación",
+      "total": "Total",
+      "balance": "Saldo",
+      "status": "Estado",
+      "issued": "Emitida"
+    },
+    "pagination": {
+      "summary": "{from}–{to} de {total}",
+      "prev": "Ant.",
+      "next": "Sig."
+    },
+    "toasts": {
+      "exportComingSoon": "La exportación CSV de la lista llega en una próxima iteración."
+    }
+  },
+  "invoiceDrawer": {
+    "title": "Detalle de factura",
+    "close": "Cerrar panel",
+    "loading": "Cargando factura…",
+    "loadError": "No se pudo cargar esta factura.",
+    "fields": {
+      "id": "ID",
+      "copy": "Copiar",
+      "booking": "Reserva",
+      "created": "Creada",
+      "paidAt": "Pagada el",
+      "voidedAt": "Anulada el",
+      "total": "Total"
+    },
+    "toasts": {
+      "copied": "ID copiada al portapapeles.",
+      "copyFailed": "No se pudo copiar el ID."
     }
   }
 }

@@ -74,6 +74,7 @@ func main() {
 	reportService := service.NewReportService(reportRepo)
 	reportHandler := internalapi.NewReportHandler(reportService)
 	healthHandler := internalapi.NewHealthHandler(db.Pool)
+	pdfHandler := internalapi.NewPDFHandler(cfg.LocalPDFDir)
 
 	r := chi.NewRouter()
 
@@ -206,6 +207,11 @@ func main() {
 			r.Get("/metrics", reportHandler.GetMetrics)
 			r.Get("/daily", reportHandler.GetDailyBreakdown)
 		})
+
+		// Local PDF serving (dev only — R2 serves PDFs directly via
+		// its CDN in production). The `*` wildcard streams the
+		// requested object key (validated inside the handler).
+		r.Get("/pdfs/*", pdfHandler.Serve)
 	})
 
 	log.Printf("Server starting on :%s...", cfg.Port)

@@ -51,9 +51,12 @@
 	let showPayments = $state(false);
 	let showVoidForm = $state(false);
 	let voidReason = $state('');
+	let voidError = $state(false);
 	let submittingVoid = $state(false);
 	let regeneratingPdf = $state(false);
 	let showPaymentForm = $state(false);
+	/** Bound to the void-reason textarea so we can focus() it on error. */
+	let voidReasonInput: HTMLTextAreaElement | null = $state(null);
 
 	// === Derived ===
 	const isVoid = $derived(invoice?.effective_status === 'void');
@@ -163,20 +166,35 @@
 		if (!invoice) return;
 		const reason = voidReason.trim();
 		if (!reason) {
+			// B7-validation 5: surface the missing-reason inline (red
+			// border + helper text + focused textarea) so the user
+			// doesn't have to hunt for a toast. We still fire the toast
+			// for users who missed the inline cue.
+			voidError = true;
+			voidReasonInput?.focus();
 			addToast($_('invoiceWidget.void.missingReason'), 'error');
 			return;
 		}
 		submittingVoid = true;
 		try {
-			// Dev auth: we don't have a user_id in the widget context, so we
-			// pass an empty string. The backend will resolve the default
-			// owner in middleware. Owner override is required for refunds
-			// (BR-INV-010); voiding without payments is always allowed.
-			const updated = await api.invoices.void(invoice.id, reason, '');
-			invoice = updated;
+			// Dev auth (B7-validation 4): the Void handler requires a
+			// valid X-User-ID — empty string is rejected with 401. We use
+			// the same DEV_USER_ID as PaymentForm; production will
+			// source it from the session. Owner override is required
+			// for refunds (BR-INV-010); voiding without payments is
+			// always allowed regardless of role.
+			await api.invoices.void(invoice.id, reason, DEV_USER_ID);
+			// B7-validation 5: the void endpoint returns models.Invoice
+			// (no .payments / .line_items), so we can't just assign it
+			// to `invoice` — the payments list and breakdown would
+			// crash on `.length` (line 352). Re-fetch via getByBooking
+			// to get the full InvoiceDetail, same pattern as
+			// handlePaymentSuccess.
 			showVoidForm = false;
 			voidReason = '';
+			voidError = false;
 			addToast($_('invoiceWidget.toasts.voidSuccess'), 'success');
+			if (bookingId) await loadInvoice(bookingId);
 			onChange?.();
 		} catch (e: any) {
 			addToast(
@@ -409,15 +427,32 @@
 				</label>
 				<textarea
 					id="invoice-void-reason"
+					data-testid="invoice-void-reason"
+					bind:this={voidReasonInput}
 					bind:value={voidReason}
+					oninput={() => (voidError = false)}
 					placeholder={$_('invoiceWidget.void.reasonPlaceholder')}
 					rows="2"
-					class="mt-1 w-full rounded-lg border border-teren-border-subtle bg-white px-3 py-2 text-sm text-teren-text-main placeholder:text-teren-text-muted focus:border-teren-error-base focus:outline-none focus:ring-1 focus:ring-teren-error-base"
+					aria-invalid={voidError}
+					aria-describedby={voidError ? 'invoice-void-error' : undefined}
+					class="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-teren-text-main placeholder:text-teren-text-muted focus:outline-none focus:ring-1 {voidError
+						? 'border-teren-error-base ring-1 ring-teren-error-base'
+						: 'border-teren-border-subtle focus:border-teren-error-base focus:ring-teren-error-base'}"
 				></textarea>
+				{#if voidError}
+					<p
+						id="invoice-void-error"
+						data-testid="invoice-void-error"
+						class="mt-1 text-xs text-teren-error-base"
+					>
+						{$_('invoiceWidget.void.missingReason')}
+					</p>
+				{/if}
 				<div class="mt-3 flex gap-2">
 					<button
 						type="button"
 						disabled={submittingVoid}
+						data-testid="invoice-void-confirm"
 						onclick={confirmVoid}
 						class="flex-1 rounded-lg bg-teren-error-base px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-teren-error-hover active:scale-95 disabled:opacity-60 cursor-pointer"
 					>
@@ -426,6 +461,7 @@
 					<button
 						type="button"
 						disabled={submittingVoid}
+						data-testid="invoice-void-cancel"
 						onclick={() => {
 							showVoidForm = false;
 							voidReason = '';

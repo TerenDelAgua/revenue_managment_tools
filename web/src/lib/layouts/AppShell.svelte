@@ -17,6 +17,7 @@
 		{ icon: '📊', labelKey: 'nav.dashboard', href: '/' },
 		{ icon: '🗺️', labelKey: 'nav.floorMap', href: '/map' },
 		{ icon: '📅', labelKey: 'nav.bookings', href: '/bookings' },
+		{ icon: '🧾', labelKey: 'nav.invoices', href: '/invoices' },
 		{ icon: '👥', labelKey: 'nav.guests', href: '/guests' },
 		{ icon: '📈', labelKey: 'nav.reports', href: '/reports' },
 		{ icon: '⚙️', labelKey: 'nav.settings', href: '/settings' }
