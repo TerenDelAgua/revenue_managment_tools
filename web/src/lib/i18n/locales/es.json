@@ -342,7 +342,8 @@
     "export": "Exportar",
     "loading": "Cargando facturas…",
     "errors": {
-      "loadFailed": "No se pudo cargar la lista de facturas."
+      "loadFailed": "No se pudo cargar la lista de facturas.",
+      "exportFailed": "No se pudo exportar la lista de facturas."
     },
     "empty": {
       "title": "Sin facturas",
@@ -363,7 +364,8 @@
       "next": "Sig."
     },
     "toasts": {
-      "exportComingSoon": "La exportación CSV de la lista llega en una próxima iteración."
+      "exported": "Exportadas {count} factura(s).",
+      "exportEmpty": "Ninguna factura coincide con los filtros actuales."
     }
   },
   "invoiceDrawer": {

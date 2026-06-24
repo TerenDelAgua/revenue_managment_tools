@@ -342,7 +342,8 @@
     "export": "Ekspor",
     "loading": "Memuat faktur…",
     "errors": {
-      "loadFailed": "Tidak dapat memuat daftar faktur."
+      "loadFailed": "Tidak dapat memuat daftar faktur.",
+      "exportFailed": "Tidak dapat mengekspor daftar faktur."
     },
     "empty": {
       "title": "Tidak ada faktur",
@@ -363,7 +364,8 @@
       "next": "Berikutnya"
     },
     "toasts": {
-      "exportComingSoon": "Ekspor CSV daftar akan datang di iterasi berikutnya."
+      "exported": "Diekspor {count} faktur.",
+      "exportEmpty": "Tidak ada faktur yang cocok dengan filter saat ini."
     }
   },
   "invoiceDrawer": {

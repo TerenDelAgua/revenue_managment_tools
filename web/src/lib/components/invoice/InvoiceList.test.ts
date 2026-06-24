@@ -182,4 +182,107 @@ describe('InvoiceList', () => {
 			expect(getByTestId('inv-pagination-summary').textContent).toContain('2');
 		});
 	});
+
+	it('IL-07 (B10): Export paginates internally and downloads a CSV with all matching rows', async () => {
+		// Simulate 2 pages of results so the export must iterate.
+		const page1 = {
+			invoices: [baseResponse.invoices[0]],
+			pagination: { page: 1, limit: 50, total: 2 }
+		};
+		const page2 = {
+			invoices: [baseResponse.invoices[1]],
+			pagination: { page: 2, limit: 50, total: 2 }
+		};
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200 }));
+		fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200 }));
+		fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200 }));
+		vi.stubGlobal('fetch', fetchMock);
+
+		// Spy on the CSV download machinery.
+		const createObjectURL = vi.fn<typeof URL.createObjectURL>(() => 'blob:mock');
+		const origCreate = URL.createObjectURL;
+		const origRevoke = URL.revokeObjectURL;
+		URL.createObjectURL = createObjectURL;
+		URL.revokeObjectURL = vi.fn();
+		const origCreateEl = document.createElement.bind(document);
+		const createElSpy = vi
+			.spyOn(document, 'createElement')
+			.mockImplementation((tag: string) => {
+				const el = origCreateEl(tag) as HTMLAnchorElement;
+				if (tag === 'a') (el as any).click = () => {};
+				return el;
+			});
+
+		const { getByTestId } = render(InvoiceList, {
+			props: { propertyId: 'prop-1', onSelect: () => {} }
+		});
+		await waitFor(() => expect(getByTestId('inv-table')).toBeInTheDocument());
+
+		// Click Export. It must fire 2 list calls (page 1 + page 2) and
+		// then a download (createObjectURL).
+		await fireEvent.click(getByTestId('inv-export-csv'));
+		await waitFor(() => {
+			expect(createObjectURL).toHaveBeenCalledOnce();
+		});
+
+		// First call = the table's own load. Then export iterates pages.
+		const exportCalls = fetchMock.mock.calls.slice(1);
+		expect(exportCalls.length).toBe(2);
+		expect(exportCalls[0][0] as string).toContain('page=1');
+		expect(exportCalls[1][0] as string).toContain('page=2');
+
+		// Inspect the CSV Blob content.
+		const blob = (createObjectURL.mock.calls[0] as unknown as [Blob])[0];
+		expect(blob.type).toBe('text/csv;charset=utf-8');
+		const text = await blob.text();
+		const body = text.replace(/^﻿/, '').replace(/\r/g, '');
+		const lines = body.split('\n').filter(Boolean);
+		// 1 header + 2 rows.
+		expect(lines).toHaveLength(3);
+		// Header row mirrors the on-screen columns.
+		expect(lines[0]).toContain('Number');
+		expect(lines[0]).toContain('Guest');
+		expect(lines[0]).toContain('Total');
+		// Both invoices present.
+		expect(lines[1]).toContain('INV-2026-0001');
+		expect(lines[1]).toContain('Alice Smith');
+		expect(lines[2]).toContain('INV-2026-0002');
+		expect(lines[2]).toContain('Bob Jones');
+		// Status labels render via i18n (English locale).
+		expect(lines[1]).toContain('Unpaid');
+		expect(lines[2]).toContain('Paid');
+
+		createElSpy.mockRestore();
+		URL.createObjectURL = origCreate;
+		URL.revokeObjectURL = origRevoke;
+	});
+
+	it('IL-08 (B10): Export is disabled while in flight and re-enables on success', async () => {
+		// Slow fetch so we can observe the disabled state.
+		let resolveFetch: (r: Response) => void;
+		const slow = new Promise<Response>((r) => {
+			resolveFetch = r;
+		});
+		const fetchMock = vi.fn().mockReturnValueOnce(slow); // initial table load
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(InvoiceList, {
+			props: { propertyId: 'prop-1', onSelect: () => {} }
+		});
+		// While the table load is pending, the export button is already
+		// disabled because we only enable after the first list resolves.
+		await waitFor(() => expect(getByTestId('inv-export-csv')).toBeInTheDocument());
+
+		// Trigger export — second fetch will be slow.
+		fetchMock.mockReturnValueOnce(new Promise<Response>(() => {})); // never resolves
+		const exportBtn = getByTestId('inv-export-csv') as HTMLButtonElement;
+		await fireEvent.click(exportBtn);
+
+		await waitFor(() => {
+			expect(exportBtn.disabled).toBe(true);
+		});
+		// Resolves the first load so any waiters unwind.
+		resolveFetch!(new Response(JSON.stringify(baseResponse), { status: 200 }));
+	});
 });

@@ -342,7 +342,8 @@
     "export": "Export",
     "loading": "Loading invoices…",
     "errors": {
-      "loadFailed": "Could not load the invoice list."
+      "loadFailed": "Could not load the invoice list.",
+      "exportFailed": "Could not export the invoice list."
     },
     "empty": {
       "title": "No invoices found",
@@ -363,7 +364,8 @@
       "next": "Next"
     },
     "toasts": {
-      "exportComingSoon": "List CSV export is coming in a future iteration."
+      "exported": "Exported {count} invoice(s).",
+      "exportEmpty": "No invoices match the current filters."
     }
   },
   "invoiceDrawer": {

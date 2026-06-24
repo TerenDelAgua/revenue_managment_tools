@@ -20,6 +20,7 @@
 	import { _ } from 'svelte-i18n';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
+	import { toCSV, downloadCSV } from '$lib/util/csv';
 	import type {
 		InvoiceSummary,
 		ListInvoicesFilter,
@@ -104,10 +105,78 @@
 		page = p;
 	}
 
-	function exportCsv() {
-		// CSV export is on the per-invoice widget — this is a no-op
-		// placeholder for B9. A full list export would be B9.5.
-		addToast($_('invoicesList.toasts.exportComingSoon'), 'info');
+	/** True while a paginated export is in flight — disables the button. */
+	let exporting = $state(false);
+
+	/**
+	 * Builds the current filter object from local state. Pulled out so
+	 * the table fetch and the export fetch share one source of truth.
+	 */
+	function currentFilter(): ListInvoicesFilter {
+		const filter: ListInvoicesFilter = { property_id: propertyId, page: 1, limit: 50 };
+		if (statusFilter !== 'all') filter.status = statusFilter;
+		if (dateFrom) filter.date_from = dateFrom;
+		if (dateTo) filter.date_to = dateTo;
+		if (search.trim()) filter.search = search.trim();
+		return filter;
+	}
+
+	/**
+	 * Export the full result set matching the active filters (not just
+	 * the current page) to a CSV file. Paginates internally up to a hard
+	 * cap of 1000 invoices so a runaway query can't OOM the browser.
+	 * The CSV mirrors the on-screen columns plus a status label.
+	 */
+	async function exportCsv() {
+		if (exporting) return;
+		exporting = true;
+		try {
+			const baseFilter = currentFilter();
+			const allRows: InvoiceSummary[] = [];
+			const MAX_PAGES = 20; // 20 × 50 = 1000 invoices cap
+			for (let p = 1; p <= MAX_PAGES; p++) {
+				const res = await api.invoices.list({ ...baseFilter, page: p });
+				allRows.push(...res.invoices);
+				if (allRows.length >= res.pagination.total) break;
+				if (res.invoices.length === 0) break;
+			}
+			if (allRows.length === 0) {
+				addToast($_('invoicesList.toasts.exportEmpty'), 'info');
+				return;
+			}
+			const headers = [
+				$_('invoicesList.columns.number'),
+				$_('invoicesList.columns.guest'),
+				$_('invoicesList.columns.room'),
+				$_('invoicesList.columns.total'),
+				$_('invoicesList.columns.balance'),
+				$_('invoicesList.columns.status'),
+				$_('invoicesList.columns.issued')
+			];
+			const rows = allRows.map((inv) => [
+				inv.invoice_number,
+				inv.guest_name ?? '',
+				inv.room_number ?? '',
+				String(inv.total),
+				String(inv.balance),
+				$_(`invoiceWidget.status.${inv.effective_status}`),
+				formatDate(inv.issued_at)
+			]);
+			const csv = toCSV(headers, rows);
+			const stamp = new Date().toISOString().split('T')[0];
+			downloadCSV(`invoices-${stamp}.csv`, csv);
+			addToast(
+				$_('invoicesList.toasts.exported', { values: { count: allRows.length } }),
+				'success'
+			);
+		} catch (e: any) {
+			addToast(
+				e?.message ?? $_('invoicesList.errors.exportFailed'),
+				'error'
+			);
+		} finally {
+			exporting = false;
+		}
 	}
 
 	function formatMoney(value: number, currency = 'IDR'): string {
@@ -223,11 +292,12 @@
 		</button>
 		<button
 			type="button"
+			disabled={exporting}
 			onclick={exportCsv}
-			class="rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 cursor-pointer"
+			class="rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
 			data-testid="inv-export-csv"
 		>
-			⬇ {$_('invoicesList.export')}
+			{exporting ? '…' : `⬇ ${$_('invoicesList.export')}`}
 		</button>
 	</header>
 
