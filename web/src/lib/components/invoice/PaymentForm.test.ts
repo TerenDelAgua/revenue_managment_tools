@@ -15,14 +15,34 @@ import { describe, it, expect, beforeAll, beforeEach, vi, afterEach } from 'vite
 import { render, waitFor, fireEvent } from '@testing-library/svelte';
 import { locale } from 'svelte-i18n';
 import PaymentForm from './PaymentForm.svelte';
+import type { Payment } from '$lib/types';
 
 const baseProps = {
 	invoiceId: 'inv-1',
 	propertyId: 'prop-1',
 	balance: 100000,
+	totalPaid: 0,
 	receivedBy: 'user-1',
 	onSuccess: vi.fn(),
 	onCancel: vi.fn()
+};
+
+// A realistic non-reversal payment we can reverse in refund tests.
+const sampleCharge: Payment = {
+	id: 'p-charge-1',
+	invoice_id: 'inv-1',
+	property_id: 'prop-1',
+	amount: 100000,
+	method: 'cash',
+	original_currency: 'IDR',
+	exchange_rate: 1,
+	reference: null,
+	notes: null,
+	is_reversal: false,
+	reversal_of: null,
+	received_by: 'user-1',
+	received_at: '2026-06-22T08:00:00Z',
+	created_at: '2026-06-22T08:00:00Z'
 };
 
 beforeAll(() => {
@@ -187,6 +207,156 @@ describe('PaymentForm', () => {
 
 		await fireEvent.click(getByTestId('payment-cancel'));
 		expect(onCancel).toHaveBeenCalledTimes(1);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	// ============ Refund mode (B11) ============
+
+	it('PT-08 (B11): refund mode shows refund banner + cap hint + forces reference field', async () => {
+		const { getByTestId, queryByTestId } = render(PaymentForm, {
+			props: {
+				...baseProps,
+				mode: 'refund',
+				balance: 100000,
+				totalPaid: 75000 // user already paid 75k; max refundable is 75k
+			}
+		});
+
+		// Mode banner + data-mode attribute.
+		expect(getByTestId('payment-mode-banner')).toHaveTextContent(/refund/i);
+		expect(getByTestId('payment-form').getAttribute('data-mode')).toBe('refund');
+
+		// Amount pre-fills with totalPaid (NOT balance).
+		const amount = getByTestId('payment-amount') as HTMLInputElement;
+		expect(amount.value).toBe('75000');
+
+		// Cap hint shows totalPaid.
+		expect(getByTestId('payment-refund-cap-hint')).toHaveTextContent('75.000');
+
+		// Reference is required even for cash (R-01: refunds must be traceable).
+		expect(getByTestId('payment-reference')).toBeInTheDocument();
+
+		// Notes textarea has the * marker (required).
+		const notesLabel = getByTestId('payment-form').querySelector(
+			'label[for="payment-notes"]'
+		);
+		expect(notesLabel?.textContent).toMatch(/\*/);
+		expect(queryByTestId('payment-balance-hint')).toBeNull(); // payment hint replaced
+	});
+
+	it('PT-09 (B11): refund submit posts negative amount + is_reversal=true + reversal_of + X-User-Role', async () => {
+		const payment = {
+			id: 'p-refund-1',
+			invoice_id: 'inv-1',
+			amount: -75000,
+			method: 'cash',
+			is_reversal: true,
+			received_at: '2026-06-22T10:00:00Z'
+		};
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(new Response(JSON.stringify(payment), { status: 201 }));
+		vi.stubGlobal('fetch', fetchMock);
+
+		const onSuccess = vi.fn();
+		const { getByTestId } = render(PaymentForm, {
+			props: {
+				...baseProps,
+				mode: 'refund',
+				balance: 100000,
+				totalPaid: 75000,
+				payments: [sampleCharge],
+				onSuccess
+			}
+		});
+
+		// Reference + notes are required in refund mode. Amount pre-fills
+		// with totalPaid (75000), so the refund body will be -75000.
+		await fireEvent.input(getByTestId('payment-reference'), {
+			target: { value: 'SLIP-001' }
+		});
+		await fireEvent.input(getByTestId('payment-notes'), {
+			target: { value: 'guest cancelled' }
+		});
+
+		await fireEvent.click(getByTestId('payment-submit'));
+
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalledOnce();
+		});
+
+		const [url, init] = fetchMock.mock.calls[0];
+		expect(url).toContain('/invoices/inv-1/payments');
+		const headers = (init?.headers ?? {}) as Record<string, string>;
+		expect(headers['X-User-Role']).toBe('owner');
+		expect(headers['X-User-ID']).toBe('user-1');
+
+		const body = JSON.parse(init?.body as string);
+		// Refund sends NEGATIVE amount + is_reversal=true + reversal_of.
+		expect(body.amount).toBe(-75000);
+		expect(body.is_reversal).toBe(true);
+		expect(body.reversal_of).toBe('p-charge-1');
+		expect(body.reference).toBe('SLIP-001');
+		expect(body.notes).toBe('guest cancelled');
+	});
+
+	it('PT-10 (B11): refund without reference blocks submit', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(PaymentForm, {
+			props: { ...baseProps, mode: 'refund', totalPaid: 75000 }
+		});
+
+		// Submit button disabled without reference even though cash is selected.
+		const submit = getByTestId('payment-submit') as HTMLButtonElement;
+		expect(submit.disabled).toBe(true);
+
+		await fireEvent.input(getByTestId('payment-notes'), {
+			target: { value: 'reason' }
+		});
+		// Still disabled — reference missing.
+		expect(submit.disabled).toBe(true);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('PT-11 (B11): refund over total_paid shows exceedsPaid error', async () => {
+		const { getByTestId } = render(PaymentForm, {
+			props: { ...baseProps, mode: 'refund', balance: 100000, totalPaid: 50000 }
+		});
+
+		// Bump amount to 999999 (> totalPaid).
+		await fireEvent.input(getByTestId('payment-amount'), {
+			target: { value: '999999' }
+		});
+		const errorEl = getByTestId('payment-amount-error');
+		await waitFor(() => {
+			expect(errorEl.textContent).toMatch(/exceed/i);
+		});
+	});
+
+	it('PT-12 (B11): refund without any chargeable payment surfaces inline error and skips API', async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(PaymentForm, {
+			props: {
+				...baseProps,
+				mode: 'refund',
+				balance: 0,
+				totalPaid: 50000,
+				payments: [] // no chargeable payment available
+			}
+		});
+
+		await fireEvent.input(getByTestId('payment-reference'), { target: { value: 'X' } });
+		await fireEvent.input(getByTestId('payment-notes'), { target: { value: 'reason' } });
+		await fireEvent.click(getByTestId('payment-submit'));
+
+		await waitFor(() => {
+			expect(getByTestId('payment-form-error')).toBeInTheDocument();
+		});
+		expect(getByTestId('payment-form-error').textContent).toMatch(/no charge/i);
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

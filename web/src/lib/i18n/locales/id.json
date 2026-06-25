@@ -180,9 +180,10 @@
     },
     "actions": {
       "openPdf": "Buka PDF",
-      "regeneratePdf": "Buat Ulang PDF",
-      "registerPayment": "Catat Pembayaran",
-      "void": "Batalkan Faktur",
+      "regeneratePdf": "Buat ulang PDF",
+      "registerPayment": "Catat pembayaran",
+      "refund": "Pengembalian",
+      "void": "Batalkan faktur",
       "viewAll": "Lihat semua faktur"
     },
     "void": {
@@ -231,7 +232,26 @@
       "generic": "Tidak dapat mencatat pembayaran."
     },
     "toasts": {
-      "success": "Pembayaran tercatat."
+      "success": "Pembayaran tercatat.",
+      "refundSuccess": "Pengembalian diterbitkan."
+    },
+    "refund": {
+      "banner": "Pengembalian",
+      "amountLabel": "Jumlah pengembalian",
+      "maxButton": "Semua",
+      "capHint": "Maks. dapat dikembalikan: {cap}",
+      "referenceLabel": "Referensi pengembalian",
+      "referencePlaceholder": "ID transaksi awal, nomor slip…",
+      "referenceHint": "Pengembalian harus selalu dapat ditelusuri ke transaksi.",
+      "notesLabel": "Alasan pengembalian",
+      "notesPlaceholder": "Mengapa pengembalian ini diterbitkan?",
+      "submit": "Terbitkan pengembalian",
+      "errors": {
+        "amountRequired": "Masukkan jumlah pengembalian.",
+        "amountPositive": "Jumlah pengembalian harus lebih dari nol.",
+        "exceedsPaid": "Jumlah pengembalian tidak boleh melebihi total diterima.",
+        "noChargeToReverse": "Tidak ada pembayaran yang dapat dikembalikan pada faktur ini."
+      }
     }
   },
   "reports": {

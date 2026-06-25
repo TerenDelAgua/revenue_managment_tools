@@ -55,6 +55,8 @@
 	let submittingVoid = $state(false);
 	let regeneratingPdf = $state(false);
 	let showPaymentForm = $state(false);
+	/** 'payment' = register a charge, 'refund' = register a reversal. */
+	let paymentFormMode = $state<'payment' | 'refund'>('payment');
 	/** Bound to the void-reason textarea so we can focus() it on error. */
 	let voidReasonInput: HTMLTextAreaElement | null = $state(null);
 
@@ -240,12 +242,20 @@
 		return p.is_reversal || p.amount < 0;
 	}
 
-	async function handlePaymentSuccess() {
+	async function handlePaymentSuccess(p: Payment) {
 		// B7: refetch the invoice so the breakdown + balance + status pill
 		// reflect the new payment. The PaymentForm is dismissed and a calm
-		// toast confirms the operation.
+		// toast confirms the operation. B11: the toast message changes
+		// for refunds so the user can tell which action they just did.
 		showPaymentForm = false;
-		addToast($_('paymentForm.toasts.success'), 'success');
+		paymentFormMode = 'payment'; // reset for next open
+		const isRefund = paymentIsRefund(p);
+		addToast(
+			isRefund
+				? $_('paymentForm.toasts.refundSuccess')
+				: $_('paymentForm.toasts.success'),
+			'success'
+		);
 		if (bookingId) await loadInvoice(bookingId);
 		onChange?.();
 	}
@@ -475,61 +485,83 @@
 		{/if}
 
 		<!-- Payment form (inline progressive disclosure, no modal) -->
-		{#if showPaymentForm && invoice}
-			<PaymentForm
-				invoiceId={invoice.id}
-				{propertyId}
-				balance={invoice.balance}
-				receivedBy={DEV_USER_ID}
-				onSuccess={handlePaymentSuccess}
-				onCancel={() => (showPaymentForm = false)}
-			/>
-		{/if}
+	{#if showPaymentForm && invoice}
+		<PaymentForm
+			invoiceId={invoice.id}
+			{propertyId}
+			balance={invoice.balance}
+			totalPaid={invoice.total_paid}
+			receivedBy={DEV_USER_ID}
+			mode={paymentFormMode}
+			payments={invoice.payments}
+			onSuccess={handlePaymentSuccess}
+			onCancel={() => (showPaymentForm = false)}
+		/>
+	{/if}
 
-		<!-- Actions -->
-		{#if !isVoid}
-			<footer class="flex flex-wrap gap-2 border-t border-teren-background-base px-5 py-4">
-				{#if invoice.pdf_url}
-					<button
-						type="button"
-						onclick={openPdf}
-						class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 cursor-pointer"
-						data-testid="invoice-open-pdf"
-					>
-						{$_('invoiceWidget.actions.openPdf')}
-					</button>
-				{:else}
-					<button
-						type="button"
-						disabled={regeneratingPdf}
-						onclick={regeneratePdf}
-						class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-60 cursor-pointer"
-						data-testid="invoice-regenerate-pdf"
-					>
-						{regeneratingPdf ? '…' : $_('invoiceWidget.actions.regeneratePdf')}
-					</button>
-				{/if}
-				{#if invoice.balance > 0 && !showPaymentForm}
-					<button
-						type="button"
-						onclick={() => (showPaymentForm = true)}
-						class="rounded-lg border border-teren-success-base/40 bg-teren-success-subtle px-3 py-2 text-xs font-semibold text-teren-success-hover transition-colors hover:bg-teren-success-subtle/70 dark:text-teren-success-base cursor-pointer"
-						data-testid="invoice-payment-toggle"
-					>
-						{$_('invoiceWidget.actions.registerPayment')}
-					</button>
-				{/if}
-				{#if !showVoidForm}
-					<button
-						type="button"
-						onclick={() => (showVoidForm = true)}
-						class="rounded-lg border border-teren-error-base/40 bg-teren-error-subtle px-3 py-2 text-xs font-semibold text-teren-error-hover transition-colors hover:bg-teren-error-subtle/70 dark:text-teren-error-base cursor-pointer"
-						data-testid="invoice-void-toggle"
-					>
-						{$_('invoiceWidget.actions.void')}
-					</button>
-				{/if}
-			</footer>
-		{/if}
+	<!-- Actions -->
+	{#if !isVoid}
+		<footer class="flex flex-wrap gap-2 border-t border-teren-background-base px-5 py-4">
+			{#if invoice.pdf_url}
+				<button
+					type="button"
+					onclick={openPdf}
+					class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 cursor-pointer"
+					data-testid="invoice-open-pdf"
+				>
+					{$_('invoiceWidget.actions.openPdf')}
+				</button>
+			{/if}
+			{#if invoice.pdf_url}
+				<button
+					type="button"
+					disabled={regeneratingPdf}
+					onclick={regeneratePdf}
+					class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-60 cursor-pointer"
+					data-testid="invoice-regenerate-pdf"
+				>
+					{regeneratingPdf ? '…' : $_('invoiceWidget.actions.regeneratePdf')}
+				</button>
+			{/if}
+			{#if invoice.balance > 0 && !showPaymentForm}
+				<button
+					type="button"
+					onclick={() => {
+						paymentFormMode = 'payment';
+						showPaymentForm = true;
+					}}
+					class="rounded-lg border border-teren-success-base/40 bg-teren-success-subtle px-3 py-2 text-xs font-semibold text-teren-success-hover transition-colors hover:bg-teren-success-subtle/70 dark:text-teren-success-base cursor-pointer"
+					data-testid="invoice-payment-toggle"
+				>
+					{$_('invoiceWidget.actions.registerPayment')}
+				</button>
+			{/if}
+			<!-- B11: Refund is only meaningful when there's been at least one
+			     payment collected. total_paid is in models.InvoiceDetail. -->
+			{#if invoice.total_paid > 0 && !showPaymentForm}
+				<button
+					type="button"
+					onclick={() => {
+						paymentFormMode = 'refund';
+						showPaymentForm = true;
+					}}
+					class="rounded-lg border border-teren-warning-base/40 bg-teren-warning-subtle px-3 py-2 text-xs font-semibold text-teren-warning-hover transition-colors hover:bg-teren-warning-subtle/70 dark:text-teren-warning-base cursor-pointer"
+					data-testid="invoice-refund-toggle"
+				>
+					{$_('invoiceWidget.actions.refund')}
+				</button>
+			{/if}
+			{#if !showVoidForm}
+				<button
+					type="button"
+					onclick={() => (showVoidForm = true)}
+					class="rounded-lg border border-teren-error-base/40 bg-teren-error-subtle px-3 py-2 text-xs font-semibold text-teren-error-hover transition-colors hover:bg-teren-error-subtle/70 dark:text-teren-error-base cursor-pointer"
+					data-testid="invoice-void-toggle"
+				>
+					{$_('invoiceWidget.actions.void')}
+				</button>
+			{/if}
+		</footer>
+	{/if}
 	{/if}
 </section>

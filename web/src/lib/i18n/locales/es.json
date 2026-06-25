@@ -182,6 +182,7 @@
       "openPdf": "Abrir PDF",
       "regeneratePdf": "Regenerar PDF",
       "registerPayment": "Registrar pago",
+      "refund": "Reembolsar",
       "void": "Anular factura",
       "viewAll": "Ver todas las facturas"
     },
@@ -231,7 +232,26 @@
       "generic": "No se pudo registrar el pago."
     },
     "toasts": {
-      "success": "Pago registrado."
+      "success": "Pago registrado.",
+      "refundSuccess": "Reembolso emitido."
+    },
+    "refund": {
+      "banner": "Reembolso",
+      "amountLabel": "Importe del reembolso",
+      "maxButton": "Todo",
+      "capHint": "Máximo reembolsable: {cap}",
+      "referenceLabel": "Referencia del reembolso",
+      "referencePlaceholder": "ID de la transacción original, número de recibo…",
+      "referenceHint": "Los reembolsos deben ser siempre trazables a una transacción.",
+      "notesLabel": "Motivo del reembolso",
+      "notesPlaceholder": "¿Por qué se emite este reembolso?",
+      "submit": "Emitir reembolso",
+      "errors": {
+        "amountRequired": "Introduce un importe de reembolso.",
+        "amountPositive": "El importe del reembolso debe ser mayor que cero.",
+        "exceedsPaid": "El reembolso no puede superar el total cobrado.",
+        "noChargeToReverse": "No hay ningún cobro a reembolsar en esta factura."
+      }
     }
   },
   "reports": {

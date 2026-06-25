@@ -24,6 +24,15 @@ import { locale } from 'svelte-i18n';
 const API_BASE_URL = env.PUBLIC_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 /**
+ * DEV_OVERRIDE_ROLE — B11: the seed user has role 'admin' (general
+ * catch-all) but the service only authorises role 'owner' for refunds
+ * and force-overrides. While we have no session/JWT, we send a hardcoded
+ * role so the dev UI can exercise these paths. Production will source
+ * the role from JWT claims server-side and MUST NOT see this header.
+ */
+const DEV_OVERRIDE_ROLE = 'owner';
+
+/**
  * currentLocale reads the active svelte-i18n locale synchronously.
  * Falls back to 'en' when svelte-i18n hasn't initialised yet (SSR
  * bootstrap) so the header is always populated.
@@ -323,7 +332,9 @@ export const api = {
 		},
 
 		// Write — spec §4.3 (R-01 reference required, R-06 Idempotency-Key)
-		// Pass an idempotencyKey (UUID v4) to opt-in to dedup.
+		// Pass an idempotencyKey (UUID v4) to opt-in to dedup. B11: we
+		// also send X-User-Role (dev override) so the backend's role
+		// gate on refunds / force-overrides is satisfied.
 		registerPayment: (
 			invoiceId: string,
 			payload: RegisterPaymentPayload,
@@ -333,7 +344,8 @@ export const api = {
 		) => {
 			const headers: Record<string, string> = {
 				'X-Property-ID': propertyId,
-				'X-User-ID': receivedBy
+				'X-User-ID': receivedBy,
+				'X-User-Role': DEV_OVERRIDE_ROLE
 			};
 			if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 			return request<Payment>(`/invoices/${invoiceId}/payments`, {
@@ -347,7 +359,7 @@ export const api = {
 		void: (invoiceId: string, reason: string, voidedBy: string) =>
 			request<InvoiceDetail>(`/invoices/${invoiceId}/void`, {
 				method: 'POST',
-				headers: { 'X-User-ID': voidedBy },
+				headers: { 'X-User-ID': voidedBy, 'X-User-Role': DEV_OVERRIDE_ROLE },
 				body: JSON.stringify({ reason })
 			}),
 

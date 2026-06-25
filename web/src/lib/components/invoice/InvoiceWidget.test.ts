@@ -398,4 +398,104 @@ describe('InvoiceWidget', () => {
 		// No balance ⇒ no payment toggle.
 		expect(queryByTestId('invoice-payment-toggle')).toBeNull();
 	});
+
+	// ============ Refund UI (B11) ============
+
+	it('IT-11 (B11): refund toggle is shown when total_paid > 0 and absent when zero', async () => {
+		// First fetch: a paid invoice (balance=0, total_paid=555000).
+		mockFetchOnce({ ...baseInvoice, status: 'paid', effective_status: 'paid', balance: 0, total_paid: 555000, total_refunded: 0 });
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => {
+			expect(getByTestId('invoice-refund-toggle')).toBeInTheDocument();
+		});
+		// Paid invoice has balance=0 → no register-payment toggle.
+		expect(getByTestId('invoice-refund-toggle').textContent).toMatch(/refund/i);
+	});
+
+	it('IT-12 (B11): clicking the refund toggle opens the PaymentForm in refund mode', async () => {
+		mockFetchOnce({ ...baseInvoice, status: 'paid', effective_status: 'paid', balance: 0, total_paid: 555000, total_refunded: 0 });
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-refund-toggle')).toBeInTheDocument());
+		await fireEvent.click(getByTestId('invoice-refund-toggle'));
+
+		await waitFor(() => {
+			expect(getByTestId('payment-form').getAttribute('data-mode')).toBe('refund');
+		});
+		// Refund banner shows.
+		expect(getByTestId('payment-mode-banner')).toHaveTextContent(/refund/i);
+	});
+
+	it('IT-13 (B11): refund success re-fetches the invoice and shows refund toast', async () => {
+		// First fetch: load invoice (paid).
+		// Second fetch: POST payment (the refund).
+		// Third fetch: re-load invoice (refetch).
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify({
+				...baseInvoice,
+				status: 'paid',
+				effective_status: 'paid',
+				balance: 0,
+				total_paid: 555000,
+				total_refunded: 0,
+				payments: [
+					{
+						id: 'p-original',
+						invoice_id: 'inv-1',
+						amount: 555000,
+						method: 'cash',
+						is_reversal: false,
+						received_at: '2026-06-22T08:00:00Z'
+					}
+				]
+			}), { status: 200 })
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify({
+				id: 'p-refund-1',
+				invoice_id: 'inv-1',
+				amount: -100000,
+				method: 'cash',
+				is_reversal: true,
+				received_at: '2026-06-22T10:00:00Z'
+			}), { status: 201 })
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify({
+				...baseInvoice,
+				status: 'active',
+				effective_status: 'partial',
+				balance: 100000,
+				total_paid: 455000,
+				total_refunded: 100000
+			}), { status: 200 })
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-refund-toggle')).toBeInTheDocument());
+		await fireEvent.click(getByTestId('invoice-refund-toggle'));
+
+		await waitFor(() => expect(getByTestId('payment-form')).toBeInTheDocument());
+
+		// Fill the form.
+		await fireEvent.input(getByTestId('payment-amount'), { target: { value: '100000' } });
+		await fireEvent.input(getByTestId('payment-reference'), { target: { value: 'SLIP-001' } });
+		await fireEvent.input(getByTestId('payment-notes'), { target: { value: 'guest complaint' } });
+		await fireEvent.click(getByTestId('payment-submit'));
+
+		// 3rd call must be the re-fetch (same pattern as the void fix).
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+		const [reFetchURL] = fetchMock.mock.calls[2];
+		expect(reFetchURL).toContain('/invoices/by-booking/book-1');
+	});
 });
