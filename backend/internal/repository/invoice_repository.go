@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -495,9 +496,21 @@ func (r *InvoiceRepository) RegisterPayment(ctx context.Context, input models.Re
 
 	// Validate amount
 	if input.Amount > 0 {
-		remaining := total - currentPaid
-		if input.Amount > remaining+0.0001 { // tolerate float drift
-			return models.Payment{}, fmt.Errorf("%w: amount=%.2f > remaining=%.2f", ErrPaymentExceeds, input.Amount, remaining)
+		// The DB stores totals with 2-decimal precision (e.g. 721.50
+		// for 650 + 11% tax) but the UI rounds display to the nearest
+		// integer, so the user types 722 against a balance that says
+		// "721.50". Naively comparing 722 > 721.50 422s the payment.
+		//
+		// Resolution: ceiling the remaining balance to the next
+		// whole unit (IDR) and accept any amount up to that ceiling.
+		// A user trying to overpay by 1 IDR above the displayed total
+		// (e.g. 723 against 721.50) still 422s because 723 > 722.
+		// We add a tiny 0.001 epsilon for the rounding edge cases.
+		remaining := math.Round((total-currentPaid)*100) / 100
+		maxAllowed := math.Ceil(remaining - 0.001) // 721.499 → 721, 721.50 → 722
+		requested := math.Round(input.Amount*100) / 100
+		if requested > maxAllowed+0.001 {
+			return models.Payment{}, fmt.Errorf("%w: amount=%.2f > max=%.2f (remaining=%.2f)", ErrPaymentExceeds, requested, maxAllowed, remaining)
 		}
 	}
 

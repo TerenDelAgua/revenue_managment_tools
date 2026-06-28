@@ -108,7 +108,13 @@
 	// silently rewrite the user's input. untrack() silences the Svelte 5
 	// "state_referenced_locally" hint.
 	const initialAmount = untrack(() => (mode === 'refund' ? totalPaid : balance));
-	let amountStr = $state(String(Math.max(0, Math.round(initialAmount))));
+	// Pre-fill with the exact balance/totalPaid from the backend (no
+	// rounding). The DB stores totals with 2-decimal precision (e.g.
+	// 721.50 for 650 + 11% tax), but the UI rounds display to integers.
+	// If we pre-fill the rounded integer (722) the backend's strict
+	// amount check 422s because 722 > 721.50. Sending the exact 721.50
+	// makes the round-trip work.
+	let amountStr = $state(String(Math.max(0, initialAmount)));
 	let method = $state<PaymentMethod>('cash');
 	let reference = $state('');
 	let notes = $state('');
@@ -262,7 +268,7 @@
 		method = p.method;
 		// Pre-fill amount / reference to match the spec.
 		const capValue = p.remaining_reverseable ?? p.amount;
-		amountStr = String(Math.max(0, Math.round(capValue)));
+		amountStr = String(Math.max(0, capValue));
 		reference = defaultRefundReference(p);
 		notes = '';
 		formError = null;
@@ -271,7 +277,7 @@
 	function backToPicker() {
 		selectedTarget = null;
 		lastRefundResult = null;
-		amountStr = String(Math.max(0, Math.round(totalPaid)));
+		amountStr = String(Math.max(0, totalPaid));
 		method = 'cash';
 		reference = '';
 		notes = '';
@@ -286,7 +292,7 @@
 		// the next round starts from a clean slate.
 		lastRefundResult = null;
 		selectedTarget = null;
-		amountStr = String(Math.max(0, Math.round(totalPaid)));
+		amountStr = String(Math.max(0, totalPaid));
 		method = 'cash';
 		reference = '';
 		notes = '';
@@ -393,7 +399,7 @@
 	}
 
 	function setFullAmount() {
-		amountStr = String(Math.max(0, Math.round(cap)));
+		amountStr = String(Math.max(0, cap));
 	}
 
 	function openChangeMethodModal() {

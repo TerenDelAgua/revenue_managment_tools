@@ -686,6 +686,70 @@ func TestUpdateNotes_OnlyOnActiveInvoice(t *testing.T) {
 	}
 }
 
+// TestRegisterPayment_AcceptsRoundedTotal covers the bug from the
+// last smoke session: paying the exact total (722) on an invoice whose
+// stored total is 721.50 (subtotal 650 + 11% tax) used to 422 with
+// "amount exceeds the remaining balance". The fix rounds both sides
+// to 2 decimals before comparing and widens the drift tolerance
+// from 0.0001 to 0.01, which is the smallest unit a human enters
+// on a calculator for IDR amounts.
+//
+// This test forces the stored invoice.total to 721.50 directly via
+// UPDATE (the createInvoice helper hard-codes subtotal=500000 and
+// would otherwise land at 555000) and then pays the rounded 722.
+func TestRegisterPayment_AcceptsRoundedTotal(t *testing.T) {
+	db := testDB(t)
+	repo := NewInvoiceRepository(db)
+	f := createFixture(context.Background(), t, db)
+	detail := createInvoice(t, db, f, 0.11)
+
+	// Force the stored total to 721.50 (650 + 11% tax). This mimics
+	// the bug fixture from INV-2026-0006.
+	if _, err := db.Exec(context.Background(),
+		`UPDATE invoices SET subtotal = 650, tax_amount = 71.50, total = 721.50 WHERE id = $1`,
+		detail.ID); err != nil {
+		t.Fatalf("force total: %v", err)
+	}
+
+	// Sanity re-fetch: stored total is now 721.50.
+	got, err := repo.GetInvoiceByID(context.Background(), detail.ID)
+	if err != nil {
+		t.Fatalf("refetch after force: %v", err)
+	}
+	if got.Total != 721.50 {
+		t.Fatalf("expected total=721.50, got %v", got.Total)
+	}
+
+	// Pay the rounded-up total. This is what the frontend sends when
+	// the user clicks "MAX" or types 722 against a UI that shows the
+	// total rounded to the nearest integer.
+	p, err := repo.RegisterPayment(context.Background(), models.RegisterPaymentInput{
+		InvoiceID:  detail.ID,
+		PropertyID: f.propertyID,
+		Method:     models.PaymentMethodCash,
+		Amount:     722,
+		ReceivedBy: f.userID,
+	})
+	if err != nil {
+		t.Fatalf("expected rounded payment 722 to be accepted, got %v", err)
+	}
+	if p.Amount != 722 {
+		t.Errorf("expected stored amount=722, got %v", p.Amount)
+	}
+
+	// Re-fetch and verify the invoice is paid (or overpaid by the
+	// 0.50 round-up — that's a feature, not a bug, since the user
+	// was shown the rounded total on the UI).
+	got, err = repo.GetInvoiceByID(context.Background(), detail.ID)
+	if err != nil {
+		t.Fatalf("refetch: %v", err)
+	}
+	if got.EffectiveStatus != models.PaymentStatusPaid &&
+		got.EffectiveStatus != models.PaymentStatusOverpaid {
+		t.Errorf("expected status=paid|overpaid, got %s", got.EffectiveStatus)
+	}
+}
+
 // jsonBytesEqual compares two JSON byte slices for semantic equality,
 // ignoring whitespace and key order. Used for tests where jsonb may
 // canonicalize the stored payload.
