@@ -184,6 +184,7 @@
       "regeneratePdf": "Regenerate PDF",
       "registerPayment": "Register payment",
       "refund": "Refund",
+      "refundAll": "Refund all payments",
       "void": "Void invoice",
       "viewAll": "View all invoices",
       "terminalRefunded": "This invoice is fully refunded — no further actions available.",
@@ -212,7 +213,9 @@
       "regenerateSuccess": "PDF regenerated.",
       "regenerateError": "Could not regenerate the PDF.",
       "voidSuccess": "Invoice voided.",
-      "voidError": "Could not void the invoice."
+      "voidError": "Could not void the invoice.",
+      "refundAllSuccess": "Refund-all completed.",
+      "refundAllError": "Could not refund all payments."
     }
   },
   "paymentForm": {

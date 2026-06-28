@@ -184,6 +184,7 @@
       "regeneratePdf": "Buat ulang PDF",
       "registerPayment": "Catat pembayaran",
       "refund": "Pengembalian",
+      "refundAll": "Kembalikan semua pembayaran",
       "void": "Batalkan faktur",
       "viewAll": "Lihat semua faktur",
       "terminalRefunded": "Faktur ini telah dikembalikan sepenuhnya — tidak ada tindakan lebih lanjut yang tersedia.",
@@ -212,7 +213,9 @@
       "regenerateSuccess": "PDF dibuat ulang.",
       "regenerateError": "Tidak dapat membuat ulang PDF.",
       "voidSuccess": "Faktur dibatalkan.",
-      "voidError": "Tidak dapat membatalkan faktur."
+      "voidError": "Tidak dapat membatalkan faktur.",
+      "refundAllSuccess": "Pengembalian total selesai.",
+      "refundAllError": "Tidak dapat mengembalikan semua pembayaran."
     }
   },
   "paymentForm": {

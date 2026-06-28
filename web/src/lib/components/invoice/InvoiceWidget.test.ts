@@ -658,4 +658,135 @@ describe('InvoiceWidget', () => {
 		// Refunded glyph is NOT shown — it's only for terminal refunded.
 		expect(queryByTestId('invoice-refunded-glyph')).toBeNull();
 	});
+
+	// ============ v1.2 — Block 10: refund-all button + modal ============
+
+	const paidInvoiceForRefundAll: InvoiceDetail = {
+		...baseInvoice,
+		status: 'active',
+		effective_status: 'paid',
+		total_paid: 555000,
+		balance: 0
+	};
+
+	it('IT-19 (v1.2 B10): paid invoice shows the "Refund all payments" button', async () => {
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(paidInvoiceForRefundAll), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-actions')).toBeInTheDocument());
+		expect(getByTestId('invoice-refund-all-toggle')).toBeInTheDocument();
+		expect(getByTestId('invoice-refund-all-toggle').textContent).toMatch(/refund all/i);
+	});
+
+	it('IT-20 (v1.2 B10): refunded invoice hides the "Refund all" button (terminal banner wins)', async () => {
+		// Reuse the refunded terminal fixture from IT-14.
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(terminalInvoicePaid), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-terminal-banner')).toBeInTheDocument());
+		expect(queryByTestId('invoice-refund-all-toggle')).toBeNull();
+	});
+
+	it('IT-21 (v1.2 B10): clicking Refund-all + confirming the modal fires POST /refund-all and refetches', async () => {
+		const refundAllResponse = {
+			batch: {
+				id: 'batch-1',
+				invoice_id: 'inv-1',
+				property_id: 'prop-1',
+				method: 'cash',
+				amount: 0,
+				original_currency: 'IDR',
+				exchange_rate: 1,
+				reference: 'REFUND-ALL',
+				notes: 'bulk refund',
+				is_reversal: false,
+				reversal_of: null,
+				received_by: 'receptionist-1',
+				received_at: '2026-06-22T11:00:00Z',
+				created_at: '2026-06-22T11:00:00Z'
+			},
+			refunds: [],
+			refunded_count: 2,
+			refunded_total: 555000
+		};
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL, init?: RequestInit) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(paidInvoiceForRefundAll), { status: 200 });
+			}
+			if (u.includes('/refund-all') && init?.method === 'POST') {
+				// Echo the request body for assertion.
+				return new Response(
+					JSON.stringify({
+						...refundAllResponse,
+						request_body: init.body
+					}),
+					{ status: 200 }
+				);
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId, findByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-actions')).toBeInTheDocument());
+
+		// 1. Click "Refund all payments".
+		await fireEvent.click(getByTestId('invoice-refund-all-toggle'));
+
+		// 2. The destructive confirm modal opens with the refundAll i18n.
+		const title = await findByTestId('confirm-destructive-title');
+		expect(title.textContent).toMatch(/refund all payments/i);
+
+		// 3. Tick the checkbox + click confirm. ConfirmDestructive's
+		//    callback fires onConfirm → confirmRefundAll → POST.
+		await fireEvent.click(getByTestId('confirm-destructive-checkbox'));
+		await fireEvent.click(getByTestId('confirm-destructive-confirm'));
+
+		// 4. Verify the POST was issued with the right body shape.
+		const postCall = fetchMock.mock.calls.find(([u, init]) => {
+			const us = typeof u === 'string' ? u : (u as URL).toString();
+			return us.includes('/refund-all') && init?.method === 'POST';
+		});
+		expect(postCall).toBeTruthy();
+		const body = JSON.parse((postCall?.[1]?.body ?? '{}') as string);
+		expect(body.reason).toBeTruthy(); // any non-empty reason
+
+		// 5. A second GET /invoices/by-booking fires after success
+		//    (refetch by the widget). Wait for it — loadInvoice() is
+		//    async and Svelte batches the re-fetch into the next tick.
+		await waitFor(
+			() => {
+				const getCount = fetchMock.mock.calls.filter(([u]) => {
+					const us = typeof u === 'string' ? u : (u as URL).toString();
+					return us.includes('/invoices/by-booking/');
+				}).length;
+				expect(getCount).toBeGreaterThanOrEqual(2);
+			},
+			{ timeout: 2000 }
+		);
+	});
 });

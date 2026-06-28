@@ -383,6 +383,19 @@ export interface RegisterPaymentPayload {
     force_override?: boolean;
 }
 
+/**
+ * v1.2 (Block 10): response from POST /invoices/{id}/refund-all.
+ * Mirrors the server shape: one batch row + N individual refund rows.
+ * The batch is the audit anchor; the individual rows replicate what a
+ * hand-rolled refund would have produced but in a single atomic tx.
+ */
+export interface RefundAllResponse {
+    batch: Payment;
+    refunds: Payment[];
+    refunded_count: number;
+    refunded_total: number;
+}
+
 export interface DailySummary {
     date: string;
     property_id: string;

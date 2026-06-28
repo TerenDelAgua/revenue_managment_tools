@@ -13,6 +13,7 @@ import type {
 	InvoiceListResponse,
 	ListInvoicesFilter,
 	RegisterPaymentPayload,
+	RefundAllResponse,
 	Payment,
 	DailySummary,
 	MonthlyTaxReport
@@ -370,10 +371,20 @@ export const api = {
 				body: JSON.stringify({ notes })
 			}),
 
-		// Write — spec §4.6
-		regeneratePDF: (invoiceId: string) =>
-			request<{ pdf_url: string }>(`/invoices/${invoiceId}/regenerate-pdf`, {
-				method: 'POST'
-			})
+			// Write — spec §4.6
+	regeneratePDF: (invoiceId: string) =>
+		request<{ pdf_url: string }>(`/invoices/${invoiceId}/regenerate-pdf`, {
+			method: 'POST'
+		}),
+
+	// Block 10 — atomic refund-all (R-08). Server returns the batch row
+	// plus a summary of the individual refunds it created. Caller
+	// must have role='owner' (or 403). Returns 409 INVOICE_TERMINAL
+	// when the invoice is already refunded/void.
+	refundAll: (invoiceId: string, body: { reason: string }) =>
+		request<RefundAllResponse>(`/invoices/${invoiceId}/refund-all`, {
+			method: 'POST',
+			body: JSON.stringify(body)
+		})
 	}
 };

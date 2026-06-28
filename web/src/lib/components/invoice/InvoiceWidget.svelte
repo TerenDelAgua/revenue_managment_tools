@@ -23,6 +23,7 @@
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
 	import PaymentForm from './PaymentForm.svelte';
+	import ConfirmDestructive from '$lib/components/common/ConfirmDestructive.svelte';
 	import type {
 		InvoiceDetail,
 		Payment,
@@ -57,6 +58,12 @@
 	let showPaymentForm = $state(false);
 	/** 'payment' = register a charge, 'refund' = register a reversal. */
 	let paymentFormMode = $state<'payment' | 'refund'>('payment');
+	// Block 10 — refund-all: gated by ConfirmDestructive. Opened by
+	// the "Refund all payments" button in the action bar, fires the
+	// atomic POST /invoices/{id}/refund-all on confirm.
+	let showRefundAllModal = $state(false);
+	let refundAllReason = $state('');
+	let submittingRefundAll = $state(false);
 	/** Bound to the void-reason textarea so we can focus() it on error. */
 	let voidReasonInput: HTMLTextAreaElement | null = $state(null);
 
@@ -224,6 +231,41 @@
 		} finally {
 			submittingVoid = false;
 		}
+	}
+
+	// Block 10 — atomic refund-all. The modal has already gated the
+	// user's intent (checkbox ticked + destructive confirm); we just
+	// forward to the server and refetch the invoice so the widget
+	// re-renders with status='refunded' and the terminal banner from
+	// block 5.1 takes over.
+	async function confirmRefundAll() {
+		if (!invoice) return;
+		// The destructive modal's checkbox IS the consent — no extra
+		// reason input needed (the server allows the optional reason
+		// field but doesn't require it; the batch row carries an audit
+		// note via the user id).
+		const reason = refundAllReason.trim() || 'refund all';
+		submittingRefundAll = true;
+		try {
+			await api.invoices.refundAll(invoice.id, { reason });
+			showRefundAllModal = false;
+			refundAllReason = '';
+			addToast($_('invoiceWidget.toasts.refundAllSuccess'), 'success');
+			if (bookingId) await loadInvoice(bookingId);
+			onChange?.();
+		} catch (e: any) {
+			addToast(
+				e?.message ?? $_('invoiceWidget.toasts.refundAllError'),
+				'error'
+			);
+		} finally {
+			submittingRefundAll = false;
+		}
+	}
+
+	function cancelRefundAll() {
+		showRefundAllModal = false;
+		refundAllReason = '';
 	}
 
 	function methodLabel(m: PaymentMethod): string {
@@ -510,12 +552,26 @@
 			</div>
 		{/if}
 
-		<!-- Payment form (inline progressive disclosure, no modal) -->
-	{#if showPaymentForm && invoice}
-		<PaymentForm
-			invoiceId={invoice.id}
-			{propertyId}
-			balance={invoice.balance}
+		<!-- Block 10 — refund-all destructive confirm. The modal carries
+	     its own title/description from confirmDestructive.refundAll and
+	     reuses ConfirmDestructive for the checkbox + button gating. -->
+	<ConfirmDestructive
+		open={showRefundAllModal}
+		title={$_('confirmDestructive.refundAll.title')}
+		description={$_('confirmDestructive.refundAll.description')}
+		checkboxLabel={$_('confirmDestructive.refundAll.checkbox')}
+		confirmLabel={$_('confirmDestructive.refundAll.confirm')}
+		cancelLabel={$_('confirmDestructive.refundAll.cancel')}
+		onConfirm={confirmRefundAll}
+		onCancel={cancelRefundAll}
+	/>
+
+	<!-- Payment form (inline progressive disclosure, no modal) -->
+{#if showPaymentForm && invoice}
+	<PaymentForm
+		invoiceId={invoice.id}
+		{propertyId}
+		balance={invoice.balance}
 			totalPaid={invoice.total_paid}
 			receivedBy={DEV_USER_ID}
 			mode={paymentFormMode}
@@ -592,6 +648,24 @@
 					data-testid="invoice-refund-toggle"
 				>
 					{$_('invoiceWidget.actions.refund')}
+				</button>
+			{/if}
+			<!-- Block 10: refund-all button. Owner-only at the API; the
+			     button itself is visible to any role here, the server
+			     returns 403 for non-owners which we surface as a toast.
+			     Hidden on terminal lifecycles (banner covers it) and on
+			     zero-payment invoices. -->
+			{#if invoice.total_paid > 0 && !showPaymentForm}
+				<button
+					type="button"
+					onclick={() => {
+						refundAllReason = '';
+						showRefundAllModal = true;
+					}}
+					class="rounded-lg border border-teren-error-base/40 bg-teren-error-subtle px-3 py-2 text-xs font-semibold text-teren-error-hover transition-colors hover:bg-teren-error-subtle/70 dark:text-teren-error-base cursor-pointer"
+					data-testid="invoice-refund-all-toggle"
+				>
+					{$_('invoiceWidget.actions.refundAll')}
 				</button>
 			{/if}
 			{#if !showVoidForm}
