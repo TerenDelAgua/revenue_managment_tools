@@ -23,9 +23,12 @@ const baseSummary: DailySummaryType = {
 	invoices_unpaid: 1,
 	invoices_void: 1,
 	invoices_overpaid: 1,
+	invoices_refunded: 1, // v1.2 R-08
+	needs_review_count: 0, // v1.2 R-09 Q2
 	total_revenue: 1200000,
 	total_collected: 800000,
 	total_refunded: 50000,
+	net_revenue: 750000, // v1.2 R-08: collected - refunded
 	total_pending: 350000,
 	by_method: {
 		cash: 500000,
@@ -139,7 +142,37 @@ describe('DailySummary', () => {
 		URL.revokeObjectURL = origRevoke;
 	});
 
-	it('DT-05: shows empty states when by_method and staff_breakdown are empty', async () => {
+	// ============ v1.2 Block 13 — Reports UI ============
+
+	it('DT-04 (v1.2 B13): renders the Refunded KPI count and Net revenue tile', async () => {
+		mockFetchOnce(baseSummary);
+		const { getByTestId } = render(DailySummary, { props: { propertyId: 'prop-1' } });
+		await waitFor(() => {
+			expect(getByTestId('daily-count-refunded').textContent?.trim()).toBe('1');
+		});
+		// net_revenue = total_collected (800000) - total_refunded (50000) = 750000.
+		expect(getByTestId('daily-net-revenue')).toHaveTextContent('IDR 750.000');
+	});
+
+	it('DT-05 (v1.2 B13): shows the ⚠ needs-review banner when count > 0', async () => {
+		mockFetchOnce({ ...baseSummary, needs_review_count: 2 });
+		const { getByTestId } = render(DailySummary, { props: { propertyId: 'prop-1' } });
+		await waitFor(() => {
+			expect(getByTestId('daily-needs-review-banner')).toBeInTheDocument();
+		});
+		expect(getByTestId('daily-needs-review-banner').textContent).toMatch(/2/);
+	});
+
+	it('DT-05b (v1.2 B13): hides the needs-review banner when count is zero', async () => {
+		mockFetchOnce({ ...baseSummary, needs_review_count: 0 });
+		const { queryByTestId, getByTestId } = render(DailySummary, { props: { propertyId: 'prop-1' } });
+		await waitFor(() => {
+			expect(getByTestId('daily-count-paid')).toBeInTheDocument();
+		});
+		expect(queryByTestId('daily-needs-review-banner')).toBeNull();
+	});
+
+	it('DT-06: shows empty states when by_method and staff_breakdown are empty', async () => {
 		mockFetchOnce({ ...baseSummary, by_method: {}, staff_breakdown: [] });
 		const { container } = render(DailySummary, { props: { propertyId: 'prop-1' } });
 		await waitFor(() => {

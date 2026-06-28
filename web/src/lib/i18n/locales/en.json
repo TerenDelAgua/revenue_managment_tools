@@ -303,14 +303,17 @@
         "partial": "Partial",
         "unpaid": "Unpaid",
         "overpaid": "Overpaid",
+        "refunded": "Refunded",
         "void": "Void"
       },
       "financials": {
         "collected": "Total collected",
         "refunded": "Total refunded",
+        "net": "Net revenue",
         "pending": "Total pending",
         "tax": "Tax collected"
       },
+      "needsReviewBanner": "{count} invoice(s) flagged for review (legacy data drift). Totals below exclude them; resolve manually to close the day accurately.",
       "csv": {
         "metric": "Metric",
         "value": "Value",
@@ -346,6 +349,7 @@
         "totalSubtotal": "Subtotal",
         "totalTax": "Tax (PPN)",
         "refundsTotal": "Refunds",
+        "refundedCount": "Refunded",
         "voidCount": "Voided",
         "netTax": "Net tax collected"
       },

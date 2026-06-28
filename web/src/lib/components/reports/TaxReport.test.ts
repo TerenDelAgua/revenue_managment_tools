@@ -33,6 +33,8 @@ const monthlyReport: MonthlyTaxReport = {
 	invoices_count: 12,
 	void_count: 1,
 	refunds_total: 25000,
+	refunded_count: 2, // v1.2 R-08
+	needs_review_count: 0, // v1.2 R-09 Q2
 	net_tax_collected: 85000
 };
 
@@ -118,5 +120,24 @@ describe('TaxReport', () => {
 
 		URL.createObjectURL = origCreate;
 		URL.revokeObjectURL = origRevoke;
+	});
+
+	// ============ v1.2 Block 13 — Reports UI ============
+
+	it('TT-04 (v1.2 B13): renders the Refunded count KPI', async () => {
+		mockFetchOnce(monthlyReport);
+		const { getByTestId } = render(TaxReport, { props: { propertyId: 'prop-1' } });
+		await waitFor(() => {
+			expect(getByTestId('tax-refunded-count').textContent?.trim()).toBe('2');
+		});
+	});
+
+	it('TT-05 (v1.2 B13): shows the ⚠ needs-review banner when count > 0', async () => {
+		mockFetchOnce({ ...monthlyReport, needs_review_count: 3 });
+		const { getByTestId } = render(TaxReport, { props: { propertyId: 'prop-1' } });
+		await waitFor(() => {
+			expect(getByTestId('tax-needs-review-banner')).toBeInTheDocument();
+		});
+		expect(getByTestId('tax-needs-review-banner').textContent).toMatch(/3/);
 	});
 });

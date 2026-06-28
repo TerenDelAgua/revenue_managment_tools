@@ -135,6 +135,24 @@
 	{:else if loading && !report}
 		<p class="text-sm text-teren-text-muted">{$_('reports.loading')}</p>
 	{:else if report}
+		<!-- v1.2 R-09 Q2: same ⚠ banner as the daily summary when
+		     the period contains any needs_review invoices. The tax
+		     totals below deliberately exclude those rows from
+		     aggregations (BR-INV-011). -->
+		{#if report.needs_review_count > 0}
+			<div
+				class="mb-3 flex items-start gap-2 rounded-lg border border-teren-warning-base/30 bg-teren-warning-subtle px-3 py-2 text-xs text-teren-text-main"
+				data-testid="tax-needs-review-banner"
+				role="alert"
+			>
+				<span class="text-sm leading-none" aria-hidden="true">⚠</span>
+				<span>
+					{$_('reports.daily.needsReviewBanner', {
+						values: { count: report.needs_review_count }
+					})}
+				</span>
+			</div>
+		{/if}
 		<p class="mb-3 text-sm text-teren-text-muted" data-testid="tax-period-label">
 			{monthLabel}
 		</p>
@@ -162,6 +180,13 @@
 				<dt class="text-xs text-teren-text-muted">{$_('reports.tax.metrics.refundsTotal')}</dt>
 				<dd class="mt-1 text-lg font-bold tabular-nums text-teren-error-base" data-testid="tax-refunds">
 					−{formatMoney(report.refunds_total)}
+				</dd>
+			</div>
+			<!-- v1.2 R-08: count of fully-refunded invoices in the period. -->
+			<div class="rounded-lg border border-teren-border-subtle bg-white p-4">
+				<dt class="text-xs text-teren-text-muted">{$_('reports.tax.metrics.refundedCount')}</dt>
+				<dd class="mt-1 text-lg font-bold tabular-nums text-teren-error-base" data-testid="tax-refunded-count">
+					{report.refunded_count}
 				</dd>
 			</div>
 			<div class="rounded-lg border border-teren-border-subtle bg-white p-4">

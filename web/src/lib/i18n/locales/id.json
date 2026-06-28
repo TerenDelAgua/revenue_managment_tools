@@ -303,14 +303,17 @@
         "partial": "Sebagian",
         "unpaid": "Belum Bayar",
         "overpaid": "Kelebihan Bayar",
+        "refunded": "Dikembalikan",
         "void": "Dibatalkan"
       },
       "financials": {
         "collected": "Total diterima",
         "refunded": "Total dikembalikan",
+        "net": "Pendapatan bersih",
         "pending": "Total tertunda",
         "tax": "Pajak diterima"
       },
+      "needsReviewBanner": "{count} faktur ditandai untuk ditinjau (penyimpangan data lama). Total di bawah mengecualikannya; selesaikan secara manual untuk menutup hari dengan akurat.",
       "csv": {
         "metric": "Metrik",
         "value": "Nilai",
@@ -346,6 +349,7 @@
         "totalSubtotal": "Subtotal",
         "totalTax": "Pajak (PPN)",
         "refundsTotal": "Pengembalian",
+        "refundedCount": "Dikembalikan",
         "voidCount": "Dibatalkan",
         "netTax": "Pajak bersih"
       },

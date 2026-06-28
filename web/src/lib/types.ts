@@ -405,9 +405,30 @@ export interface DailySummary {
     invoices_unpaid: number;
     invoices_void: number;
     invoices_overpaid: number;
+    /**
+     * v1.2 (R-08): count of invoices issued today whose lifecycle
+     * flipped to 'refunded' (i.e. total_refunded >= total at some
+     * point during the day). Displayed as a separate KPI in the
+     * daily report (matches the dedicated Refunded column on the
+     * invoice list).
+     */
+    invoices_refunded: number;
+    /**
+     * v1.2 (R-09 Q2): count of invoices flagged needs_review=TRUE
+     * today. Surfaced as a warning banner on the daily report so
+     * the owner knows there's data drift to resolve before the
+     * daily close is accurate.
+     */
+    needs_review_count: number;
     total_revenue: number;
     total_collected: number;
     total_refunded: number;
+    /**
+     * v1.2 (R-08): informational. total_collected - total_refunded
+     * for the day. Useful as a single "what actually stayed in the
+     * bank" number; tax report uses its own net_tax formula.
+     */
+    net_revenue: number;
     total_pending: number;
     by_method: Partial<Record<PaymentMethod, number>>;
     tax_collected: number;
@@ -428,5 +449,16 @@ export interface MonthlyTaxReport {
     invoices_count: number;
     void_count: number;
     refunds_total: number;
+    /**
+     * v1.2 (R-08): count of fully-refunded invoices in the period
+     * (status='refunded'). Useful KPI alongside the monetary total.
+     */
+    refunded_count: number;
+    /**
+     * v1.2 (R-09 Q2): count of invoices flagged needs_review=TRUE
+     * in the period. Surfaced as a warning banner (same UX as the
+     * daily summary).
+     */
+    needs_review_count: number;
     net_tax_collected: number;
 }

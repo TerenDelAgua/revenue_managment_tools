@@ -13,6 +13,7 @@
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
 	import { toCSV, downloadCSV } from '$lib/util/csv';
+	import { formatMoney } from '$lib/utils/money';
 	import type { DailySummary, PaymentMethod } from '$lib/types';
 
 	interface Props {
@@ -50,12 +51,6 @@
 	}
 
 	// === Helpers ===
-	function formatMoney(value: number, currency = 'IDR'): string {
-		const fixed = Math.round(value).toString();
-		const grouped = fixed.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-		return `${currency} ${grouped}`;
-	}
-
 	function methodLabel(m: PaymentMethod): string {
 		return $_(`invoiceWidget.payments.method.${m}`);
 	}
@@ -145,13 +140,14 @@
 		<p class="text-sm text-teren-text-muted">{$_('reports.loading')}</p>
 	{:else if summary}
 		<!-- Counts grid -->
-		<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+		<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
 			{#each [
 				{ key: 'issued', labelKey: 'reports.daily.counts.issued', value: summary.invoices_issued, tone: 'neutral' },
 				{ key: 'paid', labelKey: 'reports.daily.counts.paid', value: summary.invoices_paid, tone: 'success' },
 				{ key: 'partial', labelKey: 'reports.daily.counts.partial', value: summary.invoices_partial, tone: 'warning' },
 				{ key: 'unpaid', labelKey: 'reports.daily.counts.unpaid', value: summary.invoices_unpaid, tone: 'error' },
 				{ key: 'overpaid', labelKey: 'reports.daily.counts.overpaid', value: summary.invoices_overpaid, tone: 'warning' },
+				{ key: 'refunded', labelKey: 'reports.daily.counts.refunded', value: summary.invoices_refunded, tone: 'refunded' },
 				{ key: 'void', labelKey: 'reports.daily.counts.void', value: summary.invoices_void, tone: 'muted' }
 			] as cell (cell.key)}
 				<div class="rounded-lg border border-teren-border-subtle bg-teren-background-base p-3 text-center">
@@ -163,6 +159,7 @@
 						{cell.tone === 'success' ? 'text-teren-success-hover dark:text-teren-success-base' : ''}
 						{cell.tone === 'warning' ? 'text-teren-warning-hover dark:text-teren-warning-base' : ''}
 						{cell.tone === 'error' ? 'text-teren-error-hover dark:text-teren-error-base' : ''}
+						{cell.tone === 'refunded' ? 'text-teren-error-hover dark:text-teren-error-base' : ''}
 						{cell.tone === 'muted' ? 'text-teren-text-muted line-through' : ''}
 						{cell.tone === 'neutral' ? 'text-teren-text-main' : ''}"
 						data-testid="daily-count-{cell.key}"
@@ -173,8 +170,28 @@
 			{/each}
 		</div>
 
+		<!-- v1.2 R-09 Q2: warning banner when ANY invoice for the day
+		     carries needs_review=TRUE. The owner must resolve the
+		     drift manually before the daily close can be trusted —
+		     the report below deliberately excludes those rows from
+		     all totals (BR-INV-011). -->
+		{#if summary.needs_review_count > 0}
+			<div
+				class="mt-5 flex items-start gap-2 rounded-lg border border-teren-warning-base/30 bg-teren-warning-subtle px-3 py-2 text-xs text-teren-text-main"
+				data-testid="daily-needs-review-banner"
+				role="alert"
+			>
+				<span class="text-sm leading-none" aria-hidden="true">⚠</span>
+				<span>
+					{$_('reports.daily.needsReviewBanner', {
+						values: { count: summary.needs_review_count }
+					})}
+				</span>
+			</div>
+		{/if}
+
 		<!-- Financials -->
-		<dl class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+		<dl class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
 			<div class="rounded-lg border border-teren-border-subtle bg-white p-4">
 				<dt class="text-xs text-teren-text-muted">{$_('reports.daily.financials.collected')}</dt>
 				<dd class="mt-1 text-lg font-bold tabular-nums text-teren-success-hover dark:text-teren-success-base" data-testid="daily-collected">
@@ -185,6 +202,15 @@
 				<dt class="text-xs text-teren-text-muted">{$_('reports.daily.financials.refunded')}</dt>
 				<dd class="mt-1 text-lg font-bold tabular-nums text-teren-error-base" data-testid="daily-refunded">
 					−{formatMoney(summary.total_refunded)}
+				</dd>
+			</div>
+			<!-- v1.2 R-08: net_revenue = collected - refunded. The
+			     single number the owner cares about at the end of
+			     the day — what actually stayed in the bank. -->
+			<div class="rounded-lg border border-teren-primary-base/30 bg-teren-primary-subtle p-4">
+				<dt class="text-xs text-teren-text-muted">{$_('reports.daily.financials.net')}</dt>
+				<dd class="mt-1 text-lg font-bold tabular-nums text-teren-primary-hover dark:text-teren-primary-base" data-testid="daily-net-revenue">
+					{formatMoney(summary.net_revenue)}
 				</dd>
 			</div>
 			<div class="rounded-lg border border-teren-border-subtle bg-white p-4">
