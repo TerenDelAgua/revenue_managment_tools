@@ -140,14 +140,14 @@ func (s *BookingService) CreateBooking(ctx context.Context, req models.CreateBoo
 	}, nil
 }
 
-func (s *BookingService) ListBookings(ctx context.Context, propertyID uuid.UUID, status string, search string, page int, limit int) ([]*repository.BookingListDTO, int, error) {
+func (s *BookingService) ListBookings(ctx context.Context, propertyID uuid.UUID, status string, search string, roomID *uuid.UUID, page int, limit int) ([]*repository.BookingListDTO, int, error) {
 	if page < 1 {
 		page = 1
 	}
 	if limit < 1 {
 		limit = 50
 	}
-	return s.bookingRepo.List(ctx, propertyID, status, search, page, limit)
+	return s.bookingRepo.List(ctx, propertyID, status, search, roomID, page, limit)
 }
 
 func (s *BookingService) GetBookingByID(ctx context.Context, id uuid.UUID) (*models.BookingDetail, error) {

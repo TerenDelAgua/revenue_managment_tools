@@ -252,12 +252,18 @@ type BookingListDTO struct {
 	Source           string     `json:"source"`
 }
 
-func (r *BookingRepository) List(ctx context.Context, propertyID uuid.UUID, status string, search string, page int, limit int) ([]*BookingListDTO, int, error) {
+func (r *BookingRepository) List(ctx context.Context, propertyID uuid.UUID, status string, search string, roomID *uuid.UUID, page int, limit int) ([]*BookingListDTO, int, error) {
 	offset := (page - 1) * limit
 
 	whereClause := "WHERE b.property_id = $1 "
 	args := []interface{}{propertyID}
 	paramIdx := 2
+
+	if roomID != nil {
+		whereClause += fmt.Sprintf("AND b.room_id = $%d ", paramIdx)
+		args = append(args, *roomID)
+		paramIdx++
+	}
 
 	if status != "" {
 		whereClause += fmt.Sprintf("AND b.status = $%d ", paramIdx)
