@@ -309,6 +309,12 @@ export interface InvoiceDetail extends Invoice {
     total_paid: number;
     total_refunded: number;
     balance: number;
+    /**
+     * v1.2 (R-08, R-09 Q2): server-side flag set when valid refunds
+     * exceed the original charge (legacy drift). Surfaced as a ⚠
+     * glyph on the status pill so the owner can review.
+     */
+    needs_review?: boolean;
     effective_status: PaymentStatus;
 }
 
@@ -320,9 +326,20 @@ export interface InvoiceSummary {
     tax_amount: number;
     total: number;
     total_paid: number;
+    /**
+     * v1.2 (R-08): positive sum of non-invalidated refund rows on this
+     * invoice. Frontend uses it for KPI cards + the "Refunded" column.
+     */
+    total_refunded?: number;
     balance: number;
     status: InvoiceStatus;
     effective_status: PaymentStatus;
+    /**
+     * v1.2 (R-08, R-09 Q2): server-side flag for invoices where the
+     * sum of valid refunds exceeds the original charge. Frontend shows
+     * a ⚠ glyph next to the status pill.
+     */
+    needs_review?: boolean;
     issued_at: string;
     paid_at: string | null;
     voided_at: string | null;

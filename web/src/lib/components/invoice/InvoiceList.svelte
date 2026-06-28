@@ -361,12 +361,19 @@
 							<td class="px-4 py-2 text-teren-text-muted">{inv.room_number ?? '—'}</td>
 							<td class="px-4 py-2 text-right tabular-nums text-teren-text-main">{formatMoney(inv.total)}</td>
 							<td class="px-4 py-2 text-right tabular-nums text-teren-text-main">{formatMoney(inv.balance)}</td>
-							<td class="px-4 py-2">
+							<td class="px-3 py-2.5">
 							<span
 								class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold {tone.bg} {tone.text}"
 								data-status={inv.effective_status}
 							>
 								<span class="h-1.5 w-1.5 rounded-full {tone.dot}"></span>
+								<!-- v1.2 Block 11: glyphs per DS §5.4. Decorative. -->
+								{#if inv.effective_status === 'refunded'}
+									<span class="text-xs leading-none" aria-hidden="true" data-testid="inv-row-refunded-glyph">↩</span>
+								{/if}
+								{#if inv.needs_review}
+									<span class="text-xs leading-none" aria-hidden="true" data-testid="inv-row-needs-review-glyph">⚠</span>
+								{/if}
 								{$_(`invoiceWidget.status.${inv.effective_status}`)}
 							</span>
 						</td>

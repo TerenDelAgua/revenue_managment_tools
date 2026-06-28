@@ -311,15 +311,23 @@
 
 		{#if status}
 			<span
-				class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold {statusStyle.bg} {statusStyle.text}"
-				data-testid="invoice-status-pill"
-				data-status={status}
-			>
-				<span class="h-1.5 w-1.5 rounded-full {statusStyle.dot}"></span>
-				{$_(`invoiceWidget.status.${status}`)}
-			</span>
-		{/if}
-	</header>
+			class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold {statusStyle.bg} {statusStyle.text}"
+			data-testid="invoice-status-pill"
+			data-status={status}
+		>
+			<span class="h-1.5 w-1.5 rounded-full {statusStyle.dot}"></span>
+			<!-- v1.2 Block 11: status glyphs per DS §5.4. Decorative
+			     (aria-hidden), the i18n label below carries the meaning. -->
+			{#if status === 'refunded'}
+				<span class="text-sm leading-none" aria-hidden="true" data-testid="invoice-refunded-glyph">↩</span>
+			{/if}
+			{#if invoice?.needs_review}
+				<span class="text-sm leading-none" aria-hidden="true" data-testid="invoice-needs-review-glyph">⚠</span>
+			{/if}
+			{$_(`invoiceWidget.status.${status}`)}
+		</span>
+	{/if}
+</header>
 
 	{#if loadError}
 		<div class="px-5 py-3 text-xs text-teren-error-base">

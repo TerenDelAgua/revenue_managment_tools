@@ -602,4 +602,60 @@ describe('InvoiceWidget', () => {
 		expect(queryByTestId('invoice-terminal-banner')).toBeNull();
 		expect(getByTestId('invoice-refund-toggle')).toBeInTheDocument();
 	});
+
+	// ============ v1.2 — Block 11: status glyphs on the pill ============
+
+	it('IT-17 (v1.2 B11): refunded invoice shows the ↩ glyph on the status pill (R-09 Q4)', async () => {
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(terminalInvoicePaid), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() =>
+			expect(getByTestId('invoice-status-pill')).toBeInTheDocument()
+		);
+		expect(getByTestId('invoice-status-pill').getAttribute('data-status')).toBe('refunded');
+		const glyph = getByTestId('invoice-refunded-glyph');
+		expect(glyph).toBeInTheDocument();
+		expect(glyph.textContent).toBe('↩');
+	});
+
+	it('IT-18 (v1.2 B11): needs_review invoice shows the ⚠ glyph on the status pill (R-09 Q2)', async () => {
+		const needsReviewInvoice: InvoiceDetail = {
+			...baseInvoice,
+			status: 'active',
+			effective_status: 'partial', // ambiguous: paid partial + refunded > paid
+			total_paid: 100000,
+			total_refunded: 150000, // > total_paid → needs_review
+			balance: 0,
+			needs_review: true
+		};
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(needsReviewInvoice), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() =>
+			expect(getByTestId('invoice-status-pill')).toBeInTheDocument()
+		);
+		expect(getByTestId('invoice-needs-review-glyph').textContent).toBe('⚠');
+		// Refunded glyph is NOT shown — it's only for terminal refunded.
+		expect(queryByTestId('invoice-refunded-glyph')).toBeNull();
+	});
 });
