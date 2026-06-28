@@ -26,6 +26,10 @@ type Labels struct {
 	ThankYou       string
 	RefundSuffix   string // "(refund)"
 	Void           string
+	// Refunded (v1.2 Block 12): stamp text painted diagonally across
+	// the centre of the PDF when lifecycle='refunded'. Mirrors Void
+	// so an auditor scans both terminal states identically.
+	Refunded       string
 	BookingLabel   string // "Booking: %s"
 	CurrencySuffix string // "IDR - UTC+8"
 }
@@ -56,6 +60,7 @@ var labelsByLocale = map[string]Labels{
 		ThankYou:       "Thank you for your stay.",
 		RefundSuffix:   "(refund)",
 		Void:           "VOID",
+		Refunded:       "REFUNDED",
 		BookingLabel:   "Booking",
 		CurrencySuffix: "IDR - UTC+8",
 	},
@@ -78,6 +83,7 @@ var labelsByLocale = map[string]Labels{
 		ThankYou:       "Gracias por su estancia.",
 		RefundSuffix:   "(reembolso)",
 		Void:           "ANULADA",
+		Refunded:       "REEMBOLSADA",
 		BookingLabel:   "Reserva",
 		CurrencySuffix: "IDR - UTC+8",
 	},
@@ -100,6 +106,7 @@ var labelsByLocale = map[string]Labels{
 		ThankYou:       "Terima kasih atas kunjungannya.",
 		RefundSuffix:   "(pengembalian)",
 		Void:           "DIBATALKAN",
+		Refunded:       "DIKEMBALIKAN",
 		BookingLabel:   "Pemesanan",
 		CurrencySuffix: "IDR - UTC+8",
 	},

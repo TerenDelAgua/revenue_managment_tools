@@ -123,6 +123,79 @@ func TestBuildPDF_VoidIncludesWatermark(t *testing.T) {
 	}
 }
 
+// TestBuildPDF_RefundedIncludesStamp (v1.2 Block 12) asserts that a
+// fully refunded invoice gets the REFUNDED diagonal stamp. We compare
+// the bytes against the active baseline AND the void baseline: the
+// refunded PDF must be visually different from both (different stamp
+// text + the same diagonal stamp machinery).
+func TestBuildPDF_RefundedIncludesStamp(t *testing.T) {
+	d := minimalInvoiceDetail(t)
+	active, err := buildPDF(d, LabelsFor("en"))
+	if err != nil {
+		t.Fatalf("active: %v", err)
+	}
+
+	d.Status = models.InvoiceStatusRefunded
+	refunded, err := buildPDF(d, LabelsFor("en"))
+	if err != nil {
+		t.Fatalf("refunded: %v", err)
+	}
+
+	// Refunded PDF is larger than the active baseline (extra stamp).
+	if len(refunded) <= len(active) {
+		t.Errorf(
+			"refunded PDF should be larger than active (got active=%d, refunded=%d)",
+			len(active), len(refunded),
+		)
+	}
+
+	// And visually different from the void PDF (different stamp text).
+	d.Status = models.InvoiceStatusVoid
+	voided, err := buildPDF(d, LabelsFor("en"))
+	if err != nil {
+		t.Fatalf("voided: %v", err)
+	}
+	if len(refunded) == len(voided) && bytesHaveSameSHA(refunded, voided) {
+		t.Error("refunded PDF is byte-identical to voided PDF (should differ — different stamp text)")
+	}
+}
+
+// bytesHaveSameSHA is a tiny helper for byte-equality. Used by the
+// RefundedIncludesStamp test to avoid pulling in crypto/sha256
+// inline.
+func bytesHaveSameSHA(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestBuildPDF_RefundedStamp_AllLocales (v1.2 Block 12) asserts that
+// the Refunded label is present in every locale the PDF generator
+// ships — auditors in es/id/en should see the same diagonal stamp
+// treatment.
+func TestBuildPDF_RefundedStamp_AllLocales(t *testing.T) {
+	d := minimalInvoiceDetail(t)
+	d.Status = models.InvoiceStatusRefunded
+	for _, locale := range []string{"en", "es", "id"} {
+		_, err := buildPDF(d, LabelsFor(locale))
+		if err != nil {
+			t.Errorf("locale=%s: build: %v", locale, err)
+		}
+		// Verify the label map carries the Refunded string too —
+		// silent fallback would be a UX bug.
+		labels := LabelsFor(locale)
+		if labels.Refunded == "" {
+			t.Errorf("locale=%s: Refunded label missing", locale)
+		}
+	}
+}
+
 // TestLocalStore_PutAndRoundTrip writes a PDF and verifies the URL
 // points to the file on disk and the file round-trips.
 func TestLocalStore_PutAndRoundTrip(t *testing.T) {

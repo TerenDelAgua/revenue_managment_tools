@@ -181,6 +181,7 @@
     },
     "actions": {
       "openPdf": "Buka PDF",
+      "generatePdf": "Buat PDF",
       "regeneratePdf": "Buat ulang PDF",
       "registerPayment": "Catat pembayaran",
       "refund": "Pengembalian",

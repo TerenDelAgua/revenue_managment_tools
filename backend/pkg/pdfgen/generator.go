@@ -356,38 +356,37 @@ func buildPDF(d models.InvoiceDetail, labels Labels) ([]byte, error) {
 		}
 	}
 
-	// --- VOID watermark
-	if d.Status == models.InvoiceStatusVoid {
-		pdf.Ln(2)
-		pdf.SetFont("Helvetica", "B", 28)
-		pdf.SetTextColor(colorError.r, colorError.g, colorError.b)
-		pdf.CellFormat(contentW, 10, sanitize(labels.Void), "", 0, "C", false, 0, "")
-		pdf.Ln(4)
+	// --- Diagonal terminal stamp (VOID / REFUNDED) — spec §6 + v1.2 §4.9.2
+	//
+	// Both terminal lifecycles get the same treatment so an auditor
+	// scanning the PDF can spot a closed invoice at a glance:
+	//   - 96pt Helvetica Bold
+	//   - rotated -30° (diagonal, reads bottom-left → top-right)
+	//   - 15% opacity so the underlying totals stay legible
+	//   - spec colour: #DC2626 (TEREN error-600)
+	//
+	// We draw the stamp AFTER the content block but apply the rotation
+	// from the page centre so it crosses the totals / line-items area
+	// rather than drifting into the footer. The state mutates the
+	// transformation matrix and the alpha — both must be reset before
+	// the next paint, or every later element gets a tilt + tint.
+	if d.Status == models.InvoiceStatusVoid || d.Status == models.InvoiceStatusRefunded {
+		stampText := labels.Void
+		if d.Status == models.InvoiceStatusRefunded {
+			stampText = labels.Refunded
+		}
+		drawDiagonalStamp(pdf, leftMargin, contentW, stampText)
 	}
 
 	// --- Footer (B7-validation 2): flows naturally after content, on
 	// the same page whenever possible. If we are very close to the
 	// page bottom, SetAutoPageBreak pushes us to a new page — the
 	// footer follows and stays at the bottom of the *last* page.
-	pdf.Ln(4)
-	pdf.SetFont("Helvetica", "", 7)
-	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
-	pdf.CellFormat(0, 3,
-		fmt.Sprintf("%s: %s  -  %s: %s",
-			sanitize(labels.IssuedAt),
-			d.IssuedAt.Format("02 Jan 2006 15:04"),
-			sanitize(labels.By),
-			sanitize(d.CreatedBy.String())),
-		"", 0, "L", false, 0, "")
+
 	pdf.Ln(3)
 	pdf.SetFont("Helvetica", "I", 9)
 	pdf.SetTextColor(colorText.r, colorText.g, colorText.b)
 	pdf.CellFormat(0, 4, sanitize(labels.ThankYou), "", 0, "L", false, 0, "")
-	pdf.Ln(3)
-	pdf.SetFont("Helvetica", "", 7)
-	pdf.SetTextColor(colorMuted.r, colorMuted.g, colorMuted.b)
-	pdf.CellFormat(0, 3, `"Built with intention. Designed for flow. Owned by TEREN."`,
-		"", 0, "C", false, 0, "")
 
 	var out []byte
 	if err := pdf.Output(&bufferAdapter{bytes: &out}); err != nil {
@@ -401,6 +400,47 @@ func max(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+// drawDiagonalStamp paints a big rotated, semi-transparent word across
+// the centre of the page — the "VOID" / "REFUNDED" terminal marker
+// from spec §6 + v1.2 §4.9.2.
+//
+// Spec values: 96pt Helvetica Bold, -30° rotation, opacity 0.15, TEREN
+// error-600 (#DC2626). The rotation pivots around the centre of the
+// content block; the stamp reaches from roughly the bottom-left of the
+// totals to the top-right of the line-items column.
+//
+// Both the alpha and the transformation matrix are reset before
+// returning — failing to do so would tilt + tint every element drawn
+// afterwards.
+func drawDiagonalStamp(pdf *gofpdf.Fpdf, leftMargin, contentW float64, text string) {
+	// Page-size anchor: a stamp is a "page decoration", not a content
+	// flow element, so we anchor it to the page geometry, not the
+	// current Y. Default A4 portrait is 210 × 297mm; we read from
+	// the pdf so it works on Letter too.
+	_, pageH := pdf.GetPageSize()
+	// Centre the stamp text horizontally across the content block.
+	cx := leftMargin + contentW/2
+	cy := pageH / 2
+
+	pdf.SetFont("Helvetica", "B", 96)
+	pdf.SetTextColor(colorError.r, colorError.g, colorError.b)
+	pdf.SetAlpha(0.15, "Normal")
+
+	// gofpdf rotation contract: open a Transform context, apply one
+	// or more Transform* methods, draw, then TransformEnd.
+	// TransformRotate(angle, x, y) rotates around (x, y) in degrees.
+	// -30° reads bottom-left → top-right per spec §6.
+	pdf.TransformBegin()
+	pdf.TransformRotate(-30, cx, cy)
+	// 200mm-wide cell so the rotated 96pt text fits comfortably;
+	// centred in its own bounding box. Vertical position is
+	// approximate — the rotation pivots on (cx, cy) so the centre
+	// of the text lands on the page centre.
+	pdf.CellFormat(200, 30, sanitize(text), "", 0, "C", false, 0, "")
+	pdf.TransformEnd()
+	pdf.SetAlpha(1.0, "Normal")
 }
 
 func propertyBlock(labels Labels) string {

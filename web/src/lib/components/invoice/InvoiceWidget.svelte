@@ -169,7 +169,19 @@
 	function openPdf() {
 		if (!invoice?.pdf_url) return;
 		// Open in a new tab. Backend issues a presigned URL when R2 is enabled.
-		window.open(invoice.pdf_url, '_blank', 'noopener,noreferrer');
+		//
+		// We append `?v={updated_at}` so the browser bypasses its cached
+		// copy of the file. The ObjectKey on the backend is deterministic
+		// (propertyID/invoices/{number}.pdf) and `RegeneratePDF`
+		// overwrites the bytes in place, so a same-URL GET can return
+		// different content after a refund/void. Without the cache-bust
+		// the user keeps seeing the pre-refund PDF even though the file
+		// on disk has been updated. updated_at changes on every write so
+		// the cache key always changes.
+		const cacheBust = invoice.updated_at
+			? `?v=${new Date(invoice.updated_at).getTime()}`
+			: '';
+		window.open(invoice.pdf_url + cacheBust, '_blank', 'noopener,noreferrer');
 	}
 
 	async function regeneratePdf() {
@@ -576,7 +588,11 @@
 
 	<!-- Actions -->
 	{#if isTerminal}
-		<!-- R-08 banner — see isTerminal derived above. -->
+		<!-- R-08 banner — see isTerminal derived above. Terminal
+		     lifecycle = refunded or void. The spec §4.4 explicitly
+		     keeps PDF regeneration open so the auditor can grab a
+		     stamped copy (REFUNDED / VOID diagonal stamp, block 12),
+		     so the PDF action row is still rendered here. -->
 		<footer
 			class="border-t border-teren-background-base px-5 py-4"
 			data-testid="invoice-terminal-banner"
@@ -587,6 +603,42 @@
 				{lifecycle === 'refunded'
 					? $_('invoiceWidget.actions.terminalRefunded')
 					: $_('invoiceWidget.actions.terminalVoid')}
+			</div>
+			<!-- Spec §4.4: PDF regeneration is allowed even on terminal
+			     invoices (stamped REFUNDED / VOID). Always shown so the
+			     user can fetch the audit copy. -->
+			<div class="mt-3 flex flex-wrap gap-2" data-testid="invoice-terminal-pdf-actions">
+				{#if invoice.pdf_url}
+					<button
+						type="button"
+						onclick={openPdf}
+						class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 cursor-pointer"
+						data-testid="invoice-open-pdf"
+					>
+						{$_('invoiceWidget.actions.openPdf')}
+					</button>
+				{:else}
+					<button
+						type="button"
+						disabled={regeneratingPdf}
+						onclick={regeneratePdf}
+						class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-60 cursor-pointer"
+						data-testid="invoice-generate-pdf"
+					>
+						{regeneratingPdf ? '…' : $_('invoiceWidget.actions.generatePdf')}
+					</button>
+				{/if}
+				{#if invoice.pdf_url}
+					<button
+						type="button"
+						disabled={regeneratingPdf}
+						onclick={regeneratePdf}
+						class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-60 cursor-pointer"
+						data-testid="invoice-regenerate-pdf"
+					>
+						{regeneratingPdf ? '…' : $_('invoiceWidget.actions.regeneratePdf')}
+					</button>
+				{/if}
 			</div>
 		</footer>
 	{:else if !isVoid}
@@ -602,6 +654,21 @@
 					data-testid="invoice-open-pdf"
 				>
 					{$_('invoiceWidget.actions.openPdf')}
+				</button>
+			{:else}
+				<!-- BR-INV-006: PDFs are not generated on payment —
+				     they're created on first request. The action bar
+				     therefore exposes a "Generate PDF" button whenever
+				     there isn't one yet, instead of hiding both PDF
+				     actions behind an empty pdf_url. -->
+				<button
+					type="button"
+					disabled={regeneratingPdf}
+					onclick={regeneratePdf}
+					class="flex-1 rounded-lg bg-teren-primary px-3 py-2 text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-60 cursor-pointer"
+					data-testid="invoice-generate-pdf"
+				>
+					{regeneratingPdf ? '…' : $_('invoiceWidget.actions.generatePdf')}
 				</button>
 			{/if}
 			{#if invoice.pdf_url}

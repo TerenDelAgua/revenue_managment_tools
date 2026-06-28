@@ -181,6 +181,7 @@
     },
     "actions": {
       "openPdf": "Open PDF",
+      "generatePdf": "Generate PDF",
       "regeneratePdf": "Regenerate PDF",
       "registerPayment": "Register payment",
       "refund": "Refund",

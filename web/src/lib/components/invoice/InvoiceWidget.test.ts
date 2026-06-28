@@ -206,7 +206,8 @@ describe('InvoiceWidget', () => {
 			voided_at: '2026-06-20T10:00:00Z',
 			voided_by: 'user-1',
 			void_reason: 'test',
-			balance: 0
+			balance: 0,
+			pdf_url: null // void invoice, no PDF yet
 		});
 		const { container, getByTestId, queryByTestId } = render(InvoiceWidget, {
 			props: { bookingId: 'book-1', propertyId: 'prop-1' }
@@ -216,9 +217,18 @@ describe('InvoiceWidget', () => {
 			expect(getByTestId('invoice-status-pill').getAttribute('data-status')).toBe('void');
 		});
 
-		// Footer actions (void button + open PDF) must be gone when invoice is void.
+		// Mutating actions are gone when invoice is void (R-08). The
+		// VOID button is the canonical example.
 		expect(queryByTestId('invoice-void-toggle')).toBeNull();
-		expect(queryByTestId('invoice-open-pdf')).toBeNull();
+		// Refund + register-payment are also gone — they live in the
+		// non-terminal action bar.
+		expect(queryByTestId('invoice-refund-toggle')).toBeNull();
+		expect(queryByTestId('invoice-payment-toggle')).toBeNull();
+
+		// Spec §4.4: PDF regeneration IS allowed on terminal invoices
+		// (stamped copy for audit). Without pdf_url we expose the
+		// "Generate PDF" affordance instead.
+		expect(getByTestId('invoice-generate-pdf')).toBeInTheDocument();
 
 		// Pill carries the line-through styling.
 		expect(container.querySelector('[data-status="void"]')?.classList.contains('line-through')).toBe(true);
@@ -689,11 +699,13 @@ describe('InvoiceWidget', () => {
 	});
 
 	it('IT-20 (v1.2 B10): refunded invoice hides the "Refund all" button (terminal banner wins)', async () => {
-		// Reuse the refunded terminal fixture from IT-14.
+		// Force pdf_url=null on top of the inherited terminal fixture
+		// so we exercise the "Generate PDF" branch.
+		const refundedNoPdf = { ...terminalInvoicePaid, pdf_url: null };
 		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
 			const u = typeof url === 'string' ? url : (url as URL).toString();
 			if (u.includes('/invoices/by-booking/')) {
-				return new Response(JSON.stringify(terminalInvoicePaid), { status: 200 });
+				return new Response(JSON.stringify(refundedNoPdf), { status: 200 });
 			}
 			return new Response('not found', { status: 404 });
 		});
@@ -705,6 +717,39 @@ describe('InvoiceWidget', () => {
 
 		await waitFor(() => expect(getByTestId('invoice-terminal-banner')).toBeInTheDocument());
 		expect(queryByTestId('invoice-refund-all-toggle')).toBeNull();
+
+		// Spec §4.4 / v1.2 Block 12: PDF actions remain on terminal
+		// invoices so the auditor can grab a stamped copy. With
+		// pdf_url=null, the "Generate PDF" button shows (not Open PDF).
+		expect(getByTestId('invoice-generate-pdf')).toBeInTheDocument();
+		expect(queryByTestId('invoice-open-pdf')).toBeNull();
+		expect(queryByTestId('invoice-regenerate-pdf')).toBeNull();
+	});
+
+	it('IT-22 (v1.2 B12): refunded invoice WITH a pdf_url shows Open PDF + Regenerate PDF', async () => {
+		// User has already generated the stamped PDF once — re-open
+		// gives them both Open (view existing) and Regenerate (fetch
+		// a fresh copy with the latest refund state).
+		const fixtureWithPdf = {
+			...terminalInvoicePaid,
+			pdf_url: 'http://localhost:8080/local/inv-1.pdf'
+		};
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(fixtureWithPdf), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-terminal-pdf-actions')).toBeInTheDocument());
+		expect(getByTestId('invoice-open-pdf')).toBeInTheDocument();
+		expect(getByTestId('invoice-regenerate-pdf')).toBeInTheDocument();
 	});
 
 	it('IT-21 (v1.2 B10): clicking Refund-all + confirming the modal fires POST /refund-all and refetches', async () => {
