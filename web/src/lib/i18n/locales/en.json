@@ -185,7 +185,9 @@
       "registerPayment": "Register payment",
       "refund": "Refund",
       "void": "Void invoice",
-      "viewAll": "View all invoices"
+      "viewAll": "View all invoices",
+      "terminalRefunded": "This invoice is fully refunded — no further actions available.",
+      "terminalVoid": "This invoice is voided — no further actions available."
     },
     "void": {
       "reasonLabel": "Reason",

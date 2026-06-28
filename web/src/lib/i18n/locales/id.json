@@ -185,7 +185,9 @@
       "registerPayment": "Catat pembayaran",
       "refund": "Pengembalian",
       "void": "Batalkan faktur",
-      "viewAll": "Lihat semua faktur"
+      "viewAll": "Lihat semua faktur",
+      "terminalRefunded": "Faktur ini telah dikembalikan sepenuhnya — tidak ada tindakan lebih lanjut yang tersedia.",
+      "terminalVoid": "Faktur ini telah dibatalkan — tidak ada tindakan lebih lanjut yang tersedia."
     },
     "void": {
       "reasonLabel": "Alasan",

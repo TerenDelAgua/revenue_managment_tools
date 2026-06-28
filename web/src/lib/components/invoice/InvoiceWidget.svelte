@@ -64,6 +64,15 @@
 	const isVoid = $derived(invoice?.effective_status === 'void');
 	const status = $derived<PaymentStatus | null>(invoice?.effective_status ?? null);
 
+	// R-08 (TEREN handbook, "no surprises"): once the invoice reaches a
+	// terminal lifecycle ('refunded' or 'void'), every action button
+	// would 409 INVOICE_TERMINAL on the server. Hiding the action bar
+	// and surfacing a calm banner beats leaving the buttons visible and
+	// surprising the user with an error toast on click. Status pill +
+	// audit trail already convey why the invoice is locked.
+	const lifecycle = $derived(invoice?.status ?? null);
+	const isTerminal = $derived(lifecycle === 'refunded' || lifecycle === 'void');
+
 	// Status pill → DS token. Kept local to the widget so the rest of the
 	// app stays free of invoice-specific palette decisions.
 	const statusStyle = $derived.by(() => {
@@ -509,8 +518,25 @@
 	{/if}
 
 	<!-- Actions -->
-	{#if !isVoid}
-		<footer class="flex flex-wrap gap-2 border-t border-teren-background-base px-5 py-4">
+	{#if isTerminal}
+		<!-- R-08 banner — see isTerminal derived above. -->
+		<footer
+			class="border-t border-teren-background-base px-5 py-4"
+			data-testid="invoice-terminal-banner"
+		>
+			<div
+				class="rounded-lg border border-teren-border-subtle bg-teren-background-base px-3 py-2 text-xs text-teren-text-muted"
+			>
+				{lifecycle === 'refunded'
+					? $_('invoiceWidget.actions.terminalRefunded')
+					: $_('invoiceWidget.actions.terminalVoid')}
+			</div>
+		</footer>
+	{:else if !isVoid}
+		<footer
+			class="flex flex-wrap gap-2 border-t border-teren-background-base px-5 py-4"
+			data-testid="invoice-actions"
+		>
 			{#if invoice.pdf_url}
 				<button
 					type="button"

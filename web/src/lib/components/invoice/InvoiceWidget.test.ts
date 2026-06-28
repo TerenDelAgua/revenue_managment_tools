@@ -505,4 +505,101 @@ describe('InvoiceWidget', () => {
 		const [reFetchURL] = fetchMock.mock.calls[2];
 		expect(reFetchURL).toContain('/invoices/by-booking/book-1');
 	});
+
+	// ============ v1.2 — Block 5.1: R-08 hide terminal actions ============
+
+	const terminalInvoicePaid: InvoiceDetail = {
+		...baseInvoice,
+		status: 'refunded', // ← lifecycle terminal
+		effective_status: 'refunded',
+		total_paid: 555000,
+		total_refunded: 555000,
+		balance: 0
+	};
+
+	const terminalInvoiceVoid: InvoiceDetail = {
+		...baseInvoice,
+		status: 'void', // ← lifecycle terminal
+		effective_status: 'void',
+		total_paid: 0,
+		balance: 0
+	};
+
+	it('IT-14 (v1.2 R-08): refunded invoice hides Refund/Void/Register buttons and shows the terminal banner', async () => {
+		// Mock only the GET /invoices/by-booking — every other call
+		// (POST /payments, etc.) returns 404 so it never resolves a
+		// stale body from a previous test.
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(terminalInvoicePaid), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-terminal-banner')).toBeInTheDocument());
+
+		// The action bar is gone — refund/void/register/payment are all
+		// hidden when the lifecycle is terminal.
+		expect(queryByTestId('invoice-refund-toggle')).toBeNull();
+		expect(queryByTestId('invoice-void-toggle')).toBeNull();
+		expect(queryByTestId('invoice-payment-toggle')).toBeNull();
+
+		// Banner explains the lock — text matches the i18n key.
+		expect(getByTestId('invoice-terminal-banner').textContent).toMatch(/fully refunded/i);
+	});
+
+	it('IT-15 (v1.2 R-08): voided invoice hides the action bar with the voided banner', async () => {
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(terminalInvoiceVoid), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		await waitFor(() => expect(getByTestId('invoice-terminal-banner')).toBeInTheDocument());
+		expect(queryByTestId('invoice-refund-toggle')).toBeNull();
+		expect(queryByTestId('invoice-void-toggle')).toBeNull();
+		expect(queryByTestId('invoice-payment-toggle')).toBeNull();
+		expect(getByTestId('invoice-terminal-banner').textContent).toMatch(/voided/i);
+	});
+
+	it('IT-16 (v1.2 R-08): active invoice still shows the Refund button normally', async () => {
+		const activeInvoice = {
+			...baseInvoice,
+			status: 'active', // ← lifecycle NOT terminal
+			effective_status: 'paid',
+			total_paid: 555000,
+			balance: 0
+		};
+		const fetchMock = vi.fn().mockImplementation(async (url: RequestInfo | URL) => {
+			const u = typeof url === 'string' ? url : (url as URL).toString();
+			if (u.includes('/invoices/by-booking/')) {
+				return new Response(JSON.stringify(activeInvoice), { status: 200 });
+			}
+			return new Response('not found', { status: 404 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const { getByTestId, queryByTestId } = render(InvoiceWidget, {
+			props: { bookingId: 'book-1', propertyId: 'prop-1' }
+		});
+
+		// No terminal banner, action bar still rendered with the Refund
+		// button visible (total_paid > 0 + lifecycle='active').
+		await waitFor(() => expect(getByTestId('invoice-actions')).toBeInTheDocument());
+		expect(queryByTestId('invoice-terminal-banner')).toBeNull();
+		expect(getByTestId('invoice-refund-toggle')).toBeInTheDocument();
+	});
 });
