@@ -11,10 +11,13 @@ import (
 	"github.com/go-chi/cors"
 
 	internalapi "github.com/terendelagua/teren-hotels-backend/internal/api"
+	apimw "github.com/terendelagua/teren-hotels-backend/internal/api/middleware"
 	"github.com/terendelagua/teren-hotels-backend/internal/repository"
 	"github.com/terendelagua/teren-hotels-backend/internal/service"
 	"github.com/terendelagua/teren-hotels-backend/pkg/config"
 	"github.com/terendelagua/teren-hotels-backend/pkg/database"
+	"github.com/terendelagua/teren-hotels-backend/pkg/pdfgen"
+	"github.com/terendelagua/teren-hotels-backend/pkg/pdfstore"
 )
 
 func main() {
@@ -35,6 +38,7 @@ func main() {
 	roomBlockRepo := repository.NewRoomBlockRepository(db.Pool)
 	bookingRepo := repository.NewBookingRepository(db.Pool)
 	guestRepo := repository.NewGuestRepository(db.Pool)
+	invoiceRepo := repository.NewInvoiceRepository(db.Pool)
 
 	propertyHandler := internalapi.NewPropertyHandler(propertyRepo)
 	floorHandler := internalapi.NewFloorHandler(floorRepo)
@@ -44,8 +48,24 @@ func main() {
 	inventoryHandler := internalapi.NewInventoryHandler(inventoryService)
 	roomBlockHandler := internalapi.NewRoomBlockHandler(inventoryService)
 
-	bookingService := service.NewBookingService(db.Pool, bookingRepo, guestRepo, inventoryService)
+	// InvoiceService wired with a PDFGenerator (B5).
+	// The generator uses gofpdf for rendering and uploads via the
+	// configured ObjectStore (R2 in prod, local FS in dev).
+	pdfStore, err := pdfstore.NewStore(cfg)
+	if err != nil {
+		log.Fatalf("init pdf store: %v", err)
+	}
+	pdfGen := pdfgen.NewInvoicePDFGenerator(invoiceRepo, pdfStore)
+	if cfg.UseR2() {
+		log.Printf("PDF store: R2 bucket=%s", cfg.R2Bucket)
+	} else {
+		log.Printf("PDF store: local FS dir=%s (no R2 credentials configured)", cfg.LocalPDFDir)
+	}
+
+	invoiceService := service.NewInvoiceService(db.Pool, invoiceRepo, bookingRepo, pdfGen)
+	bookingService := service.NewBookingService(db.Pool, bookingRepo, guestRepo, inventoryService, invoiceService)
 	bookingHandler := internalapi.NewBookingHandler(bookingService)
+	invoiceHandler := internalapi.NewInvoiceHandler(invoiceService)
 
 	guestService := service.NewGuestService(guestRepo)
 	guestHandler := internalapi.NewGuestHandler(guestService)
@@ -54,14 +74,33 @@ func main() {
 	reportService := service.NewReportService(reportRepo)
 	reportHandler := internalapi.NewReportHandler(reportService)
 	healthHandler := internalapi.NewHealthHandler(db.Pool)
+	pdfHandler := internalapi.NewPDFHandler(cfg.LocalPDFDir)
 
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	// Dev auth + idempotency: production will replace these with a real
+	// JWT middleware that pulls user/role from claims and the
+	// Idempotency-Key from a signed header.
+	r.Use(apimw.AuthContext)
+	r.Use(apimw.IdempotencyKey)
 
+	// Dev defaults — Vite's default port is 5173, but when it is already
+	// in use (another Vite orphan, a previous session, etc.) it falls
+	// back to 5174, 5175, … up to 5180. We whitelist that whole window
+	// so the developer does not have to chase port numbers. For
+	// production / staging, set CORS_ALLOWED_ORIGINS to a comma-separated
+	// list of explicit origins (the env-var values are appended below).
 	allowedOrigins := []string{
 		"http://localhost:5173",
+		"http://localhost:5174",
+		"http://localhost:5175",
+		"http://localhost:5176",
+		"http://localhost:5177",
+		"http://localhost:5178",
+		"http://localhost:5179",
+		"http://localhost:5180",
 		"http://localhost:3000",
 	}
 
@@ -81,7 +120,8 @@ func main() {
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
 		AllowedHeaders: []string{
 			"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Session-Id", "X-Requested-With",
-			"X-Property-ID", "Accept-Encoding", "User-Agent", "Cache-Control", "Pragma", "Origin",
+			"X-Property-ID", "X-User-ID", "X-User-Role", "Idempotency-Key",
+			"Accept-Encoding", "User-Agent", "Cache-Control", "Pragma", "Origin",
 		},
 		ExposedHeaders: []string{
 			"Link", "Content-Length", "X-Request-Id", "X-Session-Id",
@@ -152,6 +192,22 @@ func main() {
 			r.Post("/{id}/checkin", bookingHandler.CheckIn)
 			r.Post("/{id}/checkout", bookingHandler.CheckOut)
 			r.Post("/{id}/cancel", bookingHandler.Cancel)
+			// Invoicing module (spec §4) — invoice under booking.
+			r.Get("/{id}/invoice", invoiceHandler.GetByBookingID)
+		})
+
+		// Invoicing module (spec §4)
+		r.Route("/invoices", func(r chi.Router) {
+			r.Get("/", invoiceHandler.List)
+			r.Get("/daily-summary", invoiceHandler.DailySummary)
+			r.Get("/tax-report", invoiceHandler.MonthlyTaxReport)
+			r.Get("/by-booking/{bookingId}", invoiceHandler.GetByBookingID)
+			r.Get("/{id}", invoiceHandler.GetByID)
+			r.Patch("/{id}/notes", invoiceHandler.UpdateNotes)
+			r.Post("/{id}/void", invoiceHandler.Void)
+			r.Post("/{id}/payments", invoiceHandler.RegisterPayment)
+			r.Post("/{id}/refund-all", invoiceHandler.RefundAll)
+			r.Post("/{id}/regenerate-pdf", invoiceHandler.RegeneratePDF)
 		})
 
 		r.Route("/guests", func(r chi.Router) {
@@ -165,6 +221,11 @@ func main() {
 			r.Get("/metrics", reportHandler.GetMetrics)
 			r.Get("/daily", reportHandler.GetDailyBreakdown)
 		})
+
+		// Local PDF serving (dev only — R2 serves PDFs directly via
+		// its CDN in production). The `*` wildcard streams the
+		// requested object key (validated inside the handler).
+		r.Get("/pdfs/*", pdfHandler.Serve)
 	})
 
 	log.Printf("Server starting on :%s...", cfg.Port)

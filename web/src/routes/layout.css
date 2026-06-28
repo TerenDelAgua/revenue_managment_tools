@@ -54,6 +54,15 @@
 	--color-teren-warning-hover: #b45309;
 
 	/*
+	 * Semantic — Info (DS follow-up candidate for v1.2).
+	 * Used for non-actionable notifications and the "cleaning in progress"
+	 * badge state. Distinct from primary (action) and warning (attention).
+	 */
+	--color-teren-info-base: #0284c7;
+	--color-teren-info-subtle: #f0f9ff;
+	--color-teren-info-hover: #e0f2fe;
+
+	/*
 	 * Sidebar surface (DS follow-up candidate for v1.2).
 	 * The sidebar is an intentionally inverted surface — it stays dark in
 	 * both light and dark modes for high-contrast navigation. These tokens
@@ -97,6 +106,10 @@
 	--color-teren-warning-base: #fbbf24;
 	--color-teren-warning-subtle: #78350f;
 	--color-teren-warning-hover: #f59e0b;
+
+	--color-teren-info-base: #38bdf8;
+	--color-teren-info-subtle: #082f49;
+	--color-teren-info-hover: #075985;
 }
 
 /* ------------------------------------------------------------------ */
@@ -127,6 +140,10 @@
 		--color-teren-warning-base: #fbbf24;
 		--color-teren-warning-subtle: #78350f;
 		--color-teren-warning-hover: #f59e0b;
+
+		--color-teren-info-base: #38bdf8;
+		--color-teren-info-subtle: #082f49;
+		--color-teren-info-hover: #075985;
 	}
 }
 
@@ -157,6 +174,10 @@
 	--color-teren-warning-base: var(--color-teren-warning-base);
 	--color-teren-warning-subtle: var(--color-teren-warning-subtle);
 	--color-teren-warning-hover: var(--color-teren-warning-hover);
+
+	--color-teren-info-base: var(--color-teren-info-base);
+	--color-teren-info-subtle: var(--color-teren-info-subtle);
+	--color-teren-info-hover: var(--color-teren-info-hover);
 
 	--color-teren-sidebar-bg: var(--color-teren-sidebar-bg);
 	--color-teren-sidebar-fg: var(--color-teren-sidebar-fg);

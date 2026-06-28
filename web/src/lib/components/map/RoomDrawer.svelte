@@ -11,6 +11,7 @@
 	import CheckoutConfirmCard from './drawer/CheckoutConfirmCard.svelte';
 	import PendingBookingsList from './drawer/PendingBookingsList.svelte';
 	import BlockRoomForm from './drawer/BlockRoomForm.svelte';
+	import InvoiceWidget from '$lib/components/invoice/InvoiceWidget.svelte';
 
 	interface Props {
 		room: RoomMap | null;
@@ -84,7 +85,7 @@
 			numberError = null;
 			return;
 		}
-		
+
 		try {
 			await onAction('update_room', { number: trimmed });
 			numberError = null;
@@ -104,10 +105,10 @@
 		const isInactive = room.availability === 'inactive';
 		const nextStatus = isInactive ? 'active' : 'inactive';
 		const oldAvailability = room.availability;
-		
+
 		// Optimistic update
 		room.availability = isInactive ? 'available' : 'inactive';
-		
+
 		try {
 			await onAction('update_room', { status: nextStatus });
 		} catch (err: unknown) {
@@ -168,23 +169,23 @@
 	const primaryAction = $derived.by(() => {
 		switch (room?.availability) {
 			case 'pending':
-				return { labelKey: 'drawer.checkIn', color: 'bg-[#16A34A]', action: 'checkin' as const };
+				return { labelKey: 'drawer.checkIn', color: 'bg-teren-success-base', action: 'checkin' as const };
 			case 'occupied':
-				return { labelKey: 'drawer.checkOut', color: 'bg-[#1C1917]', action: 'checkout' as const };
+				return { labelKey: 'drawer.checkOut', color: 'bg-teren-text-main', action: 'checkout' as const };
 			case 'cleaning':
 				// BT-TEREN-16: la housekeeping pulsa "Cleaning Done" cuando termina.
 				// Devuelve la room a estado `active` (vendible).
-				return { labelKey: 'drawer.cleaningDone', color: 'bg-[#0284C7]', action: 'clear_cleaning' as const };
+				return { labelKey: 'drawer.cleaningDone', color: 'bg-teren-info-base', action: 'clear_cleaning' as const };
 			case 'blocked':
 				return {
 					labelKey: 'drawer.removeBlock',
-					color: 'bg-[#DC2626]',
+					color: 'bg-teren-error-base',
 					action: 'unblock' as const
 				};
 			default:
 				return {
 					labelKey: 'drawer.assignBooking',
-					color: 'bg-[#FF8C42]',
+					color: 'bg-teren-primary',
 					action: 'assign' as const
 				};
 		}
@@ -212,7 +213,7 @@
 	<button
 		type="button"
 		aria-label="Close drawer"
-		class="fixed inset-0 z-40 block w-full bg-[#1C1917]/20 backdrop-blur-[1px] transition-opacity duration-200 {isOpen
+		class="fixed inset-0 z-40 block w-full bg-teren-text-main/20 backdrop-blur-[1px] transition-opacity duration-200 {isOpen
 			? 'cursor-default opacity-100'
 			: 'pointer-events-none opacity-0'}"
 		onclick={onClose}
@@ -220,36 +221,35 @@
 
 	<!-- Panel del Drawer -->
 	<div
-		class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md transform flex-col bg-[#FCFBFA] shadow-xl transition-transform duration-250 ease-out {isOpen
+		class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md transform flex-col bg-teren-surface-base shadow-xl transition-transform duration-250 ease-out border-l border-teren-border-subtle {isOpen
 			? 'translate-x-0'
 			: 'translate-x-full'}"
-		style="border-left: 1px solid #E7E5E4;"
 	>
 		<!-- Encabezado -->
-		<div class="flex items-start justify-between border-b border-[#E7E5E4] bg-[#FCFBFA] px-6 py-4">
+		<div class="flex items-start justify-between border-b border-teren-border-subtle bg-teren-surface-base px-6 py-4">
 			<div>
 				<div class="mb-1 flex items-center gap-2">
-					<h2 class="text-xl font-bold tracking-tight text-[#1C1917]">{room.number}</h2>
+					<h2 class="text-xl font-bold tracking-tight text-teren-text-main">{room.number}</h2>
 					<span
 						class="h-2.5 w-2.5 rounded-full {room.availability === 'available'
-							? 'bg-[#16A34A]'
+							? 'bg-teren-success-base'
 							: room.availability === 'occupied'
-								? 'bg-[#DC2626]'
+								? 'bg-teren-error-base'
 								: room.availability === 'pending'
-									? 'bg-[#D97706]'
+									? 'bg-teren-warning-base'
 									: room.availability === 'blocked'
-										? 'bg-[#44403C]'
-										: 'bg-[#A8A29E]'}"
+										? 'bg-stone-700 dark:bg-stone-500'
+										: 'bg-teren-text-muted'}"
 					></span>
 				</div>
-				<p class="text-sm text-[#57534E]">
+				<p class="text-sm text-teren-text-muted">
 					{$_(`roomTypes.${room.room_type.name}`, { default: room.room_type.name })} · {$_(`status.${room.availability}`)}
 				</p>
 			</div>
 			<button
 				title={$_('drawer.close')}
 				onclick={onClose}
-				class="rounded-lg p-2 text-[#57534E] transition-colors hover:bg-[#F5F4F1] hover:text-[#1C1917]"
+				class="rounded-lg p-2 text-teren-text-muted transition-colors hover:bg-teren-background-base hover:text-teren-text-main"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -272,40 +272,40 @@
 		<div class="flex-1 space-y-5 overflow-y-auto p-5">
 			{#if mode === 'setup'}
 				<!-- Tarjeta de Configuración (Setup Mode) -->
-				<div class="rounded-xl border border-[#E7E5E4] bg-white p-5 shadow-sm space-y-4">
-					<h3 class="text-xs font-bold text-[#FF8C42] tracking-wider uppercase">Configuración de Habitación</h3>
-					
+				<div class="rounded-xl border border-teren-border-subtle bg-white p-5 shadow-sm space-y-4">
+					<h3 class="text-xs font-bold text-teren-primary tracking-wider uppercase">Configuración de Habitación</h3>
+
 					<!-- Room Number Input -->
 					<div class="space-y-1">
-						<label for="room-number-input" class="block text-xs font-semibold text-[#57534E]">Número de Habitación</label>
+						<label for="room-number-input" class="block text-xs font-semibold text-teren-text-muted">Número de Habitación</label>
 						<div class="relative">
-							<input 
-								type="text" 
+							<input
+								type="text"
 								bind:value={editNumber}
 								onblur={handleNumberBlur}
-								class="w-full rounded-lg border px-3 py-2 text-sm font-medium text-stone-800 focus:outline-none 
-								{numberError ? 'border-[#DC2626] ring-1 ring-[#DC2626]' : 'border-[#E7E5E4] focus:border-[#FF8C42] focus:ring-1 focus:ring-[#FF8C42]'}"
+								class="w-full rounded-lg border px-3 py-2 text-sm font-medium text-stone-800 focus:outline-none
+								{numberError ? 'border-teren-error-base ring-1 ring-teren-error-base' : 'border-teren-border-subtle focus:border-teren-primary focus:ring-1 focus:ring-teren-primary'}"
 							/>
 							{#if numberError}
-								<p class="mt-1 text-xs font-medium text-[#DC2626]">{numberError}</p>
+								<p class="mt-1 text-xs font-medium text-teren-error-base">{numberError}</p>
 							{/if}
 						</div>
 					</div>
 
 					<!-- Status Toggle -->
-					<div class="flex items-center justify-between py-2 border-t border-b border-[#F5F4F1]">
+					<div class="flex items-center justify-between py-2 border-t border-b border-teren-background-base">
 						<div>
 							<span class="block text-sm font-semibold text-stone-800">Estado de Ventas</span>
-							<span class="text-xs text-[#57534E]">
+							<span class="text-xs text-teren-text-muted">
 								{room.availability === 'inactive' ? 'Inactiva (No se vende)' : 'Activa (Disponible para reservas)'}
 							</span>
 						</div>
-						
+
 						<button
 							title={$_('drawer.toggleStatus')}
 							type="button"
 							onclick={toggleStatus}
-							class="relative h-6 w-11 rounded-full p-1 transition-colors cursor-pointer {room.availability === 'inactive' ? 'bg-stone-300' : 'bg-[#16A34A]'}"
+							class="relative h-6 w-11 rounded-full p-1 transition-colors cursor-pointer {room.availability === 'inactive' ? 'bg-stone-300' : 'bg-teren-success-base'}"
 						>
 							<div class="h-4 w-4 rounded-full bg-white transition-transform {room.availability === 'inactive' ? '' : 'translate-x-5'}"></div>
 						</button>
@@ -313,24 +313,24 @@
 
 					<!-- Deletion Section -->
 					<div class="pt-2 space-y-2">
-						<span class="block text-xs font-semibold text-[#57534E]">Eliminar Habitación</span>
+						<span class="block text-xs font-semibold text-teren-text-muted">Eliminar Habitación</span>
 						{#if room.has_bookings}
-							<div class="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-[#57534E] leading-relaxed">
-								⚠️ Esta habitación tiene historial de reservas y no se puede eliminar permanentemente. 
+							<div class="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-teren-text-muted leading-relaxed">
+								⚠️ Esta habitación tiene historial de reservas y no se puede eliminar permanentemente.
 								Si deseas sacarla de la venta, desactiva el <strong>Estado de Ventas</strong> arriba.
 							</div>
-							<button 
-								disabled 
+							<button
+								disabled
 								type="button"
 								class="w-full py-2.5 rounded-lg border border-stone-200 bg-stone-100 text-xs font-semibold text-stone-400 cursor-not-allowed text-center"
 							>
 								Has booking history
 							</button>
 						{:else}
-							<button 
+							<button
 								type="button"
 								onclick={() => showDeleteConfirm = true}
-								class="w-full py-2.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-semibold text-white transition-colors cursor-pointer text-center"
+								class="w-full py-2.5 rounded-lg bg-teren-error-base hover:bg-teren-error-hover text-xs font-semibold text-white transition-colors cursor-pointer text-center"
 							>
 								Eliminar Habitación
 							</button>
@@ -344,6 +344,13 @@
 				<!-- Ficha de Huésped (Hospedado o Entrante) -->
 				{#if room.active_booking || room.pending_booking}
 					<GuestDetailsCard {room} />
+
+					<!-- Factura del booking (B6). El widget carga por sí mismo
+					     vía api.invoices.getByBooking y maneja 404 → estado vacío. -->
+					<InvoiceWidget
+						bookingId={room.active_booking ?? room.pending_booking}
+						{propertyId}
+					/>
 				{/if}
 
 				<!-- Ficha de Detalles del Bloqueo -->
@@ -385,24 +392,24 @@
 		</div>
 
 		<!-- Pie de página / Acciones Principales -->
-		<div class="space-y-3 border-t border-[#E7E5E4] bg-[#FCFBFA] p-5">
+		<div class="space-y-3 border-t border-teren-border-subtle bg-teren-surface-base p-5">
 			{#if mode === 'setup'}
 				<button
 					onclick={onClose}
-					class="w-full py-3 bg-[#1C1917] hover:bg-[#3F3D38] flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 active:scale-95 cursor-pointer text-sm"
+					class="w-full py-3 bg-teren-text-main hover:bg-teren-sidebar-hover flex items-center justify-center gap-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 active:scale-95 cursor-pointer text-sm"
 				>
 					Listo / Cerrar
 				</button>
 			{:else if showBlockForm}
 				<button
 					onclick={handleBlockSubmit}
-					class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF8C42] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
+					class="flex w-full items-center justify-center gap-2 rounded-lg bg-teren-primary py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95"
 				>
 					{$_('drawer.confirmBlock')}
 				</button>
 				<button
 					onclick={() => (showBlockForm = false)}
-					class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#F5F4F1] py-2.5 text-xs font-medium text-[#57534E] transition-all duration-200 hover:bg-[#E7E5E4]"
+					class="flex w-full items-center justify-center gap-2 rounded-lg bg-teren-background-base py-2.5 text-xs font-medium text-teren-text-muted transition-all duration-200 hover:bg-teren-border-subtle"
 				>
 					{$_('drawer.cancel')}
 				</button>
@@ -410,7 +417,7 @@
 				{#if room.availability === 'occupied' && !showCheckoutConfirm}
 					<button
 						onclick={requestCheckout}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#3F3D38] active:scale-95"
+						class="flex w-full items-center justify-center gap-2 rounded-lg bg-teren-text-main py-3.5 font-semibold text-white shadow-sm transition-all duration-200 hover:bg-teren-sidebar-hover active:scale-95"
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -427,7 +434,7 @@
 							<polyline points="16 17 21 12 16 7"></polyline>
 							<line x1="21" y1="12" x2="9" y2="12"></line>
 						</svg>
-						Check Out Guest
+						{$_('drawer.checkOut')}
 					</button>
 				{:else if room.availability !== 'occupied'}
 					<button
@@ -447,14 +454,14 @@
 					{#if room.availability === 'available'}
 						<button
 							onclick={() => onAction('set_cleaning')}
-							class="w-full rounded-lg bg-[#F0F9FF] py-2.5 text-xs font-medium text-[#0284C7] transition-colors hover:bg-[#E0F2FE] border border-[#0284C7]/20"
+							class="w-full rounded-lg bg-teren-info-subtle py-2.5 text-xs font-medium text-teren-info-base transition-colors hover:bg-teren-info-hover border border-teren-info-base/20"
 						>
 							🧹 {$_('drawer.markCleaning')}
 						</button>
 					{/if}
 					<button
 						onclick={() => (showBlockForm = true)}
-						class="w-full rounded-lg bg-[#F5F4F1] py-2.5 text-xs font-medium text-[#57534E] transition-colors hover:bg-[#E7E5E4]"
+						class="w-full rounded-lg bg-teren-background-base py-2.5 text-xs font-medium text-teren-text-muted transition-all duration-200 hover:bg-teren-border-subtle"
 					>
 						{$_('drawer.blockRoom')}
 					</button>
@@ -473,24 +480,24 @@
 			class="absolute inset-0 bg-black/40 backdrop-blur-sm"
 			onclick={() => (showDeleteConfirm = false)}
 		></button>
-		<div class="relative z-10 w-full max-w-sm rounded-xl border border-[#E7E5E4] bg-[#FCFBFA] p-6 shadow-xl">
-			<h3 class="text-lg font-bold text-[#1C1917]">¿Eliminar habitación?</h3>
-			
-			<p class="mt-2 text-sm text-[#57534E] leading-relaxed">
+		<div class="relative z-10 w-full max-w-sm rounded-xl border border-teren-border-subtle bg-teren-surface-base p-6 shadow-xl">
+			<h3 class="text-lg font-bold text-teren-text-main">¿Eliminar habitación?</h3>
+
+			<p class="mt-2 text-sm text-teren-text-muted leading-relaxed">
 				¿Estás seguro de que deseas eliminar permanentemente la habitación <strong class="text-stone-800">{room.number}</strong>? Esta acción no se puede deshacer.
 			</p>
-			
+
 			<div class="mt-6 flex flex-wrap gap-2 justify-end">
-				<button 
-					type="button" 
-					class="rounded-lg border border-[#E7E5E4] bg-white px-4 py-2 text-sm font-medium text-[#57534E] hover:bg-[#F5F4F1] cursor-pointer"
+				<button
+					type="button"
+					class="rounded-lg border border-teren-border-subtle bg-white px-4 py-2 text-sm font-medium text-teren-text-muted hover:bg-teren-background-base cursor-pointer"
 					onclick={() => showDeleteConfirm = false}
 				>
 					Cancelar
 				</button>
-				<button 
-					type="button" 
-					class="rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] px-4 py-2 text-sm font-medium text-white transition cursor-pointer"
+				<button
+					type="button"
+					class="rounded-lg bg-teren-error-base hover:bg-teren-error-hover px-4 py-2 text-sm font-medium text-white transition cursor-pointer"
 					onclick={confirmDelete}
 				>
 					Eliminar

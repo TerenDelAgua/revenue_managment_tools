@@ -1,4 +1,4 @@
-﻿package service
+package service
 
 import (
 	"context"
@@ -31,9 +31,13 @@ func setupTestDB(t *testing.T) (*pgxpool.Pool, *InventoryService, *BookingServic
 	roomBlockRepo := repository.NewRoomBlockRepository(db)
 	bookingRepo := repository.NewBookingRepository(db)
 	guestRepo := repository.NewGuestRepository(db)
+	invoiceRepo := repository.NewInvoiceRepository(db)
 
 	inventorySvc := NewInventoryService(db, roomRepo, roomBlockRepo)
-	bookingSvc := NewBookingService(db, bookingRepo, guestRepo, inventorySvc)
+	// nil PDFGenerator — the invoice service still works; PDFs are skipped
+	// (pdf_url stays NULL) per spec §8.1.
+	invoiceSvc := NewInvoiceService(db, invoiceRepo, bookingRepo, nil)
+	bookingSvc := NewBookingService(db, bookingRepo, guestRepo, inventorySvc, invoiceSvc)
 
 	return db, inventorySvc, bookingSvc
 }

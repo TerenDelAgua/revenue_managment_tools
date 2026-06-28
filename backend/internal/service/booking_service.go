@@ -18,10 +18,17 @@ type BookingService struct {
 	bookingRepo  *repository.BookingRepository
 	guestRepo    *repository.GuestRepository
 	inventorySvc *InventoryService
+	invoiceSvc   *InvoiceService
 }
 
-func NewBookingService(db *pgxpool.Pool, bookingRepo *repository.BookingRepository, guestRepo *repository.GuestRepository, inventorySvc *InventoryService) *BookingService {
-	return &BookingService{db, bookingRepo, guestRepo, inventorySvc}
+func NewBookingService(
+	db *pgxpool.Pool,
+	bookingRepo *repository.BookingRepository,
+	guestRepo *repository.GuestRepository,
+	inventorySvc *InventoryService,
+	invoiceSvc *InvoiceService,
+) *BookingService {
+	return &BookingService{db: db, bookingRepo: bookingRepo, guestRepo: guestRepo, inventorySvc: inventorySvc, invoiceSvc: invoiceSvc}
 }
 
 func (s *BookingService) CreateBooking(ctx context.Context, req models.CreateBookingRequest) (*models.CreateBookingResponse, error) {
@@ -105,10 +112,26 @@ func (s *BookingService) CreateBooking(ctx context.Context, req models.CreateBoo
 		req.Notes = "[OVERRIDE] Forzado de disponibilidad por el usuario.\n" + req.Notes
 	}
 
-	// 6. Crear la reserva
-	booking, err := s.bookingRepo.Create(ctx, &req)
+	// 6. Crear la reserva + invoice atómicamente (BR-INV-001).
+	// Spec §8.1: "Si falla la transacción del invoice, rollback del booking."
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	booking, err := s.bookingRepo.CreateWithTx(ctx, tx, &req)
+	if err != nil {
+		return nil, fmt.Errorf("create booking: %w", err)
+	}
+
+	// BR-INV-001: invoice auto-creation. Subtotal=0 → courtesy (BR-INV-012).
+	if _, err := s.invoiceSvc.CreateInvoiceForBooking(ctx, tx, booking); err != nil {
+		return nil, fmt.Errorf("create invoice for booking: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
 	}
 
 	return &models.CreateBookingResponse{
@@ -117,14 +140,14 @@ func (s *BookingService) CreateBooking(ctx context.Context, req models.CreateBoo
 	}, nil
 }
 
-func (s *BookingService) ListBookings(ctx context.Context, propertyID uuid.UUID, status string, search string, page int, limit int) ([]*repository.BookingListDTO, int, error) {
+func (s *BookingService) ListBookings(ctx context.Context, propertyID uuid.UUID, status string, search string, roomID *uuid.UUID, page int, limit int) ([]*repository.BookingListDTO, int, error) {
 	if page < 1 {
 		page = 1
 	}
 	if limit < 1 {
 		limit = 50
 	}
-	return s.bookingRepo.List(ctx, propertyID, status, search, page, limit)
+	return s.bookingRepo.List(ctx, propertyID, status, search, roomID, page, limit)
 }
 
 func (s *BookingService) GetBookingByID(ctx context.Context, id uuid.UUID) (*models.BookingDetail, error) {
@@ -240,6 +263,14 @@ func (s *BookingService) CheckOut(ctx context.Context, bookingID uuid.UUID) erro
 		return err
 	}
 
+	// BR-INV-004: sincronizar bookings.payment_status con el estado derivado
+	// de la invoice (unpaid/partial/paid/overpaid/void). Si falla, lo logueamos
+	// pero NO revertimos el check-out: el huesped se fue físicamente, el
+	// dashboard de balances pendientes puede esperar (Phase 2).
+	if err := s.invoiceSvc.SetBookingPaymentStatus(ctx, bookingID); err != nil {
+		log.Printf("SetBookingPaymentStatus after checkout %s: %v", bookingID, err)
+	}
+
 	// Auto-cleaning: tras check-out la habitación pasa automáticamente a estado
 	// operacional `cleaning` (housekeeping en curso). El check-out ya está hecho
 	// (el huésped se fue físicamente), así que un fallo de cleaning NO debe
@@ -265,7 +296,16 @@ func (s *BookingService) CancelBooking(ctx context.Context, bookingID uuid.UUID,
 	if booking.Status != "confirmed" && booking.Status != "checked_in" {
 		return &BusinessError{Code: "INVALID_STATUS", Message: "Only confirmed or checked-in bookings can be cancelled"}
 	}
-	return s.bookingRepo.Cancel(ctx, bookingID, reason)
+	if err := s.bookingRepo.Cancel(ctx, bookingID, reason); err != nil {
+		return err
+	}
+	// BR-INV-007: la cancelación de la reserva implica void de la invoice
+	// asociada. Si falla, lo logueamos pero NO revertimos la cancelación:
+	// el booking se cancela, la invoice queda para review manual del owner.
+	if err := s.invoiceSvc.VoidInvoiceForBooking(ctx, bookingID, booking.CreatedBy, "Booking cancelled: "+reason); err != nil {
+		log.Printf("VoidInvoiceForBooking after cancel %s: %v", bookingID, err)
+	}
+	return nil
 }
 
 func (s *BookingService) GetPendingBookings(ctx context.Context, propertyID uuid.UUID) ([]*repository.PendingBookingDTO, error) {

@@ -3,7 +3,9 @@
     "dashboard": "Dashboard",
     "floorMap": "Floor Map",
     "bookings": "Bookings",
+    "invoices": "Invoices",
     "guests": "Guests",
+    "reports": "Reports",
     "settings": "Settings"
   },
   "header": {
@@ -152,6 +154,298 @@
       "cancelMissingReason": "Please provide a reason for cancellation.",
       "cancelSuccess": "Booking cancelled successfully.",
       "cancelError": "Error cancelling booking."
+    }
+  },
+  "invoiceWidget": {
+    "title": "Invoice",
+    "loading": "Loading invoice…",
+    "loadError": "Could not load invoice.",
+    "noInvoice": "No invoice yet for this booking.",
+    "invoiceNumber": "Invoice {number}",
+    "issuedAt": "Issued {date}",
+    "status": {
+      "paid": "Paid",
+      "partial": "Partial",
+      "unpaid": "Unpaid",
+      "overpaid": "Overpaid",
+      "void": "Void",
+      "refunded": "Refunded"
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "tax": "Tax (PPN {rate}%)",
+      "total": "Total",
+      "paid": "Paid",
+      "balance": "Balance",
+      "refunded": "Refunded"
+    },
+    "actions": {
+      "openPdf": "Open PDF",
+      "generatePdf": "Generate PDF",
+      "regeneratePdf": "Regenerate PDF",
+      "registerPayment": "Register payment",
+      "refund": "Refund",
+      "refundAll": "Refund all payments",
+      "void": "Void invoice",
+      "viewAll": "View all invoices",
+      "terminalRefunded": "This invoice is fully refunded — no further actions available.",
+      "terminalVoid": "This invoice is voided — no further actions available."
+    },
+    "void": {
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Why is this invoice being voided?",
+      "confirm": "Void invoice",
+      "cancel": "Cancel",
+      "missingReason": "Please provide a reason."
+    },
+    "payments": {
+      "title": "Payments",
+      "none": "No payments registered yet.",
+      "count": "{count, plural, =0 {No payments} =1 {1 payment} other {# payments}}",
+      "method": {
+        "cash": "Cash",
+        "bank_transfer": "Bank transfer",
+        "qris": "QRIS",
+        "card": "Card"
+      },
+      "refund": "Refund"
+    },
+    "toasts": {
+      "regenerateSuccess": "PDF regenerated.",
+      "regenerateError": "Could not regenerate the PDF.",
+      "voidSuccess": "Invoice voided.",
+      "voidError": "Could not void the invoice.",
+      "refundAllSuccess": "Refund-all completed.",
+      "refundAllError": "Could not refund all payments."
+    }
+  },
+  "paymentForm": {
+    "amountLabel": "Amount",
+    "balanceHint": "Balance: {balance}",
+    "methodLabel": "Method",
+    "referenceLabel": "Reference",
+    "referencePlaceholder": "Transaction ID, last 4 of card…",
+    "referenceHint": "Required for non-cash methods (BR-INV-005).",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Optional context…",
+    "maxButton": "Max",
+    "submit": "Register payment",
+    "submitting": "Registering…",
+    "cancel": "Cancel",
+    "errors": {
+      "amountRequired": "Enter an amount.",
+      "amountPositive": "Amount must be greater than zero.",
+      "amountExceeds": "Amount exceeds the remaining balance.",
+      "generic": "Could not register the payment."
+    },
+    "toasts": {
+      "success": "Payment registered.",
+      "refundSuccess": "Refund issued."
+    },
+    "refund": {
+      "banner": "Refund",
+      "amountLabel": "Refund amount",
+      "maxButton": "All",
+      "capHint": "Max refundable: {cap}",
+      "referenceLabel": "Refund reference",
+      "referencePlaceholder": "Original transaction ID, slip number…",
+      "referenceHint": "Refunds must always be traceable to a transaction.",
+      "notesLabel": "Reason for refund",
+      "notesPlaceholder": "Why is this refund being issued?",
+      "submit": "Issue refund",
+      "lockedMethodHint": "Method locked to match the original payment ({method}).",
+      "changeMethodToggle": "Change refund method",
+      "changeMethodActive": "Method override active — audit trail will note the change.",
+      "reverting": "Reversing {method} {date} — {amount}",
+      "backToPicker": "← Back to payments",
+      "pickerHeading": "Pick the payment to refund",
+      "pickerEmpty": "No payments are available to refund on this invoice.",
+      "pickerNoRef": "(no reference)",
+      "pickerItemRef": "Ref: {ref}",
+      "pickerItemAvailable": "Available to refund: {amount}",
+      "successMessage": "Refunded {amount}. You can issue another refund or close this panel.",
+      "refundAnother": "Refund another payment",
+      "done": "Done",
+      "errors": {
+        "amountRequired": "Enter a refund amount.",
+        "amountPositive": "Refund amount must be greater than zero.",
+        "exceedsPaid": "Refund amount cannot exceed total collected.",
+        "noChargeToReverse": "No charge found to reverse on this invoice."
+      }
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Daily cash-closing and monthly tax reports.",
+    "loading": "Loading…",
+    "errors": {
+      "loadFailed": "Could not load the report."
+    },
+    "toasts": {
+      "exported": "Report exported."
+    },
+    "tabs": {
+      "daily": "Daily cash-closing",
+      "tax": "Monthly tax"
+    },
+    "daily": {
+      "title": "Daily cash-closing",
+      "subtitle": "Invoices and payments for the selected day.",
+      "dateLabel": "Date",
+      "export": "Export CSV",
+      "noPayments": "No payments recorded for this day.",
+      "noStaff": "No staff payments recorded.",
+      "byMethod": "By payment method",
+      "byStaff": "By staff",
+      "counts": {
+        "issued": "Issued",
+        "paid": "Paid",
+        "partial": "Partial",
+        "unpaid": "Unpaid",
+        "overpaid": "Overpaid",
+        "refunded": "Refunded",
+        "void": "Void"
+      },
+      "financials": {
+        "collected": "Total collected",
+        "refunded": "Total refunded",
+        "net": "Net revenue",
+        "pending": "Total pending",
+        "tax": "Tax collected"
+      },
+      "needsReviewBanner": "{count} invoice(s) flagged for review (legacy data drift). Totals below exclude them; resolve manually to close the day accurately.",
+      "csv": {
+        "metric": "Metric",
+        "value": "Value",
+        "invoicesIssued": "Invoices issued",
+        "invoicesPaid": "Invoices paid",
+        "invoicesPartial": "Invoices partial",
+        "invoicesUnpaid": "Invoices unpaid",
+        "invoicesOverpaid": "Invoices overpaid",
+        "invoicesVoid": "Invoices void",
+        "totalRevenue": "Total revenue",
+        "totalCollected": "Total collected",
+        "totalRefunded": "Total refunded",
+        "totalPending": "Total pending",
+        "taxCollected": "Tax collected",
+        "methodHeader": "By payment method",
+        "method": "Method",
+        "amount": "Amount",
+        "staffHeader": "By staff",
+        "staffName": "Staff",
+        "paymentsCount": "Payments",
+        "amountCollected": "Amount collected"
+      }
+    },
+    "tax": {
+      "title": "Monthly tax (PPN)",
+      "subtitle": "Aggregated tax collected for the selected period.",
+      "yearLabel": "Year",
+      "monthLabel": "Month",
+      "wholeYear": "Whole year",
+      "export": "Export CSV",
+      "metrics": {
+        "invoicesCount": "Invoices",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Tax (PPN)",
+        "refundsTotal": "Refunds",
+        "refundedCount": "Refunded",
+        "voidCount": "Voided",
+        "netTax": "Net tax collected"
+      },
+      "csv": {
+        "metric": "Metric",
+        "value": "Value",
+        "period": "Period",
+        "invoicesCount": "Invoices",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Tax",
+        "refundsTotal": "Refunds",
+        "voidCount": "Voided",
+        "netTaxCollected": "Net tax collected"
+      }
+    }
+  },
+  "invoicesPage": {
+    "title": "Invoices",
+    "subtitle": "All invoices issued for this property."
+  },
+  "invoicesList": {
+    "searchLabel": "Search",
+    "searchPlaceholder": "Number, guest or room…",
+    "statusLabel": "Status",
+    "statusAll": "All",
+    "statusPaid": "Paid",
+    "statusPartial": "Partial",
+    "statusUnpaid": "Unpaid",
+    "statusOverpaid": "Overpaid",
+    "statusVoid": "Void",
+    "statusRefunded": "Refunded",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "clearFilters": "Clear",
+    "export": "Export",
+    "loading": "Loading invoices…",
+    "errors": {
+      "loadFailed": "Could not load the invoice list.",
+      "exportFailed": "Could not export the invoice list."
+    },
+    "empty": {
+      "title": "No invoices found",
+      "hint": "Try changing the filters or register a booking."
+    },
+    "columns": {
+      "number": "Number",
+      "guest": "Guest",
+      "room": "Room",
+      "total": "Total",
+      "balance": "Balance",
+      "status": "Status",
+      "issued": "Issued"
+    },
+    "pagination": {
+      "summary": "{from}–{to} of {total}",
+      "prev": "Prev",
+      "next": "Next"
+    },
+    "toasts": {
+      "exported": "Exported {count} invoice(s).",
+      "exportEmpty": "No invoices match the current filters."
+    }
+  },
+  "invoiceDrawer": {
+    "title": "Invoice detail",
+    "close": "Close drawer",
+    "loading": "Loading invoice…",
+    "loadError": "Could not load this invoice.",
+    "fields": {
+      "id": "ID",
+      "copy": "Copy",
+      "booking": "Booking",
+      "created": "Created",
+      "paidAt": "Paid at",
+      "voidedAt": "Voided at",
+      "total": "Total"
+    },
+    "toasts": {
+      "copied": "ID copied to clipboard.",
+      "copyFailed": "Could not copy the ID."
+    }
+  },
+  "confirmDestructive": {
+    "changeRefundMethod": {
+      "title": "Change refund method?",
+      "description": "The refund method will differ from the original payment method. This change is recorded in the audit trail.",
+      "checkbox": "I understand this changes the audit trail",
+      "confirm": "Confirm change",
+      "cancel": "Keep original"
+    },
+    "refundAll": {
+      "title": "Refund all payments?",
+      "description": "This will refund every chargeable payment on this invoice in a single batch. The action is logged and the invoice will move to the refunded state.",
+      "checkbox": "I understand this batch refund is permanent",
+      "confirm": "Refund all",
+      "cancel": "Cancel"
     }
   }
 }

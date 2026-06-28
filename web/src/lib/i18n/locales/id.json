@@ -3,7 +3,9 @@
     "dashboard": "Dasbor",
     "floorMap": "Peta Lantai",
     "bookings": "Pemesanan",
+    "invoices": "Faktur",
     "guests": "Tamu",
+    "reports": "Laporan",
     "settings": "Pengaturan"
   },
   "header": {
@@ -152,6 +154,298 @@
       "cancelMissingReason": "Harap berikan alasan pembatalan.",
       "cancelSuccess": "Pemesanan berhasil dibatalkan.",
       "cancelError": "Kesalahan membatalkan pemesanan."
+    }
+  },
+  "invoiceWidget": {
+    "title": "Faktur",
+    "loading": "Memuat faktur…",
+    "loadError": "Tidak dapat memuat faktur.",
+    "noInvoice": "Belum ada faktur untuk pemesanan ini.",
+    "invoiceNumber": "Faktur {number}",
+    "issuedAt": "Diterbitkan {date}",
+    "status": {
+      "paid": "Lunas",
+      "partial": "Sebagian",
+      "unpaid": "Belum Bayar",
+      "overpaid": "Kelebihan Bayar",
+      "void": "Dibatalkan",
+      "refunded": "Dikembalikan"
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "tax": "Pajak (PPN {rate}%)",
+      "total": "Total",
+      "paid": "Dibayar",
+      "balance": "Sisa",
+      "refunded": "Dikembalikan"
+    },
+    "actions": {
+      "openPdf": "Buka PDF",
+      "generatePdf": "Buat PDF",
+      "regeneratePdf": "Buat ulang PDF",
+      "registerPayment": "Catat pembayaran",
+      "refund": "Pengembalian",
+      "refundAll": "Kembalikan semua pembayaran",
+      "void": "Batalkan faktur",
+      "viewAll": "Lihat semua faktur",
+      "terminalRefunded": "Faktur ini telah dikembalikan sepenuhnya — tidak ada tindakan lebih lanjut yang tersedia.",
+      "terminalVoid": "Faktur ini telah dibatalkan — tidak ada tindakan lebih lanjut yang tersedia."
+    },
+    "void": {
+      "reasonLabel": "Alasan",
+      "reasonPlaceholder": "Mengapa faktur ini dibatalkan?",
+      "confirm": "Batalkan faktur",
+      "cancel": "Batal",
+      "missingReason": "Harap berikan alasan."
+    },
+    "payments": {
+      "title": "Pembayaran",
+      "none": "Belum ada pembayaran tercatat.",
+      "count": "{count, plural, =0 {Tanpa pembayaran} =1 {1 pembayaran} other {# pembayaran}}",
+      "method": {
+        "cash": "Tunai",
+        "bank_transfer": "Transfer Bank",
+        "qris": "QRIS",
+        "card": "Kartu"
+      },
+      "refund": "Pengembalian"
+    },
+    "toasts": {
+      "regenerateSuccess": "PDF dibuat ulang.",
+      "regenerateError": "Tidak dapat membuat ulang PDF.",
+      "voidSuccess": "Faktur dibatalkan.",
+      "voidError": "Tidak dapat membatalkan faktur.",
+      "refundAllSuccess": "Pengembalian total selesai.",
+      "refundAllError": "Tidak dapat mengembalikan semua pembayaran."
+    }
+  },
+  "paymentForm": {
+    "amountLabel": "Jumlah",
+    "balanceHint": "Sisa tagihan: {balance}",
+    "methodLabel": "Metode",
+    "referenceLabel": "Referensi",
+    "referencePlaceholder": "ID transaksi, 4 digit terakhir kartu…",
+    "referenceHint": "Wajib untuk metode non-tunai (BR-INV-005).",
+    "notesLabel": "Catatan",
+    "notesPlaceholder": "Konteks opsional…",
+    "maxButton": "Penuh",
+    "submit": "Catat Pembayaran",
+    "submitting": "Mencatat…",
+    "cancel": "Batal",
+    "errors": {
+      "amountRequired": "Masukkan jumlah.",
+      "amountPositive": "Jumlah harus lebih besar dari nol.",
+      "amountExceeds": "Jumlah melebihi sisa tagihan.",
+      "generic": "Tidak dapat mencatat pembayaran."
+    },
+    "toasts": {
+      "success": "Pembayaran tercatat.",
+      "refundSuccess": "Pengembalian diterbitkan."
+    },
+    "refund": {
+      "banner": "Pengembalian",
+      "amountLabel": "Jumlah pengembalian",
+      "maxButton": "Semua",
+      "capHint": "Maks. dapat dikembalikan: {cap}",
+      "referenceLabel": "Referensi pengembalian",
+      "referencePlaceholder": "ID transaksi awal, nomor slip…",
+      "referenceHint": "Pengembalian harus selalu dapat ditelusuri ke transaksi.",
+      "notesLabel": "Alasan pengembalian",
+      "notesPlaceholder": "Mengapa pengembalian ini diterbitkan?",
+      "submit": "Terbitkan pengembalian",
+      "lockedMethodHint": "Metode dikunci sesuai pembayaran awal ({method}).",
+      "changeMethodToggle": "Ubah metode pengembalian",
+      "changeMethodActive": "Penggantian metode aktif — jejak audit akan mencatat perubahan.",
+      "reverting": "Membatalkan {method} {date} — {amount}",
+      "backToPicker": "← Kembali ke daftar pembayaran",
+      "pickerHeading": "Pilih pembayaran yang akan dikembalikan",
+      "pickerEmpty": "Tidak ada pembayaran yang dapat dikembalikan pada faktur ini.",
+      "pickerNoRef": "(tanpa referensi)",
+      "pickerItemRef": "Ref: {ref}",
+      "pickerItemAvailable": "Dapat dikembalikan: {amount}",
+      "successMessage": "{amount} dikembalikan. Anda dapat mengeluarkan pengembalian lain atau menutup panel ini.",
+      "refundAnother": "Kembalikan pembayaran lain",
+      "done": "Selesai",
+      "errors": {
+        "amountRequired": "Masukkan jumlah pengembalian.",
+        "amountPositive": "Jumlah pengembalian harus lebih dari nol.",
+        "exceedsPaid": "Jumlah pengembalian tidak boleh melebihi total diterima.",
+        "noChargeToReverse": "Tidak ada pembayaran yang dapat dikembalikan pada faktur ini."
+      }
+    }
+  },
+  "reports": {
+    "title": "Laporan",
+    "subtitle": "Tutup kas harian dan laporan pajak bulanan.",
+    "loading": "Memuat…",
+    "errors": {
+      "loadFailed": "Tidak dapat memuat laporan."
+    },
+    "toasts": {
+      "exported": "Laporan diekspor."
+    },
+    "tabs": {
+      "daily": "Tutup kas harian",
+      "tax": "Pajak bulanan"
+    },
+    "daily": {
+      "title": "Tutup kas harian",
+      "subtitle": "Faktur dan pembayaran untuk hari yang dipilih.",
+      "dateLabel": "Tanggal",
+      "export": "Ekspor CSV",
+      "noPayments": "Tidak ada pembayaran tercatat hari ini.",
+      "noStaff": "Tidak ada pembayaran staf.",
+      "byMethod": "Per metode pembayaran",
+      "byStaff": "Per staf",
+      "counts": {
+        "issued": "Diterbitkan",
+        "paid": "Lunas",
+        "partial": "Sebagian",
+        "unpaid": "Belum Bayar",
+        "overpaid": "Kelebihan Bayar",
+        "refunded": "Dikembalikan",
+        "void": "Dibatalkan"
+      },
+      "financials": {
+        "collected": "Total diterima",
+        "refunded": "Total dikembalikan",
+        "net": "Pendapatan bersih",
+        "pending": "Total tertunda",
+        "tax": "Pajak diterima"
+      },
+      "needsReviewBanner": "{count} faktur ditandai untuk ditinjau (penyimpangan data lama). Total di bawah mengecualikannya; selesaikan secara manual untuk menutup hari dengan akurat.",
+      "csv": {
+        "metric": "Metrik",
+        "value": "Nilai",
+        "invoicesIssued": "Faktur diterbitkan",
+        "invoicesPaid": "Faktur lunas",
+        "invoicesPartial": "Faktur sebagian",
+        "invoicesUnpaid": "Faktur belum bayar",
+        "invoicesOverpaid": "Faktur kelebihan bayar",
+        "invoicesVoid": "Faktur dibatalkan",
+        "totalRevenue": "Total pendapatan",
+        "totalCollected": "Total diterima",
+        "totalRefunded": "Total dikembalikan",
+        "totalPending": "Total tertunda",
+        "taxCollected": "Pajak diterima",
+        "methodHeader": "Per metode pembayaran",
+        "method": "Metode",
+        "amount": "Jumlah",
+        "staffHeader": "Per staf",
+        "staffName": "Staf",
+        "paymentsCount": "Pembayaran",
+        "amountCollected": "Jumlah diterima"
+      }
+    },
+    "tax": {
+      "title": "Pajak bulanan (PPN)",
+      "subtitle": "Pajak agregat untuk periode yang dipilih.",
+      "yearLabel": "Tahun",
+      "monthLabel": "Bulan",
+      "wholeYear": "Sepanjang tahun",
+      "export": "Ekspor CSV",
+      "metrics": {
+        "invoicesCount": "Faktur",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Pajak (PPN)",
+        "refundsTotal": "Pengembalian",
+        "refundedCount": "Dikembalikan",
+        "voidCount": "Dibatalkan",
+        "netTax": "Pajak bersih"
+      },
+      "csv": {
+        "metric": "Metrik",
+        "value": "Nilai",
+        "period": "Periode",
+        "invoicesCount": "Faktur",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Pajak",
+        "refundsTotal": "Pengembalian",
+        "voidCount": "Dibatalkan",
+        "netTaxCollected": "Pajak bersih"
+      }
+    }
+  },
+  "invoicesPage": {
+    "title": "Faktur",
+    "subtitle": "Semua faktur yang diterbitkan untuk properti ini."
+  },
+  "invoicesList": {
+    "searchLabel": "Cari",
+    "searchPlaceholder": "Nomor, tamu atau kamar…",
+    "statusLabel": "Status",
+    "statusAll": "Semua",
+    "statusPaid": "Lunas",
+    "statusPartial": "Sebagian",
+    "statusUnpaid": "Belum Bayar",
+    "statusOverpaid": "Kelebihan Bayar",
+    "statusVoid": "Dibatalkan",
+    "statusRefunded": "Dikembalikan",
+    "fromLabel": "Dari",
+    "toLabel": "Hingga",
+    "clearFilters": "Hapus",
+    "export": "Ekspor",
+    "loading": "Memuat faktur…",
+    "errors": {
+      "loadFailed": "Tidak dapat memuat daftar faktur.",
+      "exportFailed": "Tidak dapat mengekspor daftar faktur."
+    },
+    "empty": {
+      "title": "Tidak ada faktur",
+      "hint": "Coba ubah filter atau daftarkan pemesanan."
+    },
+    "columns": {
+      "number": "Nomor",
+      "guest": "Tamu",
+      "room": "Kamar",
+      "total": "Total",
+      "balance": "Sisa",
+      "status": "Status",
+      "issued": "Diterbitkan"
+    },
+    "pagination": {
+      "summary": "{from}–{to} dari {total}",
+      "prev": "Sebelumnya",
+      "next": "Berikutnya"
+    },
+    "toasts": {
+      "exported": "Diekspor {count} faktur.",
+      "exportEmpty": "Tidak ada faktur yang cocok dengan filter saat ini."
+    }
+  },
+  "invoiceDrawer": {
+    "title": "Detail faktur",
+    "close": "Tutup panel",
+    "loading": "Memuat faktur…",
+    "loadError": "Tidak dapat memuat faktur ini.",
+    "fields": {
+      "id": "ID",
+      "copy": "Salin",
+      "booking": "Pemesanan",
+      "created": "Dibuat",
+      "paidAt": "Dibayar pada",
+      "voidedAt": "Dibatalkan pada",
+      "total": "Total"
+    },
+    "toasts": {
+      "copied": "ID disalin ke papan klip.",
+      "copyFailed": "Tidak dapat menyalin ID."
+    }
+  },
+  "confirmDestructive": {
+    "changeRefundMethod": {
+      "title": "Ubah metode pengembalian?",
+      "description": "Metode pengembalian akan berbeda dari metode pembayaran awal. Perubahan ini akan dicatat dalam jejak audit.",
+      "checkbox": "Saya paham bahwa ini mengubah jejak audit",
+      "confirm": "Konfirmasi perubahan",
+      "cancel": "Pertahankan"
+    },
+    "refundAll": {
+      "title": "Kembalikan semua pembayaran?",
+      "description": "Akan mengembalikan setiap pembayaran yang dapat dikembalikan pada faktur ini dalam satu batch. Tindakan ini dicatat dan faktur akan berpindah ke status refunded.",
+      "checkbox": "Saya paham bahwa pengembalian batch ini bersifat permanen",
+      "confirm": "Kembalikan semua",
+      "cancel": "Batal"
     }
   }
 }
