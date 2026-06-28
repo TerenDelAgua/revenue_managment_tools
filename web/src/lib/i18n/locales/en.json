@@ -168,7 +168,8 @@
       "partial": "Partial",
       "unpaid": "Unpaid",
       "overpaid": "Overpaid",
-      "void": "Void"
+      "void": "Void",
+      "refunded": "Refunded"
     },
     "breakdown": {
       "subtotal": "Subtotal",
@@ -246,6 +247,19 @@
       "notesLabel": "Reason for refund",
       "notesPlaceholder": "Why is this refund being issued?",
       "submit": "Issue refund",
+      "lockedMethodHint": "Method locked to match the original payment ({method}).",
+      "changeMethodToggle": "Change refund method",
+      "changeMethodActive": "Method override active — audit trail will note the change.",
+      "reverting": "Reversing {method} {date} — {amount}",
+      "backToPicker": "← Back to payments",
+      "pickerHeading": "Pick the payment to refund",
+      "pickerEmpty": "No payments are available to refund on this invoice.",
+      "pickerNoRef": "(no reference)",
+      "pickerItemRef": "Ref: {ref}",
+      "pickerItemAvailable": "Available to refund: {amount}",
+      "successMessage": "Refunded {amount}. You can issue another refund or close this panel.",
+      "refundAnother": "Refund another payment",
+      "done": "Done",
       "errors": {
         "amountRequired": "Enter a refund amount.",
         "amountPositive": "Refund amount must be greater than zero.",
@@ -356,6 +370,7 @@
     "statusUnpaid": "Unpaid",
     "statusOverpaid": "Overpaid",
     "statusVoid": "Void",
+    "statusRefunded": "Refunded",
     "fromLabel": "From",
     "toLabel": "To",
     "clearFilters": "Clear",
@@ -405,6 +420,22 @@
     "toasts": {
       "copied": "ID copied to clipboard.",
       "copyFailed": "Could not copy the ID."
+    }
+  },
+  "confirmDestructive": {
+    "changeRefundMethod": {
+      "title": "Change refund method?",
+      "description": "The refund method will differ from the original payment method. This change is recorded in the audit trail.",
+      "checkbox": "I understand this changes the audit trail",
+      "confirm": "Confirm change",
+      "cancel": "Keep original"
+    },
+    "refundAll": {
+      "title": "Refund all payments?",
+      "description": "This will refund every chargeable payment on this invoice in a single batch. The action is logged and the invoice will move to the refunded state.",
+      "checkbox": "I understand this batch refund is permanent",
+      "confirm": "Refund all",
+      "cancel": "Cancel"
     }
   }
 }

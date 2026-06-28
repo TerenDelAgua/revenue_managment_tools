@@ -42,7 +42,9 @@
 		{ value: 'partial', labelKey: 'invoicesList.statusPartial' },
 		{ value: 'unpaid', labelKey: 'invoicesList.statusUnpaid' },
 		{ value: 'overpaid', labelKey: 'invoicesList.statusOverpaid' },
-		{ value: 'void', labelKey: 'invoicesList.statusVoid' }
+		{ value: 'void', labelKey: 'invoicesList.statusVoid' },
+		// v1.2 (R-08) — refunded joins the filterable list per spec §5.4.
+		{ value: 'refunded', labelKey: 'invoicesList.statusRefunded' }
 	];
 
 	let statusFilter = $state<'all' | PaymentStatus>('all');
@@ -225,6 +227,13 @@
 					dot: 'bg-teren-text-muted',
 					text: 'text-teren-text-muted line-through',
 					bg: 'bg-teren-background-base'
+				};
+			// v1.2 (R-08, R-09 Q4) — same error palette as the widget.
+			case 'refunded':
+				return {
+					dot: 'bg-teren-error-base',
+					text: 'text-teren-error-hover dark:text-teren-error-base',
+					bg: 'bg-teren-error-subtle'
 				};
 			default:
 				return {

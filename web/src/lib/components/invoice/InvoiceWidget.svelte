@@ -98,6 +98,15 @@
 					text: 'text-teren-text-muted line-through',
 					bg: 'bg-teren-background-base'
 				};
+			// v1.2 (R-08, R-09 Q4) — 'refunded' is a terminal state.
+			// Per spec §5.4 the pill uses the error palette to signal
+			// "not actionable". The ↩ icon is added in Block 11.
+			case 'refunded':
+				return {
+					dot: 'bg-teren-error-base',
+					text: 'text-teren-error-hover dark:text-teren-error-base',
+					bg: 'bg-teren-error-subtle'
+				};
 			default:
 				return {
 					dot: 'bg-teren-text-muted',

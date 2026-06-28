@@ -86,8 +86,21 @@ func main() {
 	r.Use(apimw.AuthContext)
 	r.Use(apimw.IdempotencyKey)
 
+	// Dev defaults — Vite's default port is 5173, but when it is already
+	// in use (another Vite orphan, a previous session, etc.) it falls
+	// back to 5174, 5175, … up to 5180. We whitelist that whole window
+	// so the developer does not have to chase port numbers. For
+	// production / staging, set CORS_ALLOWED_ORIGINS to a comma-separated
+	// list of explicit origins (the env-var values are appended below).
 	allowedOrigins := []string{
 		"http://localhost:5173",
+		"http://localhost:5174",
+		"http://localhost:5175",
+		"http://localhost:5176",
+		"http://localhost:5177",
+		"http://localhost:5178",
+		"http://localhost:5179",
+		"http://localhost:5180",
 		"http://localhost:3000",
 	}
 
@@ -193,6 +206,7 @@ func main() {
 			r.Patch("/{id}/notes", invoiceHandler.UpdateNotes)
 			r.Post("/{id}/void", invoiceHandler.Void)
 			r.Post("/{id}/payments", invoiceHandler.RegisterPayment)
+			r.Post("/{id}/refund-all", invoiceHandler.RefundAll)
 			r.Post("/{id}/regenerate-pdf", invoiceHandler.RegeneratePDF)
 		})
 

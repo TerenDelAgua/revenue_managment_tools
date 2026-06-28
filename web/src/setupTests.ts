@@ -54,3 +54,36 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
 		}))
 	});
 }
+
+/* ------------------------------------------------------------------ */
+/* Web Animations API polyfill                                         */
+/* jsdom does not implement Element.animate, but Svelte's `fly` /      */
+/* `fade` transitions depend on it for cancel callbacks. We provide a  */
+/* minimal stub that resolves immediately so transitions don't error   */
+/* in unit tests (ConfirmDestructive, Toast, etc.).                    */
+/* ------------------------------------------------------------------ */
+if (typeof Element !== 'undefined' && typeof Element.prototype.animate !== 'function') {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	(Element.prototype as any).animate = function () {
+		return {
+			finished: Promise.resolve(),
+			play: () => {},
+			pause: () => {},
+			cancel: () => {},
+			finish: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {}
+		};
+	};
+}
+
+/* ------------------------------------------------------------------ */
+/* Disable Svelte transitions under jsdom                              */
+/* The transition runner depends on requestAnimationFrame + the WAAPI  */
+/* polyfill above, both of which leave pending microtasks that race    */
+/* with vitest's synchronous assertions. ConfirmDestructive opts out    */
+/* of transitions when this flag is set.                               */
+/* ------------------------------------------------------------------ */
+if (typeof window !== 'undefined') {
+	(window as unknown as { __disableTransitions?: boolean }).__disableTransitions = true;
+}

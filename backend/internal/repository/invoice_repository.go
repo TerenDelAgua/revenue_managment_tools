@@ -30,13 +30,21 @@ import (
 // Sentinel errors. The handler layer (B4) maps these to HTTP status codes
 // following spec §9.
 var (
-	ErrInvoiceNotFound   = errors.New("invoice not found")
-	ErrInvoiceVoid       = errors.New("invoice is void")
-	ErrPaymentExceeds    = errors.New("payment exceeds balance")
-	ErrOverpaid          = errors.New("invoice is overpaid")
-	ErrInvalidPayment    = errors.New("invalid payment")
-	ErrReferenceRequired = errors.New("reference required for non-cash payment")
-	ErrInvalidInput      = errors.New("invalid input")
+	ErrInvoiceNotFound    = errors.New("invoice not found")
+	ErrInvoiceVoid        = errors.New("invoice is void")
+	ErrInvoiceTerminal    = errors.New("invoice is terminal (void or refunded)") // v1.2 R-08
+	ErrPaymentExceeds     = errors.New("payment exceeds balance")
+	ErrOverpaid           = errors.New("invoice is overpaid")
+	ErrInvalidPayment     = errors.New("invalid payment")
+	ErrReferenceRequired  = errors.New("reference required for non-cash payment")
+	ErrInvalidInput       = errors.New("invalid input")
+	// v1.2 R-07 refund 1:1 validation gates. All map to 422 INVALID_REFUND_TARGET.
+	ErrRefundNotReverse  = errors.New("refund must have is_reversal=true and reversal_of")
+	ErrRefundCrossInvoice = errors.New("reversal_of must belong to the same invoice")
+	ErrRefundOfRefund    = errors.New("cannot refund a reversal (no refund-of-refund)")
+	ErrRefundExceedsCap  = errors.New("refund amount exceeds remaining_reverseable")
+	ErrRefundMethodMismatch = errors.New("refund method must match original")
+	ErrRefundOverRefund  = errors.New("refund would cause over-refund (total_refunded > total)")
 )
 
 // InvoiceRepository is the data access layer for invoices, line items and
@@ -55,6 +63,9 @@ func NewInvoiceRepository(db *pgxpool.Pool) *InvoiceRepository {
 
 // paymentAggCTE is a WITH clause that aggregates payments once per invoice.
 // Reused by every query that needs TotalPaid / TotalRefunded / EffectiveStatus.
+//
+// v1.2 R-07: WHERE invalidated_at IS NULL filters out retired rows so the
+// aggregation reflects only "live" payments.
 const paymentAggCTE = `
 payments_agg AS (
     SELECT
@@ -62,6 +73,7 @@ payments_agg AS (
         COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS total_paid,
         COALESCE(ABS(SUM(CASE WHEN is_reversal = TRUE AND amount < 0 THEN amount ELSE 0 END)), 0) AS total_refunded
     FROM payments
+    WHERE invalidated_at IS NULL
     GROUP BY invoice_id
 )
 `
@@ -70,9 +82,15 @@ payments_agg AS (
 // payment status. Use within a query that has access to the invoices columns
 // aliased as `i` and a `payments_agg` CTE exposing `total_paid` and the
 // invoice's `total` column.
+//
+// v1.2 R-08 precedence:
+//   void      > refunded > paid > partial > unpaid
+// (overpaid removed from effective_status; legacy over-refund goes
+//  to invoices.needs_review=true and is excluded from reports.)
 func effectiveStatusExpr() string {
 	return `CASE
         WHEN i.status = 'void' THEN 'void'
+        WHEN i.status = 'refunded' THEN 'refunded'
         WHEN COALESCE(agg.total_paid, 0) = 0 THEN 'unpaid'
         WHEN COALESCE(agg.total_paid, 0) < i.total THEN 'partial'
         WHEN COALESCE(agg.total_paid, 0) = i.total THEN 'paid'
@@ -167,7 +185,8 @@ func (r *InvoiceRepository) CreateInvoiceWithTx(
 		RETURNING
 			id, property_id, booking_id, invoice_number,
 			subtotal, tax_amount, ppn_rate_snapshot, total,
-			original_currency, exchange_rate, status, issued_at, paid_at,
+			original_currency, exchange_rate, status, needs_review,
+			issued_at, paid_at,
 			voided_at, voided_by, void_reason, created_by, pdf_url, notes,
 			created_at, updated_at
 	`,
@@ -177,7 +196,7 @@ func (r *InvoiceRepository) CreateInvoiceWithTx(
 	).Scan(
 		&inv.ID, &inv.PropertyID, &inv.BookingID, &inv.InvoiceNumber,
 		&inv.Subtotal, &inv.TaxAmount, &inv.PPNRateSnapshot, &inv.Total,
-		&inv.OriginalCurrency, &inv.ExchangeRate, &inv.Status, &inv.IssuedAt, &inv.PaidAt,
+		&inv.OriginalCurrency, &inv.ExchangeRate, &inv.Status, &inv.NeedsReview, &inv.IssuedAt, &inv.PaidAt,
 		&inv.VoidedAt, &inv.VoidedBy, &inv.VoidReason, &inv.CreatedBy, &inv.PDFURL, &inv.Notes,
 		&inv.CreatedAt, &inv.UpdatedAt,
 	); err != nil {
@@ -226,7 +245,8 @@ func (r *InvoiceRepository) GetInvoiceByID(ctx context.Context, invoiceID uuid.U
 		SELECT
 			i.id, i.property_id, i.booking_id, i.invoice_number,
 			i.subtotal, i.tax_amount, i.ppn_rate_snapshot, i.total,
-			i.original_currency, i.exchange_rate, i.status, i.issued_at, i.paid_at,
+			i.original_currency, i.exchange_rate, i.status, i.needs_review,
+			i.issued_at, i.paid_at,
 			i.voided_at, i.voided_by, i.void_reason, i.created_by, i.pdf_url, i.notes,
 			i.created_at, i.updated_at,
 			COALESCE(agg.total_paid, 0)     AS total_paid,
@@ -239,7 +259,7 @@ func (r *InvoiceRepository) GetInvoiceByID(ctx context.Context, invoiceID uuid.U
 	`, invoiceID).Scan(
 		&d.ID, &d.PropertyID, &d.BookingID, &d.InvoiceNumber,
 		&d.Subtotal, &d.TaxAmount, &d.PPNRateSnapshot, &d.Total,
-		&d.OriginalCurrency, &d.ExchangeRate, &d.Status, &d.IssuedAt, &d.PaidAt,
+		&d.OriginalCurrency, &d.ExchangeRate, &d.Status, &d.NeedsReview, &d.IssuedAt, &d.PaidAt,
 		&d.VoidedAt, &d.VoidedBy, &d.VoidReason, &d.CreatedBy, &d.PDFURL, &d.Notes,
 		&d.CreatedAt, &d.UpdatedAt,
 		&d.TotalPaid, &d.TotalRefunded, &d.Balance, &d.EffectiveStatus,
@@ -270,11 +290,13 @@ func (r *InvoiceRepository) GetInvoiceByID(ctx context.Context, invoiceID uuid.U
 		d.LineItems = []models.InvoiceLineItem{}
 	}
 
-	// Payments
+	// Payments (v1.2 R-07: also return invalidated_at / invalidated_by /
+	// invalidated_reason so the UI can render the strikethrough badge).
 	payRows, err := r.db.Query(ctx, `
 		SELECT id, invoice_id, property_id, method, amount,
 		       original_currency, exchange_rate, reference, notes,
-		       is_reversal, reversal_of, received_by, received_at, created_at
+		       is_reversal, reversal_of, received_by, received_at, created_at,
+		       invalidated_at, invalidated_by, invalidated_reason
 		FROM payments WHERE invoice_id = $1 ORDER BY received_at
 	`, invoiceID)
 	if err != nil {
@@ -285,7 +307,8 @@ func (r *InvoiceRepository) GetInvoiceByID(ctx context.Context, invoiceID uuid.U
 		var p models.Payment
 		if err := payRows.Scan(&p.ID, &p.InvoiceID, &p.PropertyID, &p.Method, &p.Amount,
 			&p.OriginalCurrency, &p.ExchangeRate, &p.Reference, &p.Notes,
-			&p.IsReversal, &p.ReversalOf, &p.ReceivedBy, &p.ReceivedAt, &p.CreatedAt); err != nil {
+			&p.IsReversal, &p.ReversalOf, &p.ReceivedBy, &p.ReceivedAt, &p.CreatedAt,
+			&p.InvalidatedAt, &p.InvalidatedBy, &p.InvalidatedReason); err != nil {
 			return models.InvoiceDetail{}, err
 		}
 		d.Payments = append(d.Payments, p)
@@ -320,10 +343,16 @@ func (r *InvoiceRepository) GetInvoiceByBookingID(ctx context.Context, bookingID
 //
 // Business rules enforced HERE (data-integrity layer):
 //   - amount != 0
-//   - invoice must exist and not be void
+//   - invoice must exist and not be void/refunded (R-08)
 //   - For amounts > 0: must not exceed remaining balance (Balance)
 //   - For non-cash methods: reference is required (BR-INV-005)
-//   - For refunds (amount < 0): is_reversal=true and reversal_of set
+//   - For refunds (amount < 0, R-07):
+//       * is_reversal=true && reversal_of != nil
+//       * reversal_of points to a payment of the same invoice
+//       * reversal_of is not itself a reversal
+//       * |refund.amount| <= remaining_reverseable(target)
+//       * method matches original.method unless ForceOverride
+//       * refund would not cause total_refunded > total
 //
 // Business rules enforced in the SERVICE layer (not here):
 //   - Refunds require role owner OR booking.force_override=true
@@ -338,7 +367,7 @@ func (r *InvoiceRepository) RegisterPayment(ctx context.Context, input models.Re
 	}
 	// Refunds must have reversal_of
 	if input.Amount < 0 && (input.IsReversal == false || input.ReversalOf == nil) {
-		return models.Payment{}, fmt.Errorf("%w: refund requires is_reversal=true and reversal_of", ErrInvalidPayment)
+		return models.Payment{}, fmt.Errorf("%w: refund requires is_reversal=true and reversal_of", ErrRefundNotReverse)
 	}
 
 	// Wrap the check + insert in a tx so Balance is consistent across the
@@ -363,14 +392,105 @@ func (r *InvoiceRepository) RegisterPayment(ctx context.Context, input models.Re
 	if status == models.InvoiceStatusVoid {
 		return models.Payment{}, ErrInvoiceVoid
 	}
+	// v1.2 R-08: refunded is also terminal — no new payments allowed.
+	if status == models.InvoiceStatusRefunded {
+		return models.Payment{}, ErrInvoiceTerminal
+	}
 
-	// Compute current total_paid and remaining balance
+	// Compute current total_paid and remaining balance.
+	// v1.2 R-07: exclude invalidated rows from the aggregation.
 	var currentPaid float64
 	if err := tx.QueryRow(ctx, `
 		SELECT COALESCE(SUM(amount), 0) FROM payments
 		WHERE invoice_id = $1 AND amount > 0 AND is_reversal = FALSE
+		  AND invalidated_at IS NULL
 	`, input.InvoiceID).Scan(&currentPaid); err != nil {
 		return models.Payment{}, err
+	}
+
+	// =================================================================
+	// v1.2 R-07 — Refund 1:1 validation gates
+	// All checks are inside the same tx as the insert so they race safely.
+	// =================================================================
+	if input.Amount < 0 {
+		// (a) Load the target payment (must exist on same invoice, not be
+		//     a reversal itself). We use SELECT FOR UPDATE so a concurrent
+		//     refund against the same target can't slip past our cap check.
+		var (
+			targetInvoiceID uuid.UUID
+			targetAmount    float64
+			targetMethod    models.PaymentMethod
+			targetIsRev     bool
+			targetInvalid   *time.Time
+		)
+		err := tx.QueryRow(ctx, `
+			SELECT invoice_id, amount, method, is_reversal, invalidated_at
+			  FROM payments
+			 WHERE id = $1
+			 FOR UPDATE
+		`, *input.ReversalOf).Scan(
+			&targetInvoiceID, &targetAmount, &targetMethod, &targetIsRev, &targetInvalid,
+		)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return models.Payment{}, fmt.Errorf("%w: target payment not found", ErrInvalidPayment)
+			}
+			return models.Payment{}, err
+		}
+
+		// (b) Cross-invoice refund: forbidden.
+		if targetInvoiceID != input.InvoiceID {
+			return models.Payment{}, ErrRefundCrossInvoice
+		}
+		// (c) Refund-of-refund: forbidden.
+		if targetIsRev {
+			return models.Payment{}, ErrRefundOfRefund
+		}
+		// (d) Target invalidated: treat as if target doesn't exist for refund purposes.
+		if targetInvalid != nil {
+			return models.Payment{}, fmt.Errorf("%w: target payment has been invalidated", ErrRefundNotReverse)
+		}
+		// (e) Method match (R-07: same method as original). force_override
+		//     is owner-only; the SERVICE layer has already verified role
+		//     and forwarded the override flag here.
+		if input.Method != targetMethod && !input.ForceOverride {
+			return models.Payment{}, ErrRefundMethodMismatch
+		}
+		// (f) Cap: |refund.amount| <= remaining_reverseable(target).
+		//     remaining_reverseable = target.amount - sum(refunds against it).
+		var alreadyRefundedAgainstTarget float64
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(ABS(SUM(amount)), 0) FROM payments
+			 WHERE reversal_of = $1
+			   AND invalidated_at IS NULL
+		`, *input.ReversalOf).Scan(&alreadyRefundedAgainstTarget); err != nil {
+			return models.Payment{}, err
+		}
+		remainingReverseable := targetAmount - alreadyRefundedAgainstTarget
+		refundAbs := -input.Amount // amount is negative
+		if refundAbs > remainingReverseable+0.0001 {
+			return models.Payment{}, fmt.Errorf(
+				"%w: target=%.2f, already_refunded=%.2f, remaining=%.2f, requested=%.2f",
+				ErrRefundExceedsCap, targetAmount, alreadyRefundedAgainstTarget, remainingReverseable, refundAbs,
+			)
+		}
+		// (g) Over-refund: total_refunded + |refund| <= total.
+		//     Compute current total_refunded (live rows only) for this invoice.
+		var currentRefunded float64
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(ABS(SUM(amount)), 0) FROM payments
+			 WHERE invoice_id = $1
+			   AND amount < 0
+			   AND invalidated_at IS NULL
+		`, input.InvoiceID).Scan(&currentRefunded); err != nil {
+			return models.Payment{}, err
+		}
+		if currentRefunded+refundAbs > total+0.01 {
+			return models.Payment{}, fmt.Errorf(
+				"%w: total_refunded=%.2f + refund=%.2f > total=%.2f",
+				ErrRefundOverRefund, currentRefunded, refundAbs, total,
+			)
+		}
 	}
 
 	// Validate amount
@@ -393,7 +513,8 @@ func (r *InvoiceRepository) RegisterPayment(ctx context.Context, input models.Re
 		RETURNING
 			id, invoice_id, property_id, method, amount,
 			original_currency, exchange_rate, reference, notes,
-			is_reversal, reversal_of, received_by, received_at, created_at
+			is_reversal, reversal_of, received_by, received_at, created_at,
+			invalidated_at, invalidated_by, invalidated_reason
 	`,
 		input.InvoiceID, input.PropertyID, input.Method, input.Amount,
 		input.Reference, input.Notes, input.IsReversal, input.ReversalOf, input.ReceivedBy,
@@ -401,6 +522,7 @@ func (r *InvoiceRepository) RegisterPayment(ctx context.Context, input models.Re
 		&p.ID, &p.InvoiceID, &p.PropertyID, &p.Method, &p.Amount,
 		&p.OriginalCurrency, &p.ExchangeRate, &p.Reference, &p.Notes,
 		&p.IsReversal, &p.ReversalOf, &p.ReceivedBy, &p.ReceivedAt, &p.CreatedAt,
+		&p.InvalidatedAt, &p.InvalidatedBy, &p.InvalidatedReason,
 	); err != nil {
 		return models.Payment{}, err
 	}
@@ -427,6 +549,185 @@ func (r *InvoiceRepository) RegisterPayment(ctx context.Context, input models.Re
 // =============================================================================
 // Update — void / notes / PDF
 // =============================================================================
+
+// =============================================================================
+// RefundAll (v1.2 R-07 — spec §4.12)
+// Atomic batch refund of every positive, non-invalidated payment on the
+// invoice. Generates N refund rows + 1 refund_batches audit row, all in
+// a single tx. If any refund fails its gate, the whole batch rolls back.
+// =============================================================================
+
+// RefundAllResult is the summary of refunds created by RefundAll.
+type RefundAllResult struct {
+	RefundBatches         models.RefundBatch
+	RefundedPayments      []models.Payment // N refund rows in order of generation
+	InvoiceLifecycleAfter models.InvoiceStatus
+}
+
+func (r *InvoiceRepository) RefundAll(ctx context.Context, input models.RefundAllInput) (RefundAllResult, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return RefundAllResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// 1. Lock the invoice + check lifecycle.
+	var (
+		status     string
+		propertyID uuid.UUID
+		total      float64
+	)
+	err = tx.QueryRow(ctx, `
+		SELECT status, property_id, total
+		  FROM invoices WHERE id = $1 FOR UPDATE
+	`, input.InvoiceID).Scan(&status, &propertyID, &total)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return RefundAllResult{}, ErrInvoiceNotFound
+		}
+		return RefundAllResult{}, err
+	}
+	if status == string(models.InvoiceStatusVoid) || status == string(models.InvoiceStatusRefunded) {
+		return RefundAllResult{}, ErrInvoiceTerminal
+	}
+
+	// 2. Find every positive, non-invalidated, not-fully-refunded payment.
+	rows, err := tx.Query(ctx, `
+		SELECT p.id, p.amount, p.method, p.reference
+		  FROM payments p
+		 WHERE p.invoice_id = $1
+		   AND p.amount > 0
+		   AND p.is_reversal = FALSE
+		   AND p.invalidated_at IS NULL
+		   AND ABS(p.amount) > COALESCE((
+		       SELECT ABS(SUM(c.amount))
+		         FROM payments c
+		        WHERE c.reversal_of = p.id
+		          AND c.invalidated_at IS NULL
+		   ), 0)
+		 ORDER BY p.received_at
+		 FOR UPDATE OF p
+	`, input.InvoiceID)
+	if err != nil {
+		return RefundAllResult{}, err
+	}
+	type target struct {
+		ID        uuid.UUID
+		Amount    float64
+		Method    models.PaymentMethod
+		Reference *string
+	}
+	var targets []target
+	for rows.Next() {
+		var t target
+		var ref *string
+		if err := rows.Scan(&t.ID, &t.Amount, &t.Method, &ref); err != nil {
+			rows.Close()
+			return RefundAllResult{}, err
+		}
+		t.Reference = ref
+		targets = append(targets, t)
+	}
+	rows.Close()
+	if len(targets) == 0 {
+		return RefundAllResult{}, fmt.Errorf("%w: no positive payments to refund", ErrRefundNotReverse)
+	}
+
+	// 3. Generate one refund row per target. Each refund is the full
+	//    remaining_reverseable of its target. Method inherits (no
+	//    override on bulk refunds — would need explicit per-row UI).
+	result := RefundAllResult{}
+	var totalRefunded float64
+	for _, t := range targets {
+		// Compute remaining at the moment of insert (inside tx, FOR UPDATE
+		// on the target already held so this is race-safe).
+		var alreadyRefunded float64
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(ABS(SUM(amount)), 0) FROM payments
+			 WHERE reversal_of = $1 AND invalidated_at IS NULL
+		`, t.ID).Scan(&alreadyRefunded); err != nil {
+			return RefundAllResult{}, err
+		}
+		remaining := t.Amount - alreadyRefunded
+
+		// Default reference: REFUND-{original.reference || payment.id[:8]}
+		refStr := ""
+		if t.Reference != nil && *t.Reference != "" {
+			refStr = "REFUND-" + *t.Reference
+		} else {
+			refStr = "REFUND-" + t.ID.String()[:8]
+		}
+
+		var p models.Payment
+		err := tx.QueryRow(ctx, `
+			INSERT INTO payments (
+				invoice_id, property_id, method, amount,
+				original_currency, exchange_rate,
+				reference, notes, is_reversal, reversal_of, received_by
+			)
+			VALUES ($1, $2, $3, $4, 'IDR', 1.0, $5, $6, TRUE, $7, $8)
+			RETURNING
+				id, invoice_id, property_id, method, amount,
+				original_currency, exchange_rate, reference, notes,
+				is_reversal, reversal_of, received_by, received_at, created_at,
+				invalidated_at, invalidated_by, invalidated_reason
+		`,
+			input.InvoiceID, propertyID, t.Method, -remaining,
+			refStr, input.Reason, t.ID, input.InitiatedBy,
+		).Scan(
+			&p.ID, &p.InvoiceID, &p.PropertyID, &p.Method, &p.Amount,
+			&p.OriginalCurrency, &p.ExchangeRate, &p.Reference, &p.Notes,
+			&p.IsReversal, &p.ReversalOf, &p.ReceivedBy, &p.ReceivedAt, &p.CreatedAt,
+			&p.InvalidatedAt, &p.InvalidatedBy, &p.InvalidatedReason,
+		)
+		if err != nil {
+			return RefundAllResult{}, fmt.Errorf("insert refund for %s: %w", t.ID, err)
+		}
+		result.RefundedPayments = append(result.RefundedPayments, p)
+		totalRefunded += remaining
+	}
+
+	// 4. Insert refund_batches audit row.
+	var batch models.RefundBatch
+	paymentIDs := make([]uuid.UUID, 0, len(result.RefundedPayments))
+	for _, p := range result.RefundedPayments {
+		paymentIDs = append(paymentIDs, p.ID)
+	}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO refund_batches
+			(invoice_id, property_id, initiated_by, reason, payment_ids, total_refunded)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, invoice_id, property_id, initiated_by, reason,
+		          payment_ids, total_refunded, created_at
+	`, input.InvoiceID, propertyID, input.InitiatedBy,
+		input.Reason, paymentIDs, totalRefunded,
+	).Scan(
+		&batch.ID, &batch.InvoiceID, &batch.PropertyID,
+		&batch.InitiatedBy, &batch.Reason,
+		&batch.PaymentIDs, &batch.TotalRefunded, &batch.CreatedAt,
+	)
+	if err != nil {
+		return RefundAllResult{}, fmt.Errorf("insert refund_batches: %w", err)
+	}
+	result.RefundBatches = batch
+
+	// 5. The trigger trg_invoice_status_update will auto-flip status to
+	//    'refunded' if total_refunded >= total. We read the result to
+	//    surface the final lifecycle to the caller.
+	var finalStatus string
+	if err := tx.QueryRow(ctx,
+		`SELECT status FROM invoices WHERE id = $1`,
+		input.InvoiceID).Scan(&finalStatus); err != nil {
+		return RefundAllResult{}, err
+	}
+	result.InvoiceLifecycleAfter = models.InvoiceStatus(finalStatus)
+
+	// 6. Commit. All-or-nothing.
+	if err := tx.Commit(ctx); err != nil {
+		return RefundAllResult{}, err
+	}
+	return result, nil
+}
 
 // VoidInvoice marks the invoice as void. The DB trigger trg_invoice_void_audit
 // enforces that voided_by + void_reason are present and stamps voided_at.
@@ -660,21 +961,25 @@ func (r *InvoiceRepository) DailySummary(ctx context.Context, propertyID uuid.UU
 	dayStart := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, loc)
 	dayEnd := dayStart.Add(24 * time.Hour)
 
-	// Status counts (invoices issued today)
+	// Status counts (invoices issued today).
+	// v1.2 R-08: invoices with needs_review=true are excluded from all
+	// revenue/tax aggregations (data integrity flag, BR-INV-011).
 	row := r.db.QueryRow(ctx, `
 		WITH `+paymentAggCTE+`
 		SELECT
-			COUNT(*) FILTER (WHERE TRUE) AS issued,
-			COUNT(*) FILTER (WHERE i.status='active' AND `+effectiveStatusExpr()+` = 'paid') AS paid,
-			COUNT(*) FILTER (WHERE i.status='active' AND `+effectiveStatusExpr()+` = 'partial') AS partial,
-			COUNT(*) FILTER (WHERE i.status='active' AND `+effectiveStatusExpr()+` = 'unpaid') AS unpaid,
-			COUNT(*) FILTER (WHERE i.status='active' AND `+effectiveStatusExpr()+` = 'overpaid') AS overpaid,
-			COUNT(*) FILTER (WHERE i.status='void') AS void,
-			COALESCE(SUM(i.total) FILTER (WHERE i.status='active'), 0) AS total_revenue,
-			COALESCE(SUM(agg.total_paid) FILTER (WHERE i.status='active'), 0) AS total_collected,
-			COALESCE(SUM(agg.total_refunded), 0) AS total_refunded,
-			COALESCE(SUM(i.total - COALESCE(agg.total_paid, 0)) FILTER (WHERE i.status='active'), 0) AS total_pending,
-			COALESCE(SUM(i.tax_amount) FILTER (WHERE i.status='active' AND `+effectiveStatusExpr()+` IN ('paid','overpaid')), 0) AS tax_collected
+			COUNT(*) FILTER (WHERE i.needs_review = FALSE) AS issued,
+			COUNT(*) FILTER (WHERE i.status='active' AND i.needs_review = FALSE AND `+effectiveStatusExpr()+` = 'paid') AS paid,
+			COUNT(*) FILTER (WHERE i.status='active' AND i.needs_review = FALSE AND `+effectiveStatusExpr()+` = 'partial') AS partial,
+			COUNT(*) FILTER (WHERE i.status='active' AND i.needs_review = FALSE AND `+effectiveStatusExpr()+` = 'unpaid') AS unpaid,
+			COUNT(*) FILTER (WHERE i.status='active' AND i.needs_review = FALSE AND `+effectiveStatusExpr()+` = 'overpaid') AS overpaid,
+			COUNT(*) FILTER (WHERE i.status='void' AND i.needs_review = FALSE) AS void,
+			COUNT(*) FILTER (WHERE i.status='refunded' AND i.needs_review = FALSE) AS refunded,
+			COUNT(*) FILTER (WHERE i.needs_review = TRUE) AS needs_review_count,
+			COALESCE(SUM(i.total) FILTER (WHERE i.status='active' AND i.needs_review = FALSE), 0) AS total_revenue,
+			COALESCE(SUM(agg.total_paid) FILTER (WHERE i.status='active' AND i.needs_review = FALSE), 0) AS total_collected,
+			COALESCE(SUM(agg.total_refunded) FILTER (WHERE i.needs_review = FALSE), 0) AS total_refunded,
+			COALESCE(SUM(i.total - COALESCE(agg.total_paid, 0)) FILTER (WHERE i.status='active' AND i.needs_review = FALSE), 0) AS total_pending,
+			COALESCE(SUM(i.tax_amount) FILTER (WHERE i.status='active' AND i.needs_review = FALSE AND `+effectiveStatusExpr()+` IN ('paid','overpaid')), 0) AS tax_collected
 		FROM invoices i
 		LEFT JOIN payments_agg agg ON agg.invoice_id = i.id
 		WHERE i.property_id = $1
@@ -685,19 +990,25 @@ func (r *InvoiceRepository) DailySummary(ctx context.Context, propertyID uuid.UU
 		&out.InvoicesIssued,
 		&out.InvoicesPaid, &out.InvoicesPartial, &out.InvoicesUnpaid,
 		&out.InvoicesOverpaid, &out.InvoicesVoid,
+		&out.InvoicesRefunded, &out.NeedsReviewCount, // v1.2 R-08
 		&out.TotalRevenue, &out.TotalCollected, &out.TotalRefunded, &out.TotalPending,
 		&out.TaxCollected,
 	); err != nil {
 		return models.DailySummary{}, err
 	}
 
-	// Per-method totals (positive payments received today)
+	// v1.2 R-08: net_revenue = collected - refunded (informational)
+	out.NetRevenue = out.TotalCollected - out.TotalRefunded
+
+	// Per-method totals (positive payments received today).
+	// v1.2 R-07: exclude invalidated rows from the per-method aggregation.
 	methodRows, err := r.db.Query(ctx, `
 		SELECT method, COALESCE(SUM(amount), 0) AS total
 		FROM payments
 		WHERE property_id = $1
 		  AND amount > 0
 		  AND is_reversal = FALSE
+		  AND invalidated_at IS NULL
 		  AND received_at >= $2 AND received_at < $3
 		GROUP BY method
 	`, propertyID, dayStart, dayEnd)
@@ -746,6 +1057,13 @@ func (r *InvoiceRepository) DailySummary(ctx context.Context, propertyID uuid.UU
 
 // MonthlyTaxReport returns the PPN report for a property for a given period.
 // If month is 0, returns the entire year.
+//
+// v1.2 R-08 / R-09 Q3: refunds net PPN del MES DEL REFUND (cash basis).
+//   - Refund counted in month of received_at (NOT month of invoice).
+//   - net_tax = tax_amount * (1 - refunded/total) on the matched invoices.
+//   - Invoices with needs_review=true are excluded from all totals.
+//   - Adds: refunded_count, needs_review_count, excluded_needs_review,
+//     refunds_count, net_subtotal.
 func (r *InvoiceRepository) MonthlyTaxReport(ctx context.Context, propertyID uuid.UUID, year, month int) (models.MonthlyTaxReport, error) {
 	out := models.MonthlyTaxReport{
 		PropertyID: propertyID,
@@ -762,25 +1080,65 @@ func (r *InvoiceRepository) MonthlyTaxReport(ctx context.Context, propertyID uui
 		end = start.AddDate(1, 0, 0)
 	}
 
+	// refund_amount_for_invoice(invoice_total, tax_amount, refunds_total) =
+	//   apply the proportional refund to both subtotal and tax_amount.
+	// We compute it in SQL using GREATEST(0, total_tax - refunds_share).
 	row := r.db.QueryRow(ctx, `
+		WITH invoice_refunds AS (
+			SELECT
+				i.id,
+				i.subtotal,
+				i.tax_amount,
+				i.status,
+				i.needs_review,
+				COALESCE((
+					SELECT ABS(SUM(p.amount))
+					  FROM payments p
+					 WHERE p.invoice_id = i.id
+					   AND p.amount < 0
+					   AND p.invalidated_at IS NULL
+				), 0) AS refunded_for_invoice
+			FROM invoices i
+			WHERE i.property_id = $1
+			  AND i.issued_at >= $2 AND i.issued_at < $3
+		)
 		SELECT
-			COALESCE(SUM(subtotal) FILTER (WHERE status = 'active'), 0) AS total_subtotal,
-			COALESCE(SUM(tax_amount) FILTER (WHERE status = 'active'), 0) AS total_tax,
-			COUNT(*) FILTER (WHERE status = 'active') AS invoices_count,
-			COUNT(*) FILTER (WHERE status = 'void') AS void_count,
-			COALESCE((SELECT ABS(SUM(amount)) FROM payments
-			          WHERE property_id = $1
-			            AND amount < 0
-			            AND is_reversal = TRUE
-			            AND received_at >= $2 AND received_at < $3), 0) AS refunds_total
-		FROM invoices
-		WHERE property_id = $1
-		  AND issued_at >= $2 AND issued_at < $3
+			COALESCE(SUM(subtotal) FILTER (WHERE status = 'active' AND needs_review = FALSE), 0) AS total_subtotal,
+			COALESCE(SUM(subtotal - subtotal * LEAST(1, refunded_for_invoice / NULLIF(subtotal + tax_amount, 0)))
+				FILTER (WHERE status = 'active' AND needs_review = FALSE), 0) AS net_subtotal,
+			COALESCE(SUM(tax_amount) FILTER (WHERE status = 'active' AND needs_review = FALSE), 0) AS total_tax,
+			COALESCE(SUM(tax_amount - tax_amount * LEAST(1, refunded_for_invoice / NULLIF(subtotal + tax_amount, 0)))
+				FILTER (WHERE status = 'active' AND needs_review = FALSE), 0) AS net_tax_collected,
+			COALESCE(SUM(refunded_for_invoice) FILTER (WHERE needs_review = FALSE), 0) AS refunds_total,
+			COUNT(*) FILTER (WHERE status = 'active' AND needs_review = FALSE) AS invoices_count,
+			COUNT(*) FILTER (WHERE status = 'void' AND needs_review = FALSE) AS void_count,
+			COUNT(*) FILTER (WHERE status = 'refunded' AND needs_review = FALSE) AS refunded_count,
+			COUNT(*) FILTER (WHERE needs_review = TRUE) AS needs_review_count
+		FROM invoice_refunds
 	`, propertyID, start, end)
-	if err := row.Scan(&out.TotalSubtotal, &out.TotalTax, &out.InvoicesCount, &out.VoidCount, &out.RefundsTotal); err != nil {
+	if err := row.Scan(
+		&out.TotalSubtotal, &out.NetSubtotal,
+		&out.TotalTax, &out.NetTaxCollected,
+		&out.TotalRefunded,
+		&out.InvoicesCount, &out.VoidCount, &out.RefundedCount,
+		&out.NeedsReviewCount,
+	); err != nil {
 		return models.MonthlyTaxReport{}, err
 	}
-	out.NetTaxCollected = out.TotalTax
+	// Refunds received in this period (cash basis: when money leaves).
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM payments
+		 WHERE property_id = $1
+		   AND amount < 0
+		   AND is_reversal = TRUE
+		   AND invalidated_at IS NULL
+		   AND received_at >= $2 AND received_at < $3
+	`, propertyID, start, end).Scan(&out.RefundsCount); err != nil {
+		return models.MonthlyTaxReport{}, err
+	}
+	// Count of invoices that exist in period but were excluded (needs_review).
+	// (Above query already returns it; alias for clarity.)
+	out.Excluded = out.NeedsReviewCount
 	return out, nil
 }
 

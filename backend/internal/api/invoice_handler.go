@@ -212,12 +212,13 @@ func (h *InvoiceHandler) RegisterPayment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var req struct {
-		Method     string  `json:"method"`
-		Amount     float64 `json:"amount"`
-		Reference  string  `json:"reference"`
-		Notes      string  `json:"notes"`
-		IsReversal bool    `json:"is_reversal"`
-		ReversalOf *string `json:"reversal_of"`
+		Method        string  `json:"method"`
+		Amount        float64 `json:"amount"`
+		Reference     string  `json:"reference"`
+		Notes         string  `json:"notes"`
+		IsReversal    bool    `json:"is_reversal"`
+		ReversalOf    *string `json:"reversal_of"`
+		ForceOverride bool    `json:"force_override"` // v1.2 R-07
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		api.JSON(w, http.StatusBadRequest, api.Error{Code: "INVALID_BODY", Message: "Invalid request body"})
@@ -261,6 +262,7 @@ func (h *InvoiceHandler) RegisterPayment(w http.ResponseWriter, r *http.Request)
 		}
 		input.ReversalOf = &rid
 	}
+	input.ForceOverride = req.ForceOverride
 
 	p, err := h.svc.RegisterPayment(r.Context(), input, idemKey, userID, role)
 	if err != nil {
@@ -269,6 +271,30 @@ func (h *InvoiceHandler) RegisterPayment(w http.ResponseWriter, r *http.Request)
 				"code":    "PAYMENT_EXCEEDS_BALANCE",
 				"message": "El importe excede el balance pendiente.",
 				"hint":    "Reduce el importe o registra un refund primero.",
+			})
+			return
+		}
+		// v1.2 R-08: refunded invoices can't accept new payments.
+		if errors.Is(err, repository.ErrInvoiceTerminal) {
+			api.JSON(w, http.StatusConflict, map[string]any{
+				"code":    "INVOICE_TERMINAL",
+				"message": "Esta factura está en estado terminal y no acepta más cambios.",
+				"hint":    "Las facturas anuladas o reembolsadas íntegramente son terminales.",
+			})
+			return
+		}
+		// v1.2 R-07: refund 1:1 validation gates.
+		if errors.Is(err, repository.ErrRefundCrossInvoice) ||
+			errors.Is(err, repository.ErrRefundOfRefund) ||
+			errors.Is(err, repository.ErrRefundExceedsCap) ||
+			errors.Is(err, repository.ErrRefundMethodMismatch) ||
+			errors.Is(err, repository.ErrRefundOverRefund) ||
+			errors.Is(err, repository.ErrRefundNotReverse) ||
+			(errors.Is(err, repository.ErrInvalidPayment) && input.Amount < 0) {
+			api.JSON(w, http.StatusUnprocessableEntity, map[string]any{
+				"code":    "INVALID_REFUND_TARGET",
+				"message": "No se puede reembolsar este pago. Verifica que sea un cobro original y pertenezca a esta factura.",
+				"hint":    "Los reembolsos son siempre de 1 pago a la vez. Si necesitas reembolsar todo, usa 'Refund all'.",
 			})
 			return
 		}
@@ -385,6 +411,78 @@ func (h *InvoiceHandler) RegeneratePDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.JSON(w, http.StatusOK, map[string]any{"pdf_url": url})
+}
+
+// RefundAll — spec §4.12 (v1.2 R-07).
+//
+// Atomic batch refund of every positive, non-invalidated payment on the
+// invoice. Generates N refund rows + 1 refund_batches audit row.
+// If any refund would fail its R-07 gate, the whole batch rolls back.
+func (h *InvoiceHandler) RefundAll(w http.ResponseWriter, r *http.Request) {
+	invoiceID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		api.JSON(w, http.StatusBadRequest, api.Error{Code: "INVALID_ID", Message: "Invalid invoice ID"})
+		return
+	}
+	var req struct {
+		Reason        string `json:"reason"`
+		ForceOverride bool   `json:"force_override"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.JSON(w, http.StatusBadRequest, api.Error{Code: "INVALID_BODY", Message: "Invalid request body"})
+		return
+	}
+	defer r.Body.Close()
+
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		api.JSON(w, http.StatusUnauthorized, api.Error{Code: "UNAUTHENTICATED", Message: "Missing X-User-ID header"})
+		return
+	}
+	roleStr, _ := middleware.UserRoleFromContext(r.Context())
+	role := service.UserRole(roleStr)
+	if roleStr == "" {
+		role = service.RoleOwner // dev default
+	}
+
+	result, err := h.svc.RefundAll(r.Context(), models.RefundAllInput{
+		InvoiceID:     invoiceID,
+		Reason:        req.Reason,
+		ForceOverride: req.ForceOverride,
+		InitiatedBy:   userID,
+	}, role)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	// Surface N refund rows + the audit batch.
+	type refundedItem struct {
+		OriginalPaymentID uuid.UUID `json:"original_payment_id"`
+		RefundPaymentID   uuid.UUID `json:"refund_payment_id"`
+		Method            string    `json:"method"`
+		AmountRefunded    float64   `json:"amount_refunded"`
+	}
+	items := make([]refundedItem, 0, len(result.RefundedPayments))
+	for _, p := range result.RefundedPayments {
+		originalID := uuid.Nil
+		if p.ReversalOf != nil {
+			originalID = *p.ReversalOf
+		}
+		items = append(items, refundedItem{
+			OriginalPaymentID: originalID,
+			RefundPaymentID:   p.ID,
+			Method:            string(p.Method),
+			AmountRefunded:    -p.Amount,
+		})
+	}
+	api.JSON(w, http.StatusOK, map[string]any{
+		"invoice_id":              result.RefundBatches.InvoiceID,
+		"refunded_payments":       items,
+		"refund_batch_id":         result.RefundBatches.ID,
+		"total_refunded":          result.RefundBatches.TotalRefunded,
+		"invoice_lifecycle_after": string(result.InvoiceLifecycleAfter),
+	})
 }
 
 // =============================================================================

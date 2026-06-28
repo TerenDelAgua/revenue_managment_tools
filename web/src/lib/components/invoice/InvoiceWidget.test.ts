@@ -451,7 +451,8 @@ describe('InvoiceWidget', () => {
 						amount: 555000,
 						method: 'cash',
 						is_reversal: false,
-						received_at: '2026-06-22T08:00:00Z'
+						received_at: '2026-06-22T08:00:00Z',
+						remaining_reverseable: 555000
 					}
 				]
 			}), { status: 200 })
@@ -485,11 +486,17 @@ describe('InvoiceWidget', () => {
 		await waitFor(() => expect(getByTestId('invoice-refund-toggle')).toBeInTheDocument());
 		await fireEvent.click(getByTestId('invoice-refund-toggle'));
 
-		await waitFor(() => expect(getByTestId('payment-form')).toBeInTheDocument());
+		// v1.2 (Block 8): the picker is the new entry point — the form
+		// is hidden until the user picks a target.
+		await waitFor(() => expect(getByTestId('refund-picker')).toBeInTheDocument());
+		await fireEvent.click(getByTestId('refund-picker-item'));
 
-		// Fill the form.
+		// Form is now visible with the target pre-filled.
+		await waitFor(() => expect(getByTestId('payment-form').hasAttribute('hidden')).toBe(false));
+
+		// Fill the (pre-filled) form: amount is already 555000, the user
+		// overrides to a partial refund.
 		await fireEvent.input(getByTestId('payment-amount'), { target: { value: '100000' } });
-		await fireEvent.input(getByTestId('payment-reference'), { target: { value: 'SLIP-001' } });
 		await fireEvent.input(getByTestId('payment-notes'), { target: { value: 'guest complaint' } });
 		await fireEvent.click(getByTestId('payment-submit'));
 

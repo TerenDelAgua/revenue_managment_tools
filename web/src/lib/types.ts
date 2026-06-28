@@ -231,8 +231,8 @@ export interface CreateBookingResponse {
 // === Invoicing & Payments ===
 // Spec ref: Docs/Features/TEREN_Hotels_Invoicing_Spec_v1.1.md §4
 
-export type InvoiceStatus = 'active' | 'void';
-export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'void';
+export type InvoiceStatus = 'active' | 'void' | 'refunded';
+export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'void' | 'refunded';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'qris' | 'card';
 
 export interface InvoiceLineItem {
@@ -261,6 +261,22 @@ export interface Payment {
     received_by: string;
     received_at: string;
     created_at: string;
+    /**
+     * v1.2 (R-07): amount still available to refund on this payment row.
+     * Present only for positive (non-reversal) payments in the invoice
+     * detail response; null for reversal rows. Computed server-side as
+     * `target.amount - SUM(refund rows WHERE reversal_of = target AND
+     * invalidated_at IS NULL)`.
+     */
+    remaining_reverseable?: number | null;
+    /**
+     * v1.2 (R-09 Q2): when set, the row is excluded from total_paid /
+     * total_refunded / effective_status. Used to retire legacy bad data
+     * without losing audit trail.
+     */
+    invalidated_at?: string | null;
+    invalidated_by?: string | null;
+    invalidated_reason?: string | null;
 }
 
 export interface Invoice {
@@ -340,6 +356,14 @@ export interface RegisterPaymentPayload {
     notes?: string;
     is_reversal?: boolean;
     reversal_of?: string;
+    /**
+     * R-07 / R-02: when refunding, the user may change the refund method
+     * away from the original payment method. This requires a destructive
+     * confirmation (ConfirmDestructive) and the backend prepends an
+     * "[OVERRIDE] method changed from {X} to {Y} by {user}" note to the
+     * audit trail. Forced to owner-only on the server side.
+     */
+    force_override?: boolean;
 }
 
 export interface DailySummary {

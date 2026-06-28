@@ -168,7 +168,8 @@
       "partial": "Sebagian",
       "unpaid": "Belum Bayar",
       "overpaid": "Kelebihan Bayar",
-      "void": "Dibatalkan"
+      "void": "Dibatalkan",
+      "refunded": "Dikembalikan"
     },
     "breakdown": {
       "subtotal": "Subtotal",
@@ -246,6 +247,19 @@
       "notesLabel": "Alasan pengembalian",
       "notesPlaceholder": "Mengapa pengembalian ini diterbitkan?",
       "submit": "Terbitkan pengembalian",
+      "lockedMethodHint": "Metode dikunci sesuai pembayaran awal ({method}).",
+      "changeMethodToggle": "Ubah metode pengembalian",
+      "changeMethodActive": "Penggantian metode aktif — jejak audit akan mencatat perubahan.",
+      "reverting": "Membatalkan {method} {date} — {amount}",
+      "backToPicker": "← Kembali ke daftar pembayaran",
+      "pickerHeading": "Pilih pembayaran yang akan dikembalikan",
+      "pickerEmpty": "Tidak ada pembayaran yang dapat dikembalikan pada faktur ini.",
+      "pickerNoRef": "(tanpa referensi)",
+      "pickerItemRef": "Ref: {ref}",
+      "pickerItemAvailable": "Dapat dikembalikan: {amount}",
+      "successMessage": "{amount} dikembalikan. Anda dapat mengeluarkan pengembalian lain atau menutup panel ini.",
+      "refundAnother": "Kembalikan pembayaran lain",
+      "done": "Selesai",
       "errors": {
         "amountRequired": "Masukkan jumlah pengembalian.",
         "amountPositive": "Jumlah pengembalian harus lebih dari nol.",
@@ -356,6 +370,7 @@
     "statusUnpaid": "Belum Bayar",
     "statusOverpaid": "Kelebihan Bayar",
     "statusVoid": "Dibatalkan",
+    "statusRefunded": "Dikembalikan",
     "fromLabel": "Dari",
     "toLabel": "Hingga",
     "clearFilters": "Hapus",
@@ -405,6 +420,22 @@
     "toasts": {
       "copied": "ID disalin ke papan klip.",
       "copyFailed": "Tidak dapat menyalin ID."
+    }
+  },
+  "confirmDestructive": {
+    "changeRefundMethod": {
+      "title": "Ubah metode pengembalian?",
+      "description": "Metode pengembalian akan berbeda dari metode pembayaran awal. Perubahan ini akan dicatat dalam jejak audit.",
+      "checkbox": "Saya paham bahwa ini mengubah jejak audit",
+      "confirm": "Konfirmasi perubahan",
+      "cancel": "Pertahankan"
+    },
+    "refundAll": {
+      "title": "Kembalikan semua pembayaran?",
+      "description": "Akan mengembalikan setiap pembayaran yang dapat dikembalikan pada faktur ini dalam satu batch. Tindakan ini dicatat dan faktur akan berpindah ke status refunded.",
+      "checkbox": "Saya paham bahwa pengembalian batch ini bersifat permanen",
+      "confirm": "Kembalikan semua",
+      "cancel": "Batal"
     }
   }
 }

@@ -325,9 +325,64 @@ func (s *InvoiceService) RegisterPayment(
 	return payment, nil
 }
 
+// RefundAll is the bulk-refund endpoint (v1.2 R-07, spec §4.12). It refunds
+// every positive, non-invalidated payment on the invoice atomically.
+// Same authorization as RegisterPayment for refunds (role=owner OR
+// booking.force_override=true).
+//
+// On success, the underlying DB trigger flips invoices.status to 'refunded'
+// when total_refunded >= total. Otherwise the invoice stays 'active' with
+// effective_status='partial' or similar.
+func (s *InvoiceService) RefundAll(
+	ctx context.Context,
+	input models.RefundAllInput,
+	userRole UserRole,
+) (repository.RefundAllResult, error) {
+	if input.Reason == "" {
+		return repository.RefundAllResult{}, &BusinessError{
+			Code:    "REFUND_REASON_REQUIRED",
+			Message: "reason is required for refund-all",
+		}
+	}
+	// Refund authorization (BR-INV-010 + R-02).
+	ok, err := s.canRefund(ctx, input.InvoiceID, input.InitiatedBy, userRole)
+	if err != nil {
+		return repository.RefundAllResult{}, err
+	}
+	if !ok {
+		return repository.RefundAllResult{}, &BusinessError{
+			Code:    CodeRefundForbidden,
+			Message: "Refunds require role=owner or booking.force_override=true",
+		}
+	}
+
+	result, err := s.invoiceRepo.RefundAll(ctx, input)
+	if err != nil {
+		// Map domain errors to BusinessError for the handler.
+		switch {
+		case errors.Is(err, repository.ErrInvoiceTerminal):
+			return repository.RefundAllResult{}, &BusinessError{
+				Code:    "INVOICE_TERMINAL",
+				Message: "This invoice is in a terminal state (void or refunded).",
+			}
+		case errors.Is(err, repository.ErrInvoiceNotFound):
+			return repository.RefundAllResult{}, &BusinessError{
+				Code:    "INVOICE_NOT_FOUND",
+				Message: "Invoice not found.",
+			}
+		case errors.Is(err, repository.ErrRefundNotReverse):
+			return repository.RefundAllResult{}, &BusinessError{
+				Code:    "NO_PAYMENTS_TO_REFUND",
+				Message: "No positive payments available to refund on this invoice.",
+			}
+		default:
+			return repository.RefundAllResult{}, err
+		}
+	}
+	return result, nil
+}
+
 // VoidInvoice is the explicit owner/admin action (BR-INV-008 + §4.4).
-// Different from VoidInvoiceForBooking: this is owner-initiated, not a
-// consequence of a booking cancellation.
 func (s *InvoiceService) VoidInvoice(
 	ctx context.Context,
 	invoiceID, userID uuid.UUID,

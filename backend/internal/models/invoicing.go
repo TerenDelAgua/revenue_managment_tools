@@ -11,20 +11,26 @@ import (
 // Spec ref: Docs/Features/TEREN_Hotels_Invoicing_Spec_v1.1.md
 // =============================================================================
 
-// InvoiceStatus is the LIFECYCLE state of the invoice (active/void).
+// InvoiceStatus is the LIFECYCLE state of the invoice
+// (active/void/refunded). v1.2 (R-08) adds 'refunded' as a terminal
+// state reached when total_refunded >= total.
+//
 // The derived payment status (unpaid/partial/paid/overpaid) is computed
 // in SQL CASE statements against the payments table — see EffectiveStatus
 // on InvoiceDetail. This split follows the spec: lifecycle is mutable
-// (admin can void), derived status is recomputed on every read.
+// (admin can void, trigger can flip to refunded), derived status is
+// recomputed on every read.
 type InvoiceStatus string
 
 const (
-	InvoiceStatusActive InvoiceStatus = "active"
-	InvoiceStatusVoid   InvoiceStatus = "void"
+	InvoiceStatusActive   InvoiceStatus = "active"
+	InvoiceStatusVoid     InvoiceStatus = "void"
+	InvoiceStatusRefunded InvoiceStatus = "refunded" // v1.2 R-08
 )
 
 // PaymentStatus is the DERIVED state of the invoice vs its payments.
-// Computed in SQL at query time.
+// Computed in SQL at query time. v1.2 added PaymentStatusRefunded so
+// the UI doesn't need a separate field for the refunded lifecycle.
 type PaymentStatus string
 
 const (
@@ -36,6 +42,9 @@ const (
 	// voided (no payments can occur). Surfaced via the same field so the
 	// UI doesn't need a separate status for the void case.
 	PaymentStatusVoid PaymentStatus = "void"
+	// PaymentStatusRefunded (v1.2 R-08): mirrors invoices.status when
+	// the invoice has been fully refunded. Terminal state.
+	PaymentStatusRefunded PaymentStatus = "refunded"
 )
 
 // PaymentMethod follows the spec §2.1 enumeration.
@@ -66,6 +75,10 @@ type Invoice struct {
 	OriginalCurrency string        `json:"original_currency" db:"original_currency"`
 	ExchangeRate     float64       `json:"exchange_rate" db:"exchange_rate"`
 	Status           InvoiceStatus `json:"status" db:"status"`
+	// NeedsReview (v1.2 R-08): TRUE marks invoices with data integrity
+	// issues (typically legacy over-refund). Excluded from revenue/tax
+	// reports until owner resolves manually.
+	NeedsReview      bool          `json:"needs_review" db:"needs_review"`
 	IssuedAt         time.Time     `json:"issued_at" db:"issued_at"`
 	PaidAt           *time.Time    `json:"paid_at,omitempty" db:"paid_at"`
 	VoidedAt         *time.Time    `json:"voided_at,omitempty" db:"voided_at"`
@@ -94,6 +107,11 @@ type InvoiceLineItem struct {
 // Payment is a single cobro or refund against an invoice. amount > 0 = cobro,
 // amount < 0 = refund (BR-INV-010). is_reversal=true and reversal_of point
 // to the original payment being reversed.
+//
+// v1.2 R-07: invalidation fields let us retire bad rows (e.g. legacy
+// -666000 with mixed references) without losing audit trail. Invalidated
+// rows are excluded from total_paid / total_refunded / effective_status
+// computations but remain visible in the timeline with a strikethrough.
 type Payment struct {
 	ID               uuid.UUID     `json:"id" db:"id"`
 	InvoiceID        uuid.UUID     `json:"invoice_id" db:"invoice_id"`
@@ -109,6 +127,12 @@ type Payment struct {
 	ReceivedBy       uuid.UUID     `json:"received_by" db:"received_by"`
 	ReceivedAt       time.Time     `json:"received_at" db:"received_at"`
 	CreatedAt        time.Time     `json:"created_at" db:"created_at"`
+	// InvalidatedAt (R-07): when non-null, this row is excluded from
+	// total_paid / total_refunded / effective_status. UI renders with
+	// strikethrough + tooltip "Invalidated: {reason}".
+	InvalidatedAt     *time.Time `json:"invalidated_at,omitempty" db:"invalidated_at"`
+	InvalidatedBy     *uuid.UUID `json:"invalidated_by,omitempty" db:"invalidated_by"`
+	InvalidatedReason *string    `json:"invalidated_reason,omitempty" db:"invalidated_reason"`
 }
 
 // =============================================================================
@@ -174,16 +198,45 @@ type NewLineItem struct {
 
 // RegisterPaymentInput captures a single payment. amount > 0 = cobro,
 // amount < 0 = refund. IsReversal + ReversalOf are required when amount < 0.
+//
+// v1.2 R-07: ForceOverride lets owner override method-match rule when
+// the refund method differs from the original. Requires user.role='owner'.
+// Frontend prepends "[OVERRIDE] method changed from {X} to {Y} by {user}"
+// to the notes.
 type RegisterPaymentInput struct {
-	InvoiceID  uuid.UUID
-	PropertyID uuid.UUID
-	Method     PaymentMethod
-	Amount     float64
-	Reference  string // required for non-cash (BR-INV-005)
-	Notes      string
-	IsReversal bool
-	ReversalOf *uuid.UUID
-	ReceivedBy uuid.UUID
+	InvoiceID     uuid.UUID
+	PropertyID    uuid.UUID
+	Method        PaymentMethod
+	Amount        float64
+	Reference     string // required for non-cash (BR-INV-005)
+	Notes         string
+	IsReversal    bool
+	ReversalOf    *uuid.UUID
+	ForceOverride bool // v1.2 R-07
+	ReceivedBy    uuid.UUID
+}
+
+// RefundAllInput captures the parameters of POST /invoices/:id/refund-all
+// (spec §4.12). Reason is required and goes into refund_batches + each
+// individual refund's notes.
+type RefundAllInput struct {
+	InvoiceID     uuid.UUID
+	Reason        string
+	ForceOverride bool
+	InitiatedBy   uuid.UUID
+}
+
+// RefundBatch is the audit row written by POST /refund-all (v1.2 R-07).
+// One row per batch even if N refunds were generated.
+type RefundBatch struct {
+	ID            uuid.UUID   `json:"id" db:"id"`
+	InvoiceID     uuid.UUID   `json:"invoice_id" db:"invoice_id"`
+	PropertyID    uuid.UUID   `json:"property_id" db:"property_id"`
+	InitiatedBy   uuid.UUID   `json:"initiated_by" db:"initiated_by"`
+	Reason        string      `json:"reason" db:"reason"`
+	PaymentIDs    []uuid.UUID `json:"payment_ids" db:"payment_ids"`
+	TotalRefunded float64     `json:"total_refunded" db:"total_refunded"`
+	CreatedAt     time.Time   `json:"created_at" db:"created_at"`
 }
 
 // VoidInvoiceInput is the audit metadata required by trg_invoice_void_audit.
@@ -209,6 +262,8 @@ type ListInvoicesFilter struct {
 // =============================================================================
 
 // DailySummary is the end-of-day cash-closing payload (spec §4.9).
+// v1.2 R-08 adds InvoicesRefunded and NeedsReviewCount; NetRevenue is
+// computed as collected - refunded.
 type DailySummary struct {
 	Date             time.Time                 `json:"date"`
 	PropertyID       uuid.UUID                 `json:"property_id"`
@@ -218,9 +273,12 @@ type DailySummary struct {
 	InvoicesUnpaid   int                       `json:"invoices_unpaid"`
 	InvoicesVoid     int                       `json:"invoices_void"`
 	InvoicesOverpaid int                       `json:"invoices_overpaid"`
+	InvoicesRefunded int                       `json:"invoices_refunded"`   // v1.2 R-08
+	NeedsReviewCount int                       `json:"needs_review_count"` // v1.2 R-08
 	TotalRevenue     float64                   `json:"total_revenue"`
 	TotalCollected   float64                   `json:"total_collected"`
 	TotalRefunded    float64                   `json:"total_refunded"`
+	NetRevenue       float64                   `json:"net_revenue"` // v1.2 R-08 = collected - refunded
 	TotalPending     float64                   `json:"total_pending"`
 	ByMethod         map[PaymentMethod]float64 `json:"by_method"`
 	TaxCollected     float64                   `json:"tax_collected"`
@@ -236,16 +294,24 @@ type StaffPaymentSummary struct {
 }
 
 // MonthlyTaxReport is the PPN report for the fiscal period (spec §4.11).
+// v1.2 R-08 / R-09 Q3: refunds nets PPN del MES DEL REFUND (cash basis).
+// net_tax = tax_amount * (1 - refunded/total).
+// Excludes invoices with needs_review=true.
 type MonthlyTaxReport struct {
-	PropertyID      uuid.UUID `json:"property_id"`
-	Year            int       `json:"year"`
-	Month           int       `json:"month,omitempty"`
-	TotalSubtotal   float64   `json:"total_subtotal"`
-	TotalTax        float64   `json:"total_tax"`
-	InvoicesCount   int       `json:"invoices_count"`
-	VoidCount       int       `json:"void_count"`
-	RefundsTotal    float64   `json:"refunds_total"`
-	NetTaxCollected float64   `json:"net_tax_collected"`
+	PropertyID       uuid.UUID `json:"property_id"`
+	Year             int       `json:"year"`
+	Month            int       `json:"month,omitempty"`
+	TotalSubtotal    float64   `json:"total_subtotal"`
+	NetSubtotal      float64   `json:"net_subtotal"` // v1.2 R-08
+	TotalTax         float64   `json:"total_tax"`
+	NetTaxCollected  float64   `json:"net_tax_collected"`
+	TotalRefunded    float64   `json:"refunds_total"`
+	RefundsCount     int       `json:"refunds_count"` // v1.2 R-08
+	InvoicesCount    int       `json:"invoices_count"`
+	VoidCount        int       `json:"void_count"`
+	RefundedCount    int       `json:"refunded_count"`     // v1.2 R-08
+	NeedsReviewCount int       `json:"needs_review_count"` // v1.2 R-08
+	Excluded         int       `json:"excluded_needs_review"`
 }
 
 // =============================================================================
