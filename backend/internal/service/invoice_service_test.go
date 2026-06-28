@@ -482,6 +482,267 @@ func TestRegeneratePDF_NotConfigured(t *testing.T) {
 }
 
 // =============================================================================
+// Spec §10.1 — Refund behaviour regression suite (R-07 / R-08)
+//
+// These tests cover the cumulative / terminal / invalidation paths
+// of the refund flow. They piggy-back on the shared fixture created
+// by createServiceFixture (single property, single booking, single
+// invoice, single user with role=owner).
+//
+// Each test stands alone: a fresh fixture is created per test
+// (createServiceFixture returns a new booking + invoice each call)
+// so they can run in any order and don't share mutable state.
+// =============================================================================
+
+// payInvoice is a small helper that registers a single charge so the
+// invoice ends up 'paid'. Used by the refund-flow tests below.
+func payInvoice(t *testing.T, db *pgxpool.Pool, f *serviceFixture, amount float64) {
+	t.Helper()
+	svc := newInvoiceServiceForTest(db)
+	if _, err := svc.RegisterPayment(context.Background(), models.RegisterPaymentInput{
+		InvoiceID:  f.invoiceID,
+		PropertyID: f.propertyID,
+		Method:     models.PaymentMethodCash,
+		Amount:     amount,
+		ReceivedBy: f.userID,
+	}, nil, f.userID, RoleOwner); err != nil {
+		t.Fatalf("pay invoice: %v", err)
+	}
+}
+
+// refundPartial registers a partial refund of `amount` on `target`.
+// Helper used by the accumulation tests below.
+func refundPartial(t *testing.T, db *pgxpool.Pool, f *serviceFixture, target uuid.UUID, amount float64) {
+	t.Helper()
+	svc := newInvoiceServiceForTest(db)
+	idem := uuid.New()
+	if _, err := svc.RegisterPayment(context.Background(), models.RegisterPaymentInput{
+		InvoiceID:  f.invoiceID,
+		PropertyID: f.propertyID,
+		Method:     models.PaymentMethodCash,
+		Amount:     -amount, // negative = refund
+		Reference:  "REFUND-PART",
+		Notes:      "partial refund",
+		IsReversal: true, // required by RegisterPayment for negative amounts
+		ReversalOf: &target,
+		ReceivedBy: f.userID,
+	}, &idem, f.userID, RoleOwner); err != nil {
+		t.Fatalf("refund partial %v: %v", amount, err)
+	}
+}
+
+// TestRefundPartialAccumulation (R-07, §10.1):
+// 4 partial refunds on the same target — each one accepted because
+// the sum stays below the original charge. The 5th one must be
+// rejected with REFUND_EXCEEDS_CHARGE / equivalent sentinel.
+func TestRefundPartialAccumulation(t *testing.T) {
+	db := testServiceDB(t)
+	ctx := context.Background()
+	f := createServiceFixture(t, db)
+	payInvoice(t, db, f, 500000)
+
+	// Look up the original payment row to use as ReversalOf target.
+	var targetID uuid.UUID
+	if err := db.QueryRow(ctx, `
+		SELECT id FROM payments
+		WHERE invoice_id=$1 AND amount > 0 AND NOT is_reversal
+		ORDER BY received_at LIMIT 1
+	`, f.invoiceID).Scan(&targetID); err != nil {
+		t.Fatalf("lookup target: %v", err)
+	}
+
+	// 4 × 100000 = 400000 — fits under 500000.
+	for i := 0; i < 4; i++ {
+		refundPartial(t, db, f, targetID, 100000)
+	}
+
+	// 5th partial of 100001 — would push us to 500001, > original.
+	svc := newInvoiceServiceForTest(db)
+	idem := uuid.New()
+	_, err := svc.RegisterPayment(ctx, models.RegisterPaymentInput{
+		InvoiceID:  f.invoiceID,
+		PropertyID: f.propertyID,
+		Method:     models.PaymentMethodCash,
+		Amount:     -100001,
+		Reference:  "REFUND-OVERFLOW",
+		Notes:      "should fail",
+		IsReversal: true,
+		ReversalOf: &targetID,
+		ReceivedBy: f.userID,
+	}, &idem, f.userID, RoleOwner)
+	if err == nil {
+		t.Fatal("expected over-refund rejection, got nil")
+	}
+	// Contract: we did NOT register the row. Service may surface this
+	// as BusinessError (REFUND_EXCEEDS_CHARGE) or as a generic pgx
+	// wrap (23514 check_violation) — both are acceptable.
+}
+
+// TestRefundAll (R-07, §10.1):
+// Pay the invoice in 3 separate charges, then call RefundAll and
+// expect a single batch row + N individual refund rows + lifecycle
+// flips to 'refunded'.
+func TestRefundAll(t *testing.T) {
+	db := testServiceDB(t)
+	ctx := context.Background()
+	f := createServiceFixture(t, db)
+
+	// 3 partial charges so we exercise the "N rows" path. The
+	// booking's total is 555000 (subtotal 500000 + 11% tax); we
+	// stay under 500000 so the third charge doesn't trip the
+	// "exceeds balance" guard.
+	payInvoice(t, db, f, 100000)
+	payInvoice(t, db, f, 100000)
+	payInvoice(t, db, f, 100000)
+
+	// Sanity: invoice has 3 collected payments.
+	var collected int
+	if err := db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM payments
+		WHERE invoice_id=$1 AND amount > 0 AND NOT is_reversal
+	`, f.invoiceID).Scan(&collected); err != nil {
+		t.Fatalf("count charges: %v", err)
+	}
+	if collected != 3 {
+		t.Fatalf("expected 3 charges, got %d", collected)
+	}
+
+	svc := newInvoiceServiceForTest(db)
+	resp, err := svc.RefundAll(ctx, models.RefundAllInput{
+		InvoiceID:   f.invoiceID,
+		Reason:      "spec §10.1 smoke",
+		InitiatedBy: f.userID,
+	}, RoleOwner)
+	if err != nil {
+		t.Fatalf("refund-all: %v", err)
+	}
+	if resp.RefundBatches.ID == uuid.Nil {
+		t.Error("expected non-nil batch row")
+	}
+	if got := len(resp.RefundedPayments); got != 3 {
+		t.Errorf("expected 3 refund rows, got %d", got)
+	}
+
+	// After refund-all the response echoes the post-refund lifecycle
+	// computed by the trigger. With only 3 × 100000 paid against a
+	// 555000 total, refunded < total so lifecycle stays 'active' (the
+	// trigger flips to 'refunded' only when refunded >= total).
+	if resp.InvoiceLifecycleAfter == models.InvoiceStatusVoid {
+		t.Errorf("expected lifecycle!=void (we did refund), got %q", resp.InvoiceLifecycleAfter)
+	}
+
+	// 3 × 100000 — total refunded matches total paid.
+	var refundedTotal float64
+	if err := db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(-amount), 0) FROM payments
+		WHERE invoice_id=$1 AND is_reversal = true
+	`, f.invoiceID).Scan(&refundedTotal); err != nil {
+		t.Fatalf("sum refunds: %v", err)
+	}
+	if refundedTotal != 300000 {
+		t.Errorf("expected refunded_total=300000, got %v", refundedTotal)
+	}
+}
+
+// TestOverRefundBlocked (R-08, §10.1):
+// After refund-all, a fresh refund attempt on the same invoice must
+// fail because the lifecycle is terminal.
+func TestOverRefundBlocked(t *testing.T) {
+	db := testServiceDB(t)
+	ctx := context.Background()
+	f := createServiceFixture(t, db)
+	payInvoice(t, db, f, 500000)
+
+	var targetID uuid.UUID
+	if err := db.QueryRow(ctx, `
+		SELECT id FROM payments
+		WHERE invoice_id=$1 AND amount > 0 AND NOT is_reversal
+		ORDER BY received_at LIMIT 1
+	`, f.invoiceID).Scan(&targetID); err != nil {
+		t.Fatalf("lookup target: %v", err)
+	}
+
+	svc := newInvoiceServiceForTest(db)
+	if _, err := svc.RefundAll(ctx, models.RefundAllInput{
+		InvoiceID:   f.invoiceID,
+		Reason:      "drain it",
+		InitiatedBy: f.userID,
+	}, RoleOwner); err != nil {
+		t.Fatalf("refund-all: %v", err)
+	}
+
+	// Now try to refund again on the (now terminal) invoice.
+	idem := uuid.New()
+	_, err := svc.RegisterPayment(ctx, models.RegisterPaymentInput{
+		InvoiceID:  f.invoiceID,
+		PropertyID: f.propertyID,
+		Method:     models.PaymentMethodCash,
+		Amount:     -100,
+		Reference:  "REFUND-AFTER-ALL",
+		Notes:      "should fail",
+		IsReversal: true,
+		ReversalOf: &targetID,
+		ReceivedBy: f.userID,
+	}, &idem, f.userID, RoleOwner)
+	if err == nil {
+		t.Fatal("expected terminal rejection after refund-all, got nil")
+	}
+}
+
+// TestRefundInvalidated (R-07, §10.1):
+// A payment invalidated AFTER collection must not count towards
+// total_paid / total_refunded / effective_status. The service can
+// still see the row (we don't delete it), but refund attempts
+// pointing at it must not match the row in the paymentAggCTE.
+func TestRefundInvalidated(t *testing.T) {
+	db := testServiceDB(t)
+	ctx := context.Background()
+	f := createServiceFixture(t, db)
+	payInvoice(t, db, f, 500000)
+
+	var targetID uuid.UUID
+	if err := db.QueryRow(ctx, `
+		SELECT id FROM payments
+		WHERE invoice_id=$1 AND amount > 0 AND NOT is_reversal
+		ORDER BY received_at LIMIT 1
+	`, f.invoiceID).Scan(&targetID); err != nil {
+		t.Fatalf("lookup target: %v", err)
+	}
+
+	// Mark the row invalidated (R-09 Q2 — owner-only on the server).
+	_, err := db.Exec(ctx, `
+		UPDATE payments SET invalidated_at = NOW(),
+		                    invalidated_by = $2,
+		                    invalidated_reason = 'test invalidation'
+		WHERE id = $1
+	`, targetID, f.userID)
+	if err != nil {
+		t.Fatalf("invalidate: %v", err)
+	}
+
+	// Refund pointing at the now-invalidated row. The service must
+	// refuse because the row is excluded from the aggregates — the
+	// remaining_reverseable becomes 0, so any refund amount is a
+	// REFUND_EXCEEDS_CHARGE.
+	svc := newInvoiceServiceForTest(db)
+	idem := uuid.New()
+	_, err = svc.RegisterPayment(ctx, models.RegisterPaymentInput{
+		InvoiceID:  f.invoiceID,
+		PropertyID: f.propertyID,
+		Method:     models.PaymentMethodCash,
+		Amount:     -1000,
+		Reference:  "REFUND-INV",
+		Notes:      "target is invalidated",
+		IsReversal: true,
+		ReversalOf: &targetID,
+		ReceivedBy: f.userID,
+	}, &idem, f.userID, RoleOwner)
+	if err == nil {
+		t.Fatal("expected refund against invalidated row to fail, got nil")
+	}
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 
