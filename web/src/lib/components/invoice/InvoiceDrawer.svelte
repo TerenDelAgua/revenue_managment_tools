@@ -25,9 +25,17 @@
 		propertyId: string;
 		isOpen: boolean;
 		onClose: () => void;
+		/**
+		 * Fires after any successful mutation inside the embedded
+		 * InvoiceWidget (register payment, void, refund, regenerate
+		 * PDF). The parent uses it to refresh the invoice list behind
+		 * the drawer so the row reflects the new state without a
+		 * manual reload.
+		 */
+		onChange?: () => void;
 	}
 
-	let { invoiceId, propertyId, isOpen, onClose }: Props = $props();
+	let { invoiceId, propertyId, isOpen, onClose, onChange }: Props = $props();
 
 	// === Local state ===
 	let invoice = $state<InvoiceDetail | null>(null);
@@ -199,6 +207,7 @@
 				<InvoiceWidget
 					bookingId={invoice.booking_id}
 					{propertyId}
+					{onChange}
 				/>
 			{/if}
 		</div>

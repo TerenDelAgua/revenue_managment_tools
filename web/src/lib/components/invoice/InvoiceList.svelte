@@ -68,6 +68,19 @@
 		void loadInvoices();
 	});
 
+	/**
+	 * Public re-fetch hook. The parent page (/invoices/+page.svelte)
+	 * calls this from its `onChange` handler so that mutations done
+	 * inside the detail drawer (register payment, void, regenerate PDF,
+	 * refunds) flow back into the list — without the user having to
+	 * hit Refresh manually.
+	 *
+	 * Exposed via `bind:this` (Svelte 5 component-instance handle).
+	 */
+	export async function refresh() {
+		await loadInvoices();
+	}
+
 	async function loadInvoices() {
 		loading = true;
 		loadError = null;

@@ -17,6 +17,9 @@
 
 	let selectedInvoiceId = $state<string | null>(null);
 	let drawerOpen = $state(false);
+	// Component-instance handle for the InvoiceList so we can call its
+	// public `refresh()` method when the drawer reports a mutation.
+	let listRef = $state<{ refresh: () => Promise<void> } | null>(null);
 
 	function handleSelect(inv: InvoiceSummary) {
 		selectedInvoiceId = inv.id;
@@ -25,6 +28,16 @@
 
 	function closeDrawer() {
 		drawerOpen = false;
+	}
+
+	/**
+	 * The drawer's embedded InvoiceWidget fires this after a successful
+	 * mutation (register payment, void, refund, regenerate PDF). We
+	 * re-fetch the list so the row behind the drawer reflects the new
+	 * state — without forcing the user to hit Refresh manually.
+	 */
+	async function handleInvoiceChanged() {
+		await listRef?.refresh();
 	}
 </script>
 
@@ -40,12 +53,13 @@
 		</div>
 	</header>
 
-	<InvoiceList {propertyId} onSelect={handleSelect} />
+	<InvoiceList bind:this={listRef} {propertyId} onSelect={handleSelect} />
 
 	<InvoiceDrawer
 		invoiceId={selectedInvoiceId}
 		{propertyId}
 		isOpen={drawerOpen}
 		onClose={closeDrawer}
+		onChange={handleInvoiceChanged}
 	/>
 </div>
