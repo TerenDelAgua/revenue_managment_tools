@@ -381,9 +381,25 @@ export const api = {
 	// plus a summary of the individual refunds it created. Caller
 	// must have role='owner' (or 403). Returns 409 INVOICE_TERMINAL
 	// when the invoice is already refunded/void.
-	refundAll: (invoiceId: string, body: { reason: string }) =>
+	//
+	// IMPORTANT: we MUST send X-User-ID + X-User-Role just like the
+	// other write methods — the dev AuthContext middleware seeds the
+	// request context from these headers (real auth will replace this
+	// with JWT). Without them the handler returns 401 UNAUTHENTICATED
+	// because `middleware.UserIDFromContext` finds no value.
+	refundAll: (
+		invoiceId: string,
+		body: { reason: string },
+		propertyId: string,
+		receivedBy: string
+	) =>
 		request<RefundAllResponse>(`/invoices/${invoiceId}/refund-all`, {
 			method: 'POST',
+			headers: {
+				'X-Property-ID': propertyId,
+				'X-User-ID': receivedBy,
+				'X-User-Role': DEV_OVERRIDE_ROLE
+			},
 			body: JSON.stringify(body)
 		})
 	}

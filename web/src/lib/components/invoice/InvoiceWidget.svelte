@@ -22,6 +22,7 @@
 	import { _ } from 'svelte-i18n';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
+	import { formatMoney } from '$lib/utils/money';
 	import PaymentForm from './PaymentForm.svelte';
 	import ConfirmDestructive from '$lib/components/common/ConfirmDestructive.svelte';
 	import type {
@@ -247,7 +248,7 @@
 		const reason = refundAllReason.trim() || 'refund all';
 		submittingRefundAll = true;
 		try {
-			await api.invoices.refundAll(invoice.id, { reason });
+			await api.invoices.refundAll(invoice.id, { reason }, propertyId, DEV_USER_ID);
 			showRefundAllModal = false;
 			refundAllReason = '';
 			addToast($_('invoiceWidget.toasts.refundAllSuccess'), 'success');
@@ -270,14 +271,6 @@
 
 	function methodLabel(m: PaymentMethod): string {
 		return $_(`invoiceWidget.payments.method.${m}`);
-	}
-
-	function formatMoney(value: number, currency = 'IDR'): string {
-		// Spec §6: IDR grouping by dot. Keeping it dependency-free so the
-		// widget works in tests without Intl polyfills.
-		const fixed = Math.round(value).toString();
-		const grouped = fixed.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-		return `${currency} ${grouped}`;
 	}
 
 	function formatDate(iso: string | null): string {

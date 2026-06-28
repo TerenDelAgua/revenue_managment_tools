@@ -293,12 +293,23 @@ func (r *InvoiceRepository) GetInvoiceByID(ctx context.Context, invoiceID uuid.U
 
 	// Payments (v1.2 R-07: also return invalidated_at / invalidated_by /
 	// invalidated_reason so the UI can render the strikethrough badge).
+	// remaining_reverseable is computed via a correlated subquery against
+	// the same invoice so the partial-refund picker can pre-fill with the
+	// remaining cap (rather than the original amount, which always over-
+	// estimates after a partial refund).
 	payRows, err := r.db.Query(ctx, `
-		SELECT id, invoice_id, property_id, method, amount,
-		       original_currency, exchange_rate, reference, notes,
-		       is_reversal, reversal_of, received_by, received_at, created_at,
-		       invalidated_at, invalidated_by, invalidated_reason
-		FROM payments WHERE invoice_id = $1 ORDER BY received_at
+		SELECT p.id, p.invoice_id, p.property_id, p.method, p.amount,
+		       p.original_currency, p.exchange_rate, p.reference, p.notes,
+		       p.is_reversal, p.reversal_of, p.received_by, p.received_at, p.created_at,
+		       p.invalidated_at, p.invalidated_by, p.invalidated_reason,
+		       CASE WHEN p.is_reversal THEN NULL
+		            ELSE GREATEST(p.amount - COALESCE((
+		                SELECT ABS(SUM(c.amount)) FROM payments c
+		                 WHERE c.reversal_of = p.id
+		                   AND c.invalidated_at IS NULL
+		            ), 0), 0)
+		       END AS remaining_reverseable
+		FROM payments p WHERE p.invoice_id = $1 ORDER BY p.received_at
 	`, invoiceID)
 	if err != nil {
 		return models.InvoiceDetail{}, err
@@ -309,7 +320,8 @@ func (r *InvoiceRepository) GetInvoiceByID(ctx context.Context, invoiceID uuid.U
 		if err := payRows.Scan(&p.ID, &p.InvoiceID, &p.PropertyID, &p.Method, &p.Amount,
 			&p.OriginalCurrency, &p.ExchangeRate, &p.Reference, &p.Notes,
 			&p.IsReversal, &p.ReversalOf, &p.ReceivedBy, &p.ReceivedAt, &p.CreatedAt,
-			&p.InvalidatedAt, &p.InvalidatedBy, &p.InvalidatedReason); err != nil {
+			&p.InvalidatedAt, &p.InvalidatedBy, &p.InvalidatedReason,
+			&p.RemainingReverseable); err != nil {
 			return models.InvoiceDetail{}, err
 		}
 		d.Payments = append(d.Payments, p)

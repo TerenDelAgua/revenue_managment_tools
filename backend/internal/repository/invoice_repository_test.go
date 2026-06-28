@@ -419,6 +419,37 @@ func TestRegisterPayment_RefundFlow(t *testing.T) {
 	if got.EffectiveStatus != models.PaymentStatusPaid {
 		t.Errorf("paid - 50k refund still = paid, got %s", got.EffectiveStatus)
 	}
+
+	// Spec §10.1 / R-07: remaining_reverseable on the original
+	// payment must now be 555000 - 50000 = 505000, NOT 555000.
+	// The UI uses this field to pre-fill the partial-refund form
+	// (otherwise the user is asked to refund the full original
+	// amount even after a partial refund, which 422s and surprises
+	// them).
+	if len(got.Payments) != 2 {
+		t.Fatalf("expected 2 payments, got %d", len(got.Payments))
+	}
+	originalRow := got.Payments[0]
+	if originalRow.ID != original.ID {
+		t.Fatalf("first row should be the original payment")
+	}
+	if originalRow.RemainingReverseable == nil {
+		t.Fatal("original payment must carry remaining_reverseable (got nil)")
+	}
+	if *originalRow.RemainingReverseable != 505000 {
+		t.Errorf("remaining_reverseable: want 505000, got %v", *originalRow.RemainingReverseable)
+	}
+
+	// Refund rows themselves are NEVER refundable — remaining must
+	// be nil so the picker excludes them (refund-of-refund is also
+	// rejected by the repo anyway).
+	refundRow := got.Payments[1]
+	if refundRow.ID != refund.ID {
+		t.Fatalf("second row should be the refund")
+	}
+	if refundRow.RemainingReverseable != nil {
+		t.Errorf("refund row remaining_reverseable: want nil, got %v", *refundRow.RemainingReverseable)
+	}
 }
 
 // TestVoidInvoice_RequiresAudit asserts the trigger behavior + service-level

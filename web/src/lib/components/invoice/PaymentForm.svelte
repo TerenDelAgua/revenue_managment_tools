@@ -37,6 +37,7 @@
 	import { untrack } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { api } from '$lib/api/client';
+	import { formatMoney } from '$lib/utils/money';
 	import type { Payment, PaymentMethod } from '$lib/types';
 	import ConfirmDestructive from '$lib/components/common/ConfirmDestructive.svelte';
 
@@ -212,11 +213,7 @@
 	const isPickerOpen = $derived(isRefund && !selectedTarget && !lastRefundResult);
 
 	// === Helpers ===
-	function formatMoney(value: number): string {
-		const fixed = Math.round(value).toString();
-		const grouped = fixed.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-		return `IDR ${grouped}`;
-	}
+	// (formatMoney is imported above from $lib/utils/money)
 
 	function formatDate(iso: string | null | undefined): string {
 		if (!iso) return '—';

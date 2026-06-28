@@ -20,6 +20,7 @@
 	import { _ } from 'svelte-i18n';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
+	import { formatMoney } from '$lib/utils/money';
 	import { toCSV, downloadCSV } from '$lib/util/csv';
 	import type {
 		InvoiceSummary,
@@ -192,12 +193,6 @@
 		} finally {
 			exporting = false;
 		}
-	}
-
-	function formatMoney(value: number, currency = 'IDR'): string {
-		const fixed = Math.round(value).toString();
-		const grouped = fixed.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-		return `${currency} ${grouped}`;
 	}
 
 	function formatDate(iso: string): string {

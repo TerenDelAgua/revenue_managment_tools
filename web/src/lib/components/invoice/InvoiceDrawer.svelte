@@ -17,6 +17,7 @@
 	import { _ } from 'svelte-i18n';
 	import { api } from '$lib/api/client';
 	import { addToast } from '$lib/store/toastStore';
+	import { formatMoney } from '$lib/utils/money';
 	import InvoiceWidget from './InvoiceWidget.svelte';
 	import type { InvoiceDetail } from '$lib/types';
 
@@ -74,12 +75,6 @@
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
 	});
-
-	function formatMoney(value: number, currency = 'IDR'): string {
-		const fixed = Math.round(value).toString();
-		const grouped = fixed.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-		return `${currency} ${grouped}`;
-	}
 
 	function formatDateTime(iso: string | null | undefined): string {
 		if (!iso) return '—';

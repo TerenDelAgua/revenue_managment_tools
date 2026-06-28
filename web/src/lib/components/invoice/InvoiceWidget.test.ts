@@ -775,6 +775,16 @@ describe('InvoiceWidget', () => {
 		const body = JSON.parse((postCall?.[1]?.body ?? '{}') as string);
 		expect(body.reason).toBeTruthy(); // any non-empty reason
 
+		// 4b. Verify the dev auth headers are present — without them
+		//     the backend's AuthContext middleware can't seed the
+		//     context and the handler returns 401 UNAUTHENTICATED.
+		//     This was the IT-22 bug after the block-10 frontend
+		//     commit (forgot to add headers to the new method).
+		const postHeaders = (postCall?.[1]?.headers ?? {}) as Record<string, string>;
+		expect(postHeaders['X-User-ID']).toBeTruthy();
+		expect(postHeaders['X-User-Role']).toBe('owner');
+		expect(postHeaders['X-Property-ID']).toBe('prop-1');
+
 		// 5. A second GET /invoices/by-booking fires after success
 		//    (refetch by the widget). Wait for it — loadInvoice() is
 		//    async and Svelte batches the re-fetch into the next tick.

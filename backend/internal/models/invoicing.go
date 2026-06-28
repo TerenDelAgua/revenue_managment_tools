@@ -133,6 +133,14 @@ type Payment struct {
 	InvalidatedAt     *time.Time `json:"invalidated_at,omitempty" db:"invalidated_at"`
 	InvalidatedBy     *uuid.UUID `json:"invalidated_by,omitempty" db:"invalidated_by"`
 	InvalidatedReason *string    `json:"invalidated_reason,omitempty" db:"invalidated_reason"`
+	// RemainingReverseable (v1.2 R-07): how much of this payment is
+	// still refundable. Computed server-side as
+	//   amount - |sum(refund rows where reversal_of = this.id,
+	//                       invalidated_at IS NULL)|
+	// Only meaningful for non-reversal rows (reversals themselves
+	// are never refunded). UI uses it to pre-fill partial-refund
+	// forms and to render the cap hint.
+	RemainingReverseable *float64 `json:"remaining_reverseable,omitempty" db:"remaining_reverseable"`
 }
 
 // =============================================================================
