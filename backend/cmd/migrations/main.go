@@ -49,9 +49,13 @@ func main() {
 	}
 	log.Println("Connected to database successfully.")
 
-	// Create schema_migrations table if not exists
+	// Create the runner's catalog table if it does not exist.
+	// Schema evolution of this table (e.g. adding the `filename` column) is
+	// handled by migration files like 010, not by inline ALTER statements,
+	// to keep the runner focused on applying migrations.
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version BIGINT PRIMARY KEY,
+		filename TEXT,
 		applied_at TIMESTAMPTZ DEFAULT NOW()
 	);`)
 	if err != nil {
@@ -113,6 +117,16 @@ func main() {
 			continue
 		}
 
+		// Defensive: if a migration file with the same version was already
+		// attempted and its filename does not match, skip and warn loudly
+		// to prevent silent collisions (e.g. two files prefixed with 006_).
+		var recordedFilename string
+		err = db.QueryRow("SELECT filename FROM schema_migrations WHERE version = $1", m.Version).Scan(&recordedFilename)
+		if err == nil && recordedFilename != "" && recordedFilename != m.Filename {
+			log.Printf("WARNING: version %03d already recorded with filename %q, current file is %q. Skipping to avoid double-apply.", m.Version, recordedFilename, m.Filename)
+			continue
+		}
+
 		log.Printf("Applying migration %03d (%s)...", m.Version, m.Filename)
 		content, err := os.ReadFile(m.Path)
 		if err != nil {
@@ -129,7 +143,7 @@ func main() {
 			log.Fatalf("Failed to execute migration %s: %v", m.Filename, err)
 		}
 
-		if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", m.Version); err != nil {
+		if _, err := tx.Exec("INSERT INTO schema_migrations (version, filename) VALUES ($1, $2) ON CONFLICT (version) DO UPDATE SET filename = EXCLUDED.filename", m.Version, m.Filename); err != nil {
 			tx.Rollback()
 			log.Fatalf("Failed to record migration version %d: %v", m.Version, err)
 		}
