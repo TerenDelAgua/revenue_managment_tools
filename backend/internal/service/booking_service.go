@@ -308,17 +308,6 @@ func (s *BookingService) CancelBooking(ctx context.Context, bookingID uuid.UUID,
 	return nil
 }
 
-func (s *BookingService) CancelBooking(ctx context.Context, bookingID uuid.UUID, reason string) error {
-	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
-	if err != nil {
-		return err
-	}
-	if booking.Status != "confirmed" && booking.Status != "checked_in" {
-		return &BusinessError{Code: "INVALID_STATUS", Message: "Only confirmed or checked-in bookings can be cancelled"}
-	}
-	return s.bookingRepo.Cancel(ctx, bookingID, reason)
-}
-
 func (s *BookingService) GetPendingBookings(ctx context.Context, propertyID uuid.UUID) ([]*repository.PendingBookingDTO, error) {
 	return s.bookingRepo.GetPendingByProperty(ctx, propertyID)
 }
