@@ -30,6 +30,13 @@
 				'bg-[repeating-linear-gradient(45deg,transparent,transparent_2px,rgba(255,255,255,0.1)_2px,rgba(255,255,255,0.1)_4px)]'
 		},
 		{
+			color: 'bg-[#0284C7] text-white',
+			label: 'Cleaning',
+			icon: '🧹',
+			desc: 'Limpieza + Icono Escoba',
+			pattern: ''
+		},
+		{
 			color: 'bg-[#A8A29E] text-[#1C1917] opacity-60',
 			label: 'Inactive',
 			icon: '',

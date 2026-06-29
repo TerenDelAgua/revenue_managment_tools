@@ -52,4 +52,18 @@ describe('RoomToken Component', () => {
 		// Striped linear gradient pattern class check
 		expect(token).toHaveClass('bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(255,255,255,0.1)_4px,rgba(255,255,255,0.1)_8px)]');
 	});
+
+	it('FT-04: renders cleaning room token with sky-600 bg and broom icon', () => {
+		const room = mockRoom('cleaning');
+		const { container } = render(RoomToken, { props: { room, mode: 'ops', onSelect: () => {} } });
+
+		const token = container.querySelector('.room-token');
+		expect(token).toBeInTheDocument();
+		expect(token).toHaveClass('bg-[#0284C7]');
+		expect(token).toHaveTextContent('🧹');
+		// Cleaning rooms are NOT available: must not show green or any "ready" affordance
+		expect(token).not.toHaveClass('bg-[#16A34A]');
+		// No striped pattern (cleaning is a solid operational state, not a block)
+		expect(token).not.toHaveClass('bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(255,255,255,0.1)_4px,rgba(255,255,255,0.1)_8px)]');
+	});
 });

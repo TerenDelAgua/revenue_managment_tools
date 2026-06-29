@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEREN Hotels · Architecture & Workflow</title>
+    <style>
+        :root {
+            --bg-base: #F5F4F1;
+            --surface: #FCFBFA;
+            --primary: #FF8C42;
+            --primary-hover: #E06B20;
+            --primary-subtle: #FFF7ED;
+            --text-main: #1C1917;
+            --text-muted: #57534E;
+            --border: #E7E5E4;
+            --success: #16A34A;
+            --error: #DC2626;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 32px;
+            margin-bottom: 48px;
+        }
+
+        .brand-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--primary);
+            background: var(--primary-subtle);
+            padding: 4px 12px;
+            border-radius: 999px;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.125rem;
+            font-weight: 400;
+        }
+
+        .tagline {
+            margin-top: 16px;
+            font-style: italic;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        nav {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 40px;
+            position: sticky;
+            top: 20px;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        nav h3 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        nav a:hover {
+            background: var(--primary-subtle);
+            color: var(--primary-hover);
+        }
+
+        section {
+            margin-bottom: 56px;
+            scroll-margin-top: 20px;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+            letter-spacing: -0.01em;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 32px 0 16px 0;
+            color: var(--text-main);
+        }
+
+        h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 24px 0 12px 0;
+            color: var(--text-muted);
+        }
+
+        p {
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            font-size: 1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin: 24px 0;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            border-color: var(--primary);
+        }
+
+        .card h4 {
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 1.1rem;
+        }
+
+        .card ul {
+            margin: 12px 0;
+            padding-left: 20px;
+        }
+
+        .card li {
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .diagram {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            margin: 24px 0;
+            overflow-x: auto;
+        }
+
+        .diagram pre {
+            font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+            font-size: 0.875rem;
+            line-height: 1.8;
+            color: var(--text-main);
+            white-space: pre;
+        }
+
+        .highlight {
+            background: var(--primary-subtle);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: var(--primary-hover);
+        }
+
+        code {
+            font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+            background: var(--surface);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.875em;
+            color: var(--primary-hover);
+            border: 1px solid var(--border);
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            border: none;
+            font-size: 0.85em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+            background: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            text-align: left;
+        }
+
+        th {
+            background: var(--bg-base);
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        td {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        tr:hover {
+            background: var(--primary-subtle);
+        }
+
+        .workflow-steps {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+
+        .workflow-steps li {
+            counter-increment: step;
+            padding-left: 60px;
+            position: relative;
+            margin-bottom: 32px;
+            padding-bottom: 32px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .workflow-steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.125rem;
+        }
+
+        .workflow-steps h4 {
+            margin-top: 0;
+            color: var(--text-main);
+            font-size: 1.1rem;
+        }
+
+        .warning {
+            background: #FEF2F2;
+            border-left: 4px solid var(--error);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 24px 0;
+        }
+
+        .warning strong {
+            color: var(--error);
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .warning p {
+            margin: 0;
+            color: #991B1B;
+        }
+
+        .success {
+            background: #F0FDF4;
+            border-left: 4px solid var(--success);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 24px 0;
+        }
+
+        .success strong {
+            color: var(--success);
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        footer {
+            border-top: 2px solid var(--border);
+            padding-top: 32px;
+            margin-top: 64px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            h2 { font-size: 1.5rem; }
+            .grid { grid-template-columns: 1fr; }
+            nav ul { flex-direction: column; gap: 8px; }
+            .diagram { padding: 16px; font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <span class="brand-tag">TEREN Hotels</span>
+        <h1>Architecture & Workflow</h1>
+        <div class="subtitle">Technical documentation for developers and stakeholders</div>
+        <div class="tagline">"Flow systems. Soulful experiences."</div>
+    </header>
+
+    <nav>
+        <h3>Quick Navigation</h3>
+        <ul>
+            <li><a href="#philosophy">Philosophy</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#decisions">Decisions</a></li>
+            <li><a href="#workflow">Workflow</a></li>
+            <li><a href="#deployment">Deployment</a></li>
+        </ul>
+    </nav>
+
+    <section id="philosophy">
+        <h2>1. Core Philosophy</h2>
+        <p>TEREN Hotels is built on principles that prioritize <span class="highlight">user experience</span>, <span class="highlight">technical integrity</span>, and <span class="highlight">outdoor-first design</span>.</p>
+        
+        <div class="grid">
+            <div class="card">
+                <h4>Guest-First</h4>
+                <p>Every technical decision serves the end user—hotel staff who need fast, reliable tools under real-world conditions (sunlight, motion, time pressure).</p>
+            </div>
+            <div class="card">
+                <h4>Elegance Over Complexity</h4>
+                <p>Clean architecture, minimal boilerplate, no framework magic. We choose clarity and maintainability over clever abstractions.</p>
+            </div>
+            <div class="card">
+                <h4>Outdoor-First Design</h4>
+                <p>High contrast, legible typography, warm stone backgrounds that reduce glare. Built for receptionists using tablets in bright hotel lobbies.</p>
+            </div>
+            <div class="card">
+                <h4>Respect for Time</h4>
+                <p>Optimized for speed: < 1.5s page loads on 4G, optimistic UI updates, zero unnecessary loading screens.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="architecture">
+        <h2>2. System Architecture</h2>
+        
+        <h3>2.1 Technology Stack</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Layer</th>
+                    <th>Technology</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Backend</strong></td>
+                    <td>Go 1.21 + Chi Router</td>
+                    <td>Minimalist, fast, no magic, elegant concurrency. Perfect for high-performance APIs.</td>
+                </tr>
+                <tr>
+                    <td><strong>Frontend</strong></td>
+                    <td>SvelteKit + Tailwind v4</td>
+                    <td>Zero boilerplate, reactive by default, compiler-optimized. Matches our "no framework magic" principle.</td>
+                </tr>
+                <tr>
+                    <td><strong>Database</strong></td>
+                    <td>PostgreSQL 15+</td>
+                    <td>Robust, standards-compliant, excellent for complex queries (availability overlap, revenue calculations).</td>
+                </tr>
+                <tr>
+                    <td><strong>Deployment</strong></td>
+                    <td>Railway.app</td>
+                    <td>Zero-config deployments, managed PostgreSQL, Singapore region (low latency to Indonesia).</td>
+                </tr>
+                <tr>
+                    <td><strong>Local Dev</strong></td>
+                    <td>Docker Compose</td>
+                    <td>Reproducible environments, hot reload with Air, isolated services.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2.2 Architecture Diagram</h3>
+        <div class="diagram">
+            <pre>┌─────────────────────────────────────────────────────────────┐
+│                    TEREN Hotels Stack                        │
+├─────────────────────────────────────────────────────────────┤
+│  Frontend (SvelteKit + Tailwind v4)    Backend (Go + chi)   │
+│  - SSR routes + static assets          - REST API /api/v1   │
+│  - PWA-ready / offline cache           - Clean Arch Light   │
+│  - Svelte 5 Runes                      - pgx (raw SQL)      │
+│                                        - JWT Auth + RLS     │
+├─────────────────────────────────────────────────────────────┤
+│  PostgreSQL 15+          Redis (optional, Phase 2)          │
+│  - golang-migrate        - Session cache                    │
+│  - Row-level security    - Rate limiting                    │
+│  - Daily backups (Railway auto)                             │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    Development Flow                          │
+├─────────────────────────────────────────────────────────────┤
+│  Local (Docker)              Production (Railway)           │
+│  • docker-compose up         • Auto-deploy on push          │
+│  • Hot reload (Air)          • Managed PostgreSQL           │
+│  • .env.development.local    • Variables via UI             │
+│  • postgres:5432             • DATABASE_URL auto-injected   │
+└─────────────────────────────────────────────────────────────┘</pre>
+        </div>
+
+        <h3>2.3 Project Structure</h3>
+        <div class="diagram">
+            <pre>teren-hotels/
+├── backend/
+│   ├── cmd/
+│   │   ├── api/              # Main HTTP server entry point
+│   │   └── migrations/       # Database migration runner tool
+│   ├── internal/
+│   │   ├── api/              # HTTP handlers (Chi routers)
+│   │   ├── repository/       # PostgreSQL queries (pgx)
+│   │   └── service/          # Business logic layer
+│   ├── migrations/           # SQL migration files
+│   ├── go.mod
+│   ├── go.sum
+│   └── Dockerfile            # Multi-stage production build
+├── web/                      # SvelteKit frontend
+│   ├── src/
+│   │   ├── lib/
+│   │   │   ├── components/   # Svelte components
+│   │   │   └── types.ts      # TypeScript interfaces
+│   │   └── routes/           # SvelteKit pages
+│   ├── package.json
+│   └── Dockerfile
+├── docker-compose.yml        # Local development stack
+└── .env.example              # Environment template</pre>
+        </div>
+    </section>
+
+    <section id="decisions">
+        <h2>3. Key Technical Decisions</h2>
+
+        <div class="grid">
+            <div class="card">
+                <h4>Clean Architecture Light</h4>
+                <p>Separation of concerns without over-engineering:</p>
+                <ul>
+                    <li><strong>Handlers</strong> → HTTP logic only</li>
+                    <li><strong>Services</strong> → Business rules</li>
+                    <li><strong>Repositories</strong> → Database queries</li>
+                    <li><strong>Models</strong> → Domain entities</li>
+                </ul>
+                <p><strong>Why:</strong> Testable, maintainable, developers can understand years later.</p>
+            </div>
+
+            <div class="card">
+                <h4>Raw SQL over ORM</h4>
+                <p>We use <code>pgx</code> with raw SQL queries instead of GORM or similar:</p>
+                <ul>
+                    <li>Full control over query performance</li>
+                    <li>No "magic" hidden queries</li>
+                    <li>Complex availability queries (overlap detection)</li>
+                    <li>Explicit is better than implicit</li>
+                </ul>
+                <p><strong>Why:</strong> Technical integrity, predictable performance.</p>
+            </div>
+
+            <div class="card">
+                <h4>Grid-Based Room Layout</h4>
+                <p>12 columns × 20 rows grid system (not pixels):</p>
+                <ul>
+                    <li><code>pos_x</code>: 0-11</li>
+                    <li><code>pos_y</code>: 0-19</li>
+                    <li>Constraint: <code>UNIQUE(floor_id, pos_x, pos_y)</code></li>
+                </ul>
+                <p><strong>Why:</strong> Spec FMB-001 §4.1, enables drag-and-drop layout builder, prevents overlapping rooms.</p>
+            </div>
+
+            <div class="card">
+                <h4>Multi-Tenant via property_id</h4>
+                <p>Every table has <code>property_id UUID</code>:</p>
+                <ul>
+                    <li>Room numbers unique per property (not per floor)</li>
+                    <li>Future-ready for Row-Level Security (RLS)</li>
+                    <li>Isolation between hotels</li>
+                </ul>
+                <p><strong>Why:</strong> BR-08 compliance, SaaS scalability.</p>
+            </div>
+
+            <div class="card">
+                <h4>Optimistic UI Updates</h4>
+                <p>Frontend updates immediately, then syncs with backend:</p>
+                <ul>
+                    <li>Room token changes color instantly</li>
+                    <li>If API fails → rollback + toast notification</li>
+                    <li>User never waits for spinner</li>
+                </ul>
+                <p><strong>Why:</strong> Respect for Time, feels instantaneous.</p>
+            </div>
+
+            <div class="card">
+                <h4>No Modal Forms</h4>
+                <p>Progressive Disclosure via inline expansion:</p>
+                <ul>
+                    <li>Block room form expands in drawer</li>
+                    <li>Assign booking shows inline list</li>
+                    <li>Never blocks the user's flow</li>
+                </ul>
+                <p><strong>Why:</strong> Context preservation, aligned with TEREN Design System §3.5.</p>
+            </div>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Critical Constraints</strong>
+            <p><strong>Never commit .env files</strong> — Use <code>.env.example</code> as template. Production secrets live in Railway Variables UI only.<br>
+            <strong>Always use transactions</strong> for batch operations (AC-13: all-or-nothing layout saves).<br>
+            <strong>Validate grid bounds</strong> (BR-06: pos_x 0-11, pos_y 0-19) before any database operation.</p>
+        </div>
+    </section>
+
+    <section id="workflow">
+        <h2>4. Development Workflow</h2>
+        
+        <h3>4.1 Environment Separation</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Development (Local)</th>
+                    <th>Production (Railway)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Database</strong></td>
+                    <td><code>postgres://teren_dev:teren_dev@localhost:5432/teren_hotels</code></td>
+                    <td>Railway auto-injected <code>DATABASE_URL</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Environment File</strong></td>
+                    <td><code>.env.development.local</code> (not committed)</td>
+                    <td>Railway Variables UI</td>
+                </tr>
+                <tr>
+                    <td><strong>Hot Reload</strong></td>
+                    <td>Air (Go) + Vite (Svelte)</td>
+                    <td>N/A (production build)</td>
+                </tr>
+                <tr>
+                    <td><strong>Log Level</strong></td>
+                    <td><code>debug</code></td>
+                    <td><code>info</code> or <code>warn</code></td>
+                </tr>
+                <tr>
+                    <td><strong>CORS</strong></td>
+                    <td><code>localhost:5173, localhost:3000</code></td>
+                    <td><code>hotels.teren.dev</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.2 Daily Development Flow</h3>
+        <ol class="workflow-steps">
+            <li>
+                <h4>Start Local Stack</h4>
+                <p><code>docker-compose up -d</code> → Starts PostgreSQL, backend (with hot reload), and frontend.</p>
+                <p>Verify: <code>docker-compose ps</code> shows all services as "Up".</p>
+            </li>
+            <li>
+                <h4>Run Migrations</h4>
+                <p><code>go run cmd/migrations/main.go</code> o <code>./run-migrations</code></p>
+                <p>Creates tables, applies schema corrections, seeds test data.</p>
+            </li>
+            <li>
+                <h4>Develop & Test</h4>
+                <p>Edit code → Auto-reload in browser. Backend logs appear in <code>docker-compose logs -f backend</code>.</p>
+                <p>Run tests: <code>docker-compose exec backend go test ./... -v</code></p>
+            </li>
+            <li>
+                <h4>Commit & Push</h4>
+                <p><code>git add . && git commit -m "feat: description" && git push origin feature/branch</code></p>
+                <p>Create Pull Request on GitHub for review.</p>
+            </li>
+            <li>
+                <h4>Merge to Main</h4>
+                <p>After PR approval, merge to <code>main</code> branch.</p>
+                <p>Railway detects push → auto-deploys to production.</p>
+            </li>
+        </ol>
+
+        <div class="success">
+            <strong>✅ Best Practices</strong>
+            <p><strong>Always test migrations locally</strong> before pushing.<br>
+            <strong>Write reversible migrations</strong> (both <code>.up.sql</code> and <code>.down.sql</code>).<br>
+            <strong>Use feature branches</strong> (never commit directly to main).<br>
+            <strong>Run <code>go vet</code> and <code>go fmt</code></strong> before committing.</p>
+        </div>
+    </section>
+
+    <section id="deployment">
+        <h2>5. Deployment to Railway</h2>
+
+        <h3>5.1 Pre-Deploy Checklist</h3>
+        <ul>
+            <li>✅ All tests passing locally</li>
+            <li>✅ Migrations tested and reversible</li>
+            <li>✅ <code>.env</code> files NOT committed</li>
+            <li>✅ <code>Dockerfile</code> builds successfully: <code>docker build -t teren-backend .</code></li>
+            <li>✅ CORS origins updated for production domain</li>
+        </ul>
+
+        <h3>5.2 Railway Setup (One-Time)</h3>
+        <ol>
+            <li><strong>Create Project:</strong> Railway.app → New Project → Deploy from GitHub repo</li>
+            <li><strong>Add PostgreSQL:</strong> New → Database → PostgreSQL (auto-creates <code>DATABASE_URL</code>)</li>
+            <li><strong>Configure Variables:</strong>
+                <div class="diagram">
+                    <pre>APP_ENV=production
+SERVER_PORT=8080
+JWT_SECRET=$(openssl rand -hex 32)
+JWT_EXPIRY=24h
+CORS_ALLOWED_ORIGINS=https://hotels.teren.dev
+LOG_LEVEL=info</pre>
+                </div>
+            </li>
+            <li><strong>Set Root Directory:</strong> Service Settings → Root Directory = <code>backend</code></li>
+        </ol>
+
+        <h3>5.3 Deploy Commands</h3>
+        <div class="diagram">
+            <pre># Option 1: Auto-deploy (recommended)
+git push origin main
+# Railway detects push → builds → deploys automatically
+
+# Option 2: Manual deploy via CLI
+railway link
+railway up --detach
+
+# Option 3: Force redeploy
+railway restart</pre>
+        </div>
+
+        <h3>5.4 Post-Deploy Verification</h3>
+        <ol>
+            <li><strong>Health Check:</strong> <code>curl https://your-app.up.railway.app/health</code> → <code>{"status":"ok"}</code></li>
+            <li><strong>Run Migrations:</strong> Railway shell → <code>./run-migrations</code></li>
+            <li><strong>Check Logs:</strong> <code>railway logs</code> or Railway Dashboard → Deployments → View Logs</li>
+            <li><strong>Test Frontend:</strong> Open production URL, verify no CORS errors in DevTools</li>
+        </ol>
+
+        <div class="warning">
+            <strong>🚨 Common Issues</strong>
+            <p><strong>"go.sum not found"</strong> → Ensure <code>Dockerfile</code> is in <code>backend/</code> folder and Railway Root Directory is set correctly.<br>
+            <strong>"DATABASE_URL not found"</strong> → Railway auto-injects this when PostgreSQL service is linked. Check Variables tab.<br>
+            <strong>CORS errors</strong> → Update <code>CORS_ALLOWED_ORIGINS</code> with exact frontend URL (no trailing slash).</p>
+        </div>
+    </section>
+
+    <footer>
+        <p><strong>TEREN Hotels · Architecture Documentation v1.0</strong></p>
+        <p>Last Updated: May 2026</p>
+        <p>Built with intention. Designed for flow. Owned by TEREN.</p>
+    </footer>
+</div>
+
+<script>
+    // Smooth scroll for navigation links
+    document.querySelectorAll('nav a').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    // Highlight current section in nav
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('nav a');
+
+    window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionHeight = section.clientHeight;
+            if (scrollY >= (sectionTop - 100)) {
+                current = section.getAttribute('id');
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.style.background = '';
+            link.style.color = '';
+            if (link.getAttribute('href').slice(1) === current) {
+                link.style.background = 'var(--primary-subtle)';
+                link.style.color = 'var(--primary-hover)';
+            }
+        });
+    });
+</script>
+
+</body>
+</html>

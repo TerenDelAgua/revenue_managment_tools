@@ -9,6 +9,9 @@
 
 	let { label, value, onChange, placeholder = 'Select date', error = false }: Props = $props();
 	let inputEl: HTMLInputElement;
+	const inputId = $derived(
+		`date-input-${(label || placeholder).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+	);
 
 	function handleInput(e: Event) {
 		const target = e.target as HTMLInputElement;
@@ -18,7 +21,7 @@
 
 <div class="w-full space-y-1.5">
 	{#if label}
-		<label class="ml-1 text-xs font-semibold tracking-wide text-[#57534E] uppercase">
+		<label for={inputId} class="ml-1 text-xs font-semibold tracking-wide text-[#57534E] uppercase">
 			{label}
 		</label>
 	{/if}
@@ -60,6 +63,7 @@
 		<!-- Input Real (Transparente) -->
 		<input
 			bind:this={inputEl}
+			id={inputId}
 			type="date"
 			bind:value
 			oninput={handleInput}

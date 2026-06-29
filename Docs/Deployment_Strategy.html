@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEREN Hotels · Deployment Strategy Viewer</title>
+    <style>
+        :root {
+            --bg-base: #F5F4F1;
+            --surface: #FCFBFA;
+            --primary: #FF8C42;
+            --primary-hover: #E06B20;
+            --primary-subtle: #FFF7ED;
+            --text-main: #1C1917;
+            --text-muted: #57534E;
+            --border: #E7E5E4;
+            --success: #16A34A;
+            --error: #DC2626;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 24px;
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .brand-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--primary);
+            background: var(--primary-subtle);
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            margin-top: 6px;
+        }
+
+        .meta-row {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+
+        .meta-row span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-download {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            box-shadow: 0 2px 4px rgba(255, 140, 66, 0.15);
+        }
+
+        .btn-download:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 140, 66, 0.25);
+        }
+
+        .btn-download:active { transform: scale(0.98); }
+
+        article {
+            background-color: var(--surface);
+            padding: 48px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        article h2 {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            margin-top: 48px;
+            font-size: 1.4rem;
+            letter-spacing: -0.01em;
+        }
+
+        article h2:first-of-type { margin-top: 0; }
+
+        article h3 {
+            margin-top: 32px;
+            font-size: 1.1rem;
+            color: var(--text-main);
+        }
+
+        article h4 {
+            margin-top: 24px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        article p, article li {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        article code {
+            background-color: var(--bg-base);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+            font-size: 0.88em;
+            color: var(--primary-hover);
+        }
+
+        article pre {
+            background-color: #1C1917;
+            color: #FCFBFA;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+            font-size: 0.85em;
+            line-height: 1.5;
+            border-left: 3px solid var(--primary);
+        }
+
+        article pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+
+        article ul, article ol { padding-left: 22px; }
+
+        article li { margin-bottom: 6px; }
+
+        article strong { color: var(--text-main); }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 32px 0;
+        }
+
+        article table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 0.92em;
+        }
+
+        article th, article td {
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            text-align: left;
+        }
+
+        article th {
+            background: var(--bg-base);
+            color: var(--text-main);
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .tag-go { background: #DBEAFE; color: #1E40AF; }
+        .tag-svelte { background: #FEF3C7; color: #92400E; }
+        .tag-db { background: #D1FAE5; color: #065F46; }
+        .tag-devops { background: #FEE2E2; color: #991B1B; }
+
+        .footer-note {
+            margin-top: 40px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+        }
+
+        .footer-note strong { color: var(--primary); }
+
+        @media (max-width: 640px) {
+            article { padding: 24px 20px; }
+            h1 { font-size: 1.5rem; }
+            .container { padding: 20px 16px; }
+            article pre { padding: 14px; font-size: 0.8em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <span class="brand-tag">TEREN Hotels</span>
+            <h1>Deployment Strategy</h1>
+            <div class="subtitle">Go + SvelteKit + PostgreSQL · Railway.app + Docker Compose</div>
+            <div class="meta-row">
+                <span>📦 v1.0.0</span>
+                <span>📅 May 28, 2026</span>
+                <span>🎯 Production-ready</span>
+                <span>💰 ~$5-10/mo starter</span>
+            </div>
+        </div>
+        <button onclick="downloadSpec()" class="btn-download">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download .md
+        </button>
+    </header>
+
+    <article id="content"></article>
+
+    <div class="footer-note">
+        <strong>Flow systems. Soulful deployments.</strong><br>
+        © TEREN 2026 · Deployment Strategy v1.0
+    </div>
+</div>
+
+<script>
+const specContent = `# TEREN HOTELS · Deployment Strategy
+**Version:** 1.0.0 | **Last Updated:** May 28, 2026
+**Stack:** Go 1.21 + SvelteKit + PostgreSQL 15
+**Target:** Railway.app (Production) + Docker Compose (Local)
+**Philosophy:** Flow systems. Soulful deployments. Zero-friction shipping.
+
+---
+
+## 1. Architecture Overview
+
+### 1.1 System Components
+\`\`\`
+┌─────────────────────────────────────────────────────────────┐
+│                    TEREN Hotels Stack                        │
+├─────────────────────────────────────────────────────────────┤
+│  Frontend (SvelteKit + Tailwind v4)    Backend (Go + chi)   │
+│  - SSR routes + static assets          - REST API /api/v1   │
+│  - PWA-ready / offline cache           - Clean Arch Light   │
+│  - Svelte 5 Runes                      - pgx (raw SQL)      │
+│                                        - JWT Auth + RLS     │
+├─────────────────────────────────────────────────────────────┤
+│  PostgreSQL 15+          Redis (optional, Phase 2)          │
+│  - golang-migrate        - Session cache                    │
+│  - Row-level security    - Rate limiting                    │
+│  - Daily backups (Railway auto)                             │
+└─────────────────────────────────────────────────────────────┘
+\`\`\`
+
+### 1.2 Environments
+
+| Environment | Purpose | Platform | URL |
+|---|---|---|---|
+| **Local** | Development | Docker Compose | \`localhost:3000\` / \`:8080\` |
+| **Staging** | QA / Integration | Railway | \`teren-hotels-staging.up.railway.app\` |
+| **Production** | Live users | Railway | \`hotels.teren.dev\` |
+
+---
+
+## 2. Local Development (Docker Compose)
+
+### 2.1 \`docker-compose.yml\`
+
+\`\`\`yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: teren_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: teren_dev
+      POSTGRES_PASSWORD: teren_dev_password
+      POSTGRES_DB: teren_hotels
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U teren_dev -d teren_hotels"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: teren_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=postgres://teren_dev:teren_dev_password@postgres:5432/teren_hotels?sslmode=disable
+      - JWT_SECRET=dev_secret_min_32_chars_change_in_prod
+      - JWT_EXPIRY=24h
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - SERVER_PORT=8080
+      - LOG_LEVEL=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - go_modules:/go/pkg/mod
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: teren_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PUBLIC_API_URL=http://localhost:8080/api/v1
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+volumes:
+  postgres_data:
+  go_modules:
+\`\`\`
+
+### 2.2 Backend Dockerfile (\`backend/Dockerfile\`)
+
+\`\`\`dockerfile
+# Build stage
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+
+RUN apk add --no-cache git gcc musl-dev
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+
+# Production stage
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates tzdata
+
+WORKDIR /root/
+
+COPY --from=builder /app/main .
+COPY --from=builder /app/migrations ./migrations
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+CMD ["./main"]
+\`\`\`
+
+### 2.3 Frontend Dockerfile (\`frontend/Dockerfile\`)
+
+\`\`\`dockerfile
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
+
+EXPOSE 3000
+
+CMD ["node", "build"]
+\`\`\`
+
+### 2.4 Quick Start
+
+\`\`\`bash
+# 1. Clone and setup
+git clone https://github.com/terendelagua/teren-hotels.git
+cd teren-hotels
+cp .env.example .env
+
+# 2. Start all services
+docker-compose up -d
+
+# 3. Run migrations
+docker-compose exec backend ./migrations up
+
+# 4. View logs
+docker-compose logs -f
+
+# 5. Stop services
+docker-compose down
+\`\`\`
+
+---
+
+## 3. Production Deployment (Railway.app)
+
+### 3.1 Why Railway?
+
+✅ **Zero-config deployments** from GitHub
+✅ **Managed PostgreSQL** with automated backups
+✅ **Singapore region** (low latency to Indonesia)
+✅ **Free SSL certificates**
+✅ **Environment variables** management
+✅ **Auto-scaling** (pay for what you use)
+✅ **$5/month starter plan** sufficient for MVP
+
+### 3.2 \`railway.json\`
+
+\`\`\`json
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "backend/Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "./migrations up && ./main",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 100,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+\`\`\`
+
+### 3.3 Deployment Commands
+
+\`\`\`bash
+# Install Railway CLI
+npm install -g @railway/cli
+railway login
+
+# Create project
+railway project create
+
+# Link and set environment variables
+railway link
+railway variables set \\
+  APP_ENV=production \\
+  JWT_SECRET=$(openssl rand -hex 32) \\
+  CORS_ALLOWED_ORIGINS=https://hotels.teren.dev
+
+# Deploy
+railway up
+\`\`\`
+
+### 3.4 Environment Variables (Production)
+
+| Variable | Value | Notes |
+|---|---|---|
+| \`DATABASE_URL\` | Auto-generated | PostgreSQL connection |
+| \`APP_ENV\` | \`production\` | Production optimizations |
+| \`JWT_SECRET\` | Random 32+ chars | \`openssl rand -hex 32\` |
+| \`JWT_EXPIRY\` | \`24h\` | Token expiration |
+| \`CORS_ALLOWED_ORIGINS\` | \`https://hotels.teren.dev\` | Frontend domain |
+| \`LOG_LEVEL\` | \`info\` | Reduce verbosity |
+
+---
+
+## 4. Database Migrations
+
+### 4.1 Migration Strategy
+
+**Tool:** [golang-migrate](https://github.com/golang-migrate/migrate)
+**Approach:** Migrations run **automatically** on deployment. Zero-downtime.
+
+\`\`\`bash
+# Create new migration
+migrate create -ext sql -dir migrations -seq create_users_table
+
+# Result:
+# migrations/001_create_users_table.up.sql
+# migrations/001_create_users_table.down.sql
+\`\`\`
+
+### 4.2 Migration Best Practices
+
+✅ **DO:**
+- Test migrations locally first
+- Write reversible \`.down.sql\` files
+- Use transactions (\`BEGIN;\` / \`COMMIT;\`)
+- Add indexes concurrently in production
+- Backup before major migrations
+
+❌ **DON'T:**
+- Drop columns in same migration as adding new ones
+- Lock tables for extended periods
+- Run migrations without testing on staging
+
+---
+
+## 5. CI/CD Pipeline (GitHub Actions)
+
+\`\`\`yaml
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main, staging]
+
+env:
+  RAILWAY_TOKEN: \${{ secrets.RAILWAY_TOKEN }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - run: |
+          cd backend
+          go test -v ./...
+
+  deploy-production:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm install -g @railway/cli
+      - run: |
+          cd backend
+          railway link --project PRODUCTION_PROJECT_ID
+          railway up --detach
+      - run: sleep 30
+      - run: curl -f https://hotels.teren.dev/health || exit 1
+\`\`\`
+
+---
+
+## 6. Monitoring & Observability
+
+### 6.1 Health Check Endpoint (\`/health\`)
+
+\`\`\`go
+func (h *HealthHandler) Check(w http.ResponseWriter, r *http.Request) {
+    err := h.db.PingContext(r.Context())
+    if err != nil {
+        api.JSON(w, http.StatusServiceUnavailable, map[string]string{
+            "status": "unhealthy",
+            "error": err.Error(),
+        })
+        return
+    }
+    api.JSON(w, http.StatusOK, map[string]string{
+        "status": "healthy",
+        "version": "1.0.0",
+        "timestamp": time.Now().UTC().Format(time.RFC3339),
+    })
+}
+\`\`\`
+
+### 6.2 Railway Built-in Monitoring
+
+- ✅ CPU/Memory usage graphs
+- ✅ Request logs (real-time)
+- ✅ Deployment history
+- ✅ Database metrics
+- ✅ Alerts via email/webhook
+
+### 6.3 Recommended Add-ons
+
+- **Sentry** (error tracking) - Free tier
+- **Logtail** / **Better Stack** (log aggregation)
+- **UptimeRobot** (external uptime monitoring)
+
+---
+
+## 7. Backup & Disaster Recovery
+
+### 7.1 Database Backups
+
+**Railway Automated Backups:**
+- Daily snapshots (7-day retention)
+- Point-in-time recovery
+- One-click restore
+
+**Manual Backup:**
+
+\`\`\`bash
+# Export database
+pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
+
+# Import database
+psql $DATABASE_URL < backup_20260527.sql
+\`\`\`
+
+### 7.2 Disaster Recovery Plan
+
+**Scenario: Database corruption**
+
+1. **Stop writes:** Scale backend to 0 instances
+2. **Restore:** Railway dashboard → Database → Restore
+3. **Verify:** Run health checks
+4. **Resume:** Scale backend back up
+
+**RTO (Recovery Time):** < 30 minutes
+**RPO (Recovery Point):** < 24 hours
+
+---
+
+## 8. Security Checklist
+
+### 8.1 Pre-Launch Security
+
+✅ **Environment Variables:**
+- [ ] No secrets in code or \`.env\` committed to Git
+- [ ] JWT_SECRET is 32+ random characters
+- [ ] DATABASE_URL uses SSL in production
+
+✅ **Database:**
+- [ ] Row-level security per property_id
+- [ ] Passwords hashed with bcrypt (cost 12+)
+- [ ] Parameterized queries (no SQL injection)
+
+✅ **API:**
+- [ ] CORS restricted to production domain
+- [ ] Rate limiting on auth endpoints
+- [ ] JWT tokens expire in 24h max
+- [ ] HTTPS enforced (Railway auto-SSL)
+
+✅ **Frontend:**
+- [ ] Content Security Policy (CSP) headers
+- [ ] No sensitive data in localStorage
+- [ ] XSS protection (Svelte auto-escapes)
+
+---
+
+## 9. Cost Estimation (Monthly)
+
+| Resource | Usage | Cost |
+|---|---|---|
+| **Compute** | 2 services × 512MB RAM | $5/month |
+| **PostgreSQL** | 1GB storage | Included |
+| **Bandwidth** | < 100GB/month | Included |
+| **Build minutes** | 1000 min/month | Included |
+| **Total** | | **~$5-10/month** |
+
+### Scaling Costs
+
+- **100 hotels:** Upgrade to 2GB RAM → ~$20/month
+- **500 hotels:** Multiple instances + 20GB DB → ~$50-70/month
+
+---
+
+## 10. Deployment Checklist
+
+### 10.1 Pre-Deployment
+
+- [ ] All tests passing
+- [ ] Environment variables documented
+- [ ] Database migrations tested
+- [ ] CORS origins configured
+- [ ] JWT secrets generated
+- [ ] Health check endpoint working
+
+### 10.2 Post-Deployment
+
+- [ ] Frontend loads without errors
+- [ ] API responds to \`/health\`
+- [ ] Migrations ran successfully
+- [ ] Login/auth works
+- [ ] Floor map loads
+- [ ] Booking creation works
+- [ ] Mobile responsive (test on tablet)
+- [ ] Logs are clean (no sensitive data)
+
+---
+
+## 11. Troubleshooting
+
+### 11.1 Common Issues
+
+**Issue: "Connection refused" to database**
+\`\`\`bash
+# Verify DATABASE_URL format
+# postgres://user:password@host:5432/dbname?sslmode=require
+# In Railway, SSL is REQUIRED
+\`\`\`
+
+**Issue: CORS errors**
+\`\`\`bash
+# No trailing slash!
+✅ https://hotels.teren.dev
+❌ https://hotels.teren.dev/
+\`\`\`
+
+**Issue: Frontend can't reach backend**
+\`\`\`bash
+# PUBLIC_API_URL must be full URL
+PUBLIC_API_URL=https://teren-hotels-production.up.railway.app/api/v1
+\`\`\`
+
+### 11.2 Railway CLI
+
+\`\`\`bash
+railway logs          # View logs
+railway variables     # View env vars
+railway open          # Web console
+railway restart       # Restart service
+railway shell         # SSH debug
+\`\`\`
+
+---
+
+## 12. Rollback Strategy
+
+### 12.1 Code Rollback
+
+\`\`\`bash
+# Revert to previous commit
+git revert HEAD
+git push origin main
+
+# Railway auto-deploys
+\`\`\`
+
+### 12.2 Database Rollback
+
+Railway Dashboard → PostgreSQL → Backups → Restore
+
+⚠️ **Warning:** This replaces current database
+
+---
+
+## 13. Performance Optimization
+
+### 13.1 Backend
+
+\`\`\`go
+// Connection pooling
+config := pgxpool.Config{
+    MaxConns: 25,
+    MinConns: 5,
+    MaxConnLifetime: time.Hour,
+}
+\`\`\`
+
+- Use indexes on \`property_id\`, \`check_in\`, \`check_out\`
+- Avoid \`SELECT *\` - fetch needed columns only
+- Use \`EXPLAIN ANALYZE\` for slow queries
+
+### 13.2 Frontend
+
+- Enable gzip/brotli (Railway auto)
+- Use CDN for images (Cloudflare R2)
+- Lazy load non-critical components
+
+---
+
+## 14. Environment-Specific Configs
+
+### Development
+\`\`\`bash
+APP_ENV=development
+LOG_LEVEL=debug
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+DATABASE_URL=postgres://...?sslmode=disable
+\`\`\`
+
+### Staging
+\`\`\`bash
+APP_ENV=staging
+LOG_LEVEL=info
+CORS_ALLOWED_ORIGINS=https://teren-hotels-staging.up.railway.app
+DATABASE_URL=postgres://...?sslmode=require
+\`\`\`
+
+### Production
+\`\`\`bash
+APP_ENV=production
+LOG_LEVEL=warn
+CORS_ALLOWED_ORIGINS=https://hotels.teren.dev
+DATABASE_URL=postgres://...?sslmode=require
+SECURE_COOKIES=true
+\`\`\`
+
+---
+
+## 15. Resources
+
+- **Railway Docs:** https://docs.railway.app
+- **Go Deployment:** https://go.dev/doc/deploy
+- **SvelteKit Adapter:** https://kit.svelte.dev/docs/adapter-node
+- **PostgreSQL on Railway:** https://docs.railway.app/databases/postgresql
+
+---
+
+**🚀 Deploy Command:** \`railway up\`
+
+**Flow systems. Soulful deployments.**
+**TEREN Hotels · Deployment Strategy v1.0 · May 2026**`;
+
+    // Simple Markdown parser
+    function parseMarkdown(md) {
+        let html = md;
+
+        // Code blocks
+        html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+            return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
+        });
+
+        // Inline code (after code blocks to avoid conflicts)
+        html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+        // Headers
+        html = html.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
+        html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+        // Bold / Italic
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+        // Horizontal rule
+        html = html.replace(/^---$/gm, '<hr>');
+
+        // Tables
+        html = html.replace(/((?:^\|.+\|$\n?)+)/gm, (match) => {
+            const rows = match.trim().split('\n').filter(r => !r.match(/^\|[\s-:|]+\|$/));
+            if (rows.length === 0) return match;
+
+            let table = '<table>';
+            rows.forEach((row, i) => {
+                const cells = row.split('|').filter(c => c.trim() !== '');
+                const tag = i === 0 ? 'th' : 'td';
+                table += '<tr>' + cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+            });
+            table += '</table>';
+            return table;
+        });
+
+        // Lists
+        html = html.replace(/((?:^- .+\n?)+)/gm, (match) => {
+            const items = match.trim().split('\n').map(l => `<li>${l.replace(/^- /, '')}</li>`).join('');
+            return `<ul>${items}</ul>`;
+        });
+
+        html = html.replace(/((?:^\d+\. .+\n?)+)/gm, (match) => {
+            const items = match.trim().split('\n').map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`).join('');
+            return `<ol>${items}</ol>`;
+        });
+
+        // Checkboxes
+        html = html.replace(/\[ \]/g, '☐');
+        html = html.replace(/\[x\]/g, '☑');
+
+        // Paragraphs (lines that aren't already wrapped)
+        html = html.split('\n\n').map(block => {
+            if (block.trim() === '') return '';
+            if (block.match(/^<(h[1-6]|ul|ol|pre|table|hr|div)/)) return block;
+            if (!block.includes('<')) return `<p>${block.replace(/\n/g, '<br>')}</p>`;
+            return block;
+        }).join('\n');
+
+        return html;
+    }
+
+    function escapeHtml(str) {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    document.getElementById('content').innerHTML = parseMarkdown(specContent);
+
+    function downloadSpec() {
+        const blob = new Blob([specContent], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'TEREN_Hotels_Deployment_Strategy_v1.0.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Visual feedback
+        const btn = document.querySelector('.btn-download');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✓ Downloaded';
+        btn.style.backgroundColor = '#16A34A';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.style.backgroundColor = '';
+        }, 2000);
+    }
+</script>
+
+</body>
+</html>

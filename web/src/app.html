@@ -4,6 +4,28 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<script>
+			// TEREN Design System v1.1 — theme bootstrap (runs before first paint).
+			// Reads the user's stored preference, falls back to the OS preference,
+			// and toggles `.light` / `.dark` on <html> so CSS variables resolve
+			// to the right mode without a flash of incorrect theme (FOUC).
+			(function () {
+				try {
+					var stored = localStorage.getItem('teren-theme');
+					var mode = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+					var resolved =
+						mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+							? 'dark'
+							: 'light';
+					var root = document.documentElement;
+					root.classList.add(resolved);
+					if (mode === 'light') root.classList.add('light');
+					if (mode === 'dark') root.classList.add('dark');
+				} catch (e) {
+					// localStorage unavailable (private mode, SSR, etc.) — fall through silently.
+				}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

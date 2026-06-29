@@ -8,18 +8,57 @@ import type {
 	CreateBookingPayload,
 	GuestDetail,
 	GuestListDTO,
-	Guest
+	Guest,
+	InvoiceDetail,
+	InvoiceListResponse,
+	ListInvoicesFilter,
+	RegisterPaymentPayload,
+	RefundAllResponse,
+	Payment,
+	DailySummary,
+	MonthlyTaxReport
 } from '$lib/types';
 import { env } from '$env/dynamic/public';
+import { get } from 'svelte/store';
+import { locale } from 'svelte-i18n';
 
 const API_BASE_URL = env.PUBLIC_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
+/**
+ * DEV_OVERRIDE_ROLE — B11: the seed user has role 'admin' (general
+ * catch-all) but the service only authorises role 'owner' for refunds
+ * and force-overrides. While we have no session/JWT, we send a hardcoded
+ * role so the dev UI can exercise these paths. Production will source
+ * the role from JWT claims server-side and MUST NOT see this header.
+ */
+const DEV_OVERRIDE_ROLE = 'owner';
+
+/**
+ * currentLocale reads the active svelte-i18n locale synchronously.
+ * Falls back to 'en' when svelte-i18n hasn't initialised yet (SSR
+ * bootstrap) so the header is always populated.
+ */
+function currentLocale(): string {
+	try {
+		const l = get(locale);
+		return typeof l === 'string' && l ? l : 'en';
+	} catch {
+		return 'en';
+	}
+}
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+		// B7-validation: send the user's current i18n locale so the
+		// backend can render the PDF (and other localised payloads)
+		// in the same language the SPA is using. The handler reads
+		// Accept-Language and falls back to English if absent.
+		'Accept-Language': currentLocale(),
+		...(options?.headers as Record<string, string> | undefined)
+	};
 	const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-		headers: {
-			'Content-Type': 'application/json',
-			...options?.headers
-		},
+		headers,
 		...options
 	});
 
@@ -165,7 +204,13 @@ export const api = {
 			request<Room>(`/rooms/${id}/position`, {
 				method: 'PUT',
 				body: JSON.stringify(data)
-			})
+			}),
+		// Housekeeping: marca la habitación como "cleaning" (POST) o la libera (DELETE).
+		// El backend maneja idempotencia y rechaza con 409 si la room es inactive.
+		setCleaning: (id: string) =>
+			request<Room>(`/rooms/${id}/cleaning`, { method: 'POST' }),
+		clearCleaning: (id: string) =>
+			request<Room>(`/rooms/${id}/cleaning`, { method: 'DELETE' })
 	},
 	roomTypes: {
 		list: (propertyId: string) => request<RoomType[]>(`/properties/${propertyId}/room-types`)
@@ -255,5 +300,107 @@ export const api = {
 			request<ReportResponse>(`/reports/metrics?property_id=${propertyId}&date_from=${dateFrom}&date_to=${dateTo}`),
 		daily: (propertyId: string, dateFrom: string, dateTo: string) =>
 			request<DailyBreakdownResponse>(`/reports/daily?property_id=${propertyId}&date_from=${dateFrom}&date_to=${dateTo}`)
+	},
+	invoices: {
+		// Read — spec §4.1, §4.2
+		getByID: (id: string) => request<InvoiceDetail>(`/invoices/${id}`),
+		getByBooking: (bookingId: string) => request<InvoiceDetail>(`/invoices/by-booking/${bookingId}`),
+
+		// List — spec §4.7. Filters are optional; backend applies them as AND.
+		list: (filter: ListInvoicesFilter) => {
+			const qs = new URLSearchParams();
+			qs.set('property_id', filter.property_id);
+			if (filter.status) qs.set('status', filter.status);
+			if (filter.date_from) qs.set('date_from', filter.date_from);
+			if (filter.date_to) qs.set('date_to', filter.date_to);
+			if (filter.search) qs.set('search', filter.search);
+			if (filter.page) qs.set('page', String(filter.page));
+			if (filter.limit) qs.set('limit', String(filter.limit));
+			return request<InvoiceListResponse>(`/invoices?${qs.toString()}`);
+		},
+
+		// Aggregations — spec §4.9, §4.11
+		dailySummary: (propertyId: string, date?: string, tz?: string) => {
+			const qs = new URLSearchParams({ property_id: propertyId });
+			if (date) qs.set('date', date);
+			if (tz) qs.set('tz', tz);
+			return request<DailySummary>(`/invoices/daily-summary?${qs.toString()}`);
+		},
+		taxReport: (propertyId: string, year: number, month?: number) => {
+			const qs = new URLSearchParams({ property_id: propertyId, year: String(year) });
+			if (month) qs.set('month', String(month));
+			return request<MonthlyTaxReport>(`/invoices/tax-report?${qs.toString()}`);
+		},
+
+		// Write — spec §4.3 (R-01 reference required, R-06 Idempotency-Key)
+		// Pass an idempotencyKey (UUID v4) to opt-in to dedup. B11: we
+		// also send X-User-Role (dev override) so the backend's role
+		// gate on refunds / force-overrides is satisfied.
+		registerPayment: (
+			invoiceId: string,
+			payload: RegisterPaymentPayload,
+			propertyId: string,
+			receivedBy: string,
+			idempotencyKey?: string
+		) => {
+			const headers: Record<string, string> = {
+				'X-Property-ID': propertyId,
+				'X-User-ID': receivedBy,
+				'X-User-Role': DEV_OVERRIDE_ROLE
+			};
+			if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+			return request<Payment>(`/invoices/${invoiceId}/payments`, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify(payload)
+			});
+		},
+
+		// Write — spec §4.4
+		void: (invoiceId: string, reason: string, voidedBy: string) =>
+			request<InvoiceDetail>(`/invoices/${invoiceId}/void`, {
+				method: 'POST',
+				headers: { 'X-User-ID': voidedBy, 'X-User-Role': DEV_OVERRIDE_ROLE },
+				body: JSON.stringify({ reason })
+			}),
+
+		// Write — spec §4.5
+		updateNotes: (invoiceId: string, notes: string) =>
+			request<InvoiceDetail>(`/invoices/${invoiceId}/notes`, {
+				method: 'PATCH',
+				body: JSON.stringify({ notes })
+			}),
+
+			// Write — spec §4.6
+	regeneratePDF: (invoiceId: string) =>
+		request<{ pdf_url: string }>(`/invoices/${invoiceId}/regenerate-pdf`, {
+			method: 'POST'
+		}),
+
+	// Block 10 — atomic refund-all (R-08). Server returns the batch row
+	// plus a summary of the individual refunds it created. Caller
+	// must have role='owner' (or 403). Returns 409 INVOICE_TERMINAL
+	// when the invoice is already refunded/void.
+	//
+	// IMPORTANT: we MUST send X-User-ID + X-User-Role just like the
+	// other write methods — the dev AuthContext middleware seeds the
+	// request context from these headers (real auth will replace this
+	// with JWT). Without them the handler returns 401 UNAUTHENTICATED
+	// because `middleware.UserIDFromContext` finds no value.
+	refundAll: (
+		invoiceId: string,
+		body: { reason: string },
+		propertyId: string,
+		receivedBy: string
+	) =>
+		request<RefundAllResponse>(`/invoices/${invoiceId}/refund-all`, {
+			method: 'POST',
+			headers: {
+				'X-Property-ID': propertyId,
+				'X-User-ID': receivedBy,
+				'X-User-Role': DEV_OVERRIDE_ROLE
+			},
+			body: JSON.stringify(body)
+		})
 	}
 };

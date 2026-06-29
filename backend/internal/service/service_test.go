@@ -31,9 +31,13 @@ func setupTestDB(t *testing.T) (*pgxpool.Pool, *InventoryService, *BookingServic
 	roomBlockRepo := repository.NewRoomBlockRepository(db)
 	bookingRepo := repository.NewBookingRepository(db)
 	guestRepo := repository.NewGuestRepository(db)
+	invoiceRepo := repository.NewInvoiceRepository(db)
 
 	inventorySvc := NewInventoryService(db, roomRepo, roomBlockRepo)
-	bookingSvc := NewBookingService(db, bookingRepo, guestRepo, inventorySvc)
+	// nil PDFGenerator — the invoice service still works; PDFs are skipped
+	// (pdf_url stays NULL) per spec §8.1.
+	invoiceSvc := NewInvoiceService(db, invoiceRepo, bookingRepo, nil)
+	bookingSvc := NewBookingService(db, bookingRepo, guestRepo, inventorySvc, invoiceSvc)
 
 	return db, inventorySvc, bookingSvc
 }
@@ -171,7 +175,7 @@ func TestGetMap_OccupiedRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -208,7 +212,7 @@ func TestGetMap_PendingRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'confirmed')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'confirmed')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -291,7 +295,7 @@ func TestGetMap_PriorityLogic(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -336,7 +340,7 @@ func TestGetMap_InactiveRoom(t *testing.T) {
 	bookingID := uuid.New()
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create booking: %v", err)
@@ -372,15 +376,15 @@ func TestAssign_RoomAvailable(t *testing.T) {
 
 	// Assign to available room
 	booking, err := bookingSvc.CreateBooking(ctx, models.CreateBookingRequest{
-		PropertyID:     f.PropertyID,
-		RoomID:         &roomID,
-		GuestID:        &f.GuestID,
-		CreatedBy:      f.UserID,
-		CheckIn:        time.Now().Add(24 * time.Hour),
-		CheckOut:       time.Now().Add(48 * time.Hour),
-		OriginalAmount: 200000,
-		Source:         "booking_com",
-		Status:         "confirmed",
+		PropertyID:  f.PropertyID,
+		RoomID:      &roomID,
+		GuestID:     &f.GuestID,
+		CreatedBy:   f.UserID,
+		CheckIn:     time.Now().Add(24 * time.Hour),
+		CheckOut:    time.Now().Add(48 * time.Hour),
+		TotalAmount: 200000,
+		Source:      "other",
+		Status:      "confirmed",
 	})
 	if err != nil {
 		t.Fatalf("expected successful booking assignment, got: %v", err)
@@ -403,7 +407,7 @@ func TestAssign_RoomOccupied(t *testing.T) {
 	// Create occupied booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 100000, 'other', 'checked_in')
 	`, uuid.New(), f.PropertyID, roomID, f.GuestID, f.UserID, checkinStart, checkinEnd)
 	if err != nil {
 		t.Fatalf("failed to create active booking: %v", err)
@@ -483,7 +487,7 @@ func TestCheckIn_Flow(t *testing.T) {
 	// Insert confirmed booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 day', 100000, 'booking_com', 'confirmed')
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 day', 100000, 'other', 'confirmed')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create confirmed booking: %v", err)
@@ -516,7 +520,7 @@ func TestCheckOut_Flow(t *testing.T) {
 	// Insert checked_in booking
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE, 100000, 'booking_com', 'checked_in')
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE, 100000, 'other', 'checked_in')
 	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
 	if err != nil {
 		t.Fatalf("failed to create checked_in booking: %v", err)
@@ -656,9 +660,9 @@ func TestAssignBookingAndPendingFilter(t *testing.T) {
 	_, err := db.Exec(ctx, `
 		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by, check_in, check_out, total_amount, source, status)
 		VALUES ($1, $2, NULL, $3, $4, $5, $6, 100000, 'walk_in', 'confirmed')
-	`, bookingID, f.PropertyID, f.GuestID, f.UserID, 
-	   time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC), 
-	   time.Date(2026, 5, 30, 0, 0, 0, 0, time.UTC))
+	`, bookingID, f.PropertyID, f.GuestID, f.UserID,
+		time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 5, 30, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("failed to insert unassigned booking: %v", err)
 	}
@@ -699,3 +703,302 @@ func TestAssignBookingAndPendingFilter(t *testing.T) {
 	}
 }
 
+// ==========================================
+// 1.6 Auto-cleaning on check-out (BT-18)
+// ==========================================
+//
+// Domain rule: tras check-out, la habitación transiciona automáticamente al
+// estado operacional `cleaning` (housekeeping en curso). El check-out debe
+// seguir siendo exitoso aunque la transición de cleaning falle (caso: room
+// inactive entre check-in y check-out).
+
+func TestCheckOut_TransitionsRoomToCleaning(t *testing.T) {
+	ctx := context.Background()
+	db, _, bookingSvc := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "501", 0, 0, "active")
+
+	// Crea booking ya en estado checked_in (asignado a la room)
+	bookingID := uuid.New()
+	_, err := db.Exec(ctx, `
+		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by,
+		                      check_in, check_out, total_amount, source, status)
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 days',
+		        100000, 'other', 'checked_in')
+	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
+	if err != nil {
+		t.Fatalf("failed to create checked_in booking: %v", err)
+	}
+
+	// Check-out debe succeed
+	if err := bookingSvc.CheckOut(ctx, bookingID); err != nil {
+		t.Fatalf("CheckOut failed: %v", err)
+	}
+
+	// Booking ahora debe estar checked_out
+	var bStatus string
+	if err := db.QueryRow(ctx, "SELECT status FROM bookings WHERE id = $1", bookingID).Scan(&bStatus); err != nil {
+		t.Fatalf("failed to read booking status: %v", err)
+	}
+	if bStatus != "checked_out" {
+		t.Fatalf("expected booking status 'checked_out', got '%s'", bStatus)
+	}
+
+	// Room ahora debe estar en cleaning
+	var roomStatus string
+	if err := db.QueryRow(ctx, "SELECT status FROM rooms WHERE id = $1", roomID).Scan(&roomStatus); err != nil {
+		t.Fatalf("failed to read room status: %v", err)
+	}
+	if roomStatus != "cleaning" {
+		t.Fatalf("expected room status 'cleaning' after check-out (auto-cleaning), got '%s'", roomStatus)
+	}
+}
+
+func TestCheckOut_StillSucceedsWhenRoomInactive(t *testing.T) {
+	// Edge case: si la room fue marcada inactive entre check-in y check-out,
+	// el check-out debe completarse y solo el side-effect de cleaning se loguea.
+	ctx := context.Background()
+	db, _, bookingSvc := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "502", 0, 1, "active")
+
+	bookingID := uuid.New()
+	_, err := db.Exec(ctx, `
+		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by,
+		                      check_in, check_out, total_amount, source, status)
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 days',
+		        100000, 'other', 'checked_in')
+	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID)
+	if err != nil {
+		t.Fatalf("failed to create checked_in booking: %v", err)
+	}
+
+	// Marcar la room inactive mientras el huésped está dentro
+	_, err = db.Exec(ctx, "UPDATE rooms SET status = 'inactive' WHERE id = $1", roomID)
+	if err != nil {
+		t.Fatalf("failed to mark room inactive: %v", err)
+	}
+
+	// Check-out debe succeed aunque la transición a cleaning falle
+	if err := bookingSvc.CheckOut(ctx, bookingID); err != nil {
+		t.Fatalf("CheckOut should not fail when room is inactive, got: %v", err)
+	}
+
+	// Room sigue inactive (cleaning no se aplicó)
+	var roomStatus string
+	if err := db.QueryRow(ctx, "SELECT status FROM rooms WHERE id = $1", roomID).Scan(&roomStatus); err != nil {
+		t.Fatalf("failed to read room status: %v", err)
+	}
+	if roomStatus != "inactive" {
+		t.Fatalf("expected room to remain 'inactive' (cleaning rejected), got '%s'", roomStatus)
+	}
+}
+
+// ==========================================
+// 1.4 Cleaning State (BT-16) - FMB-001 follow-up
+// ==========================================
+//
+// Estado operacional "cleaning": housekeeping en curso. Mientras una habitación
+// está en cleaning NO debe ser vendible. La transición a "active" la libera.
+
+func TestSetCleaning_ActiveToCleaning(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "301", 0, 0, "active")
+
+	room, err := inventorySvc.SetRoomCleaning(ctx, roomID, true)
+	if err != nil {
+		t.Fatalf("expected successful cleaning transition, got: %v", err)
+	}
+	if room == nil || room.Status != "cleaning" {
+		t.Fatalf("expected room status 'cleaning', got %+v", room)
+	}
+}
+
+func TestSetCleaning_Idempotent(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "302", 0, 1, "cleaning")
+
+	// Aplicar dos veces el mismo estado no debe fallar.
+	room, err := inventorySvc.SetRoomCleaning(ctx, roomID, true)
+	if err != nil {
+		t.Fatalf("idempotent cleaning should not fail, got: %v", err)
+	}
+	if room == nil || room.Status != "cleaning" {
+		t.Fatalf("expected room status 'cleaning', got %+v", room)
+	}
+}
+
+func TestSetCleaning_ClearsToActive(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "303", 0, 2, "cleaning")
+
+	room, err := inventorySvc.SetRoomCleaning(ctx, roomID, false)
+	if err != nil {
+		t.Fatalf("expected successful clear-cleaning, got: %v", err)
+	}
+	if room == nil || room.Status != "active" {
+		t.Fatalf("expected room status 'active', got %+v", room)
+	}
+}
+
+func TestSetCleaning_RejectsInactiveRoom(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "304", 0, 3, "inactive")
+
+	_, err := inventorySvc.SetRoomCleaning(ctx, roomID, true)
+	if err == nil {
+		t.Fatal("expected ROOM_INACTIVE error, got success")
+	}
+	var bErr *BusinessError
+	if !errors.As(err, &bErr) || bErr.Code != "ROOM_INACTIVE" {
+		t.Fatalf("expected BusinessError with Code ROOM_INACTIVE, got: %v", err)
+	}
+}
+
+func TestSetCleaning_NotFoundReturnsBusinessError(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	_ = createTestFixture(ctx, t, db) // fixture limpia
+
+	_, err := inventorySvc.SetRoomCleaning(ctx, uuid.New(), true)
+	if err == nil {
+		t.Fatal("expected ROOM_NOT_FOUND error, got success")
+	}
+	var bErr *BusinessError
+	if !errors.As(err, &bErr) || bErr.Code != "ROOM_NOT_FOUND" {
+		t.Fatalf("expected BusinessError with Code ROOM_NOT_FOUND, got: %v", err)
+	}
+}
+
+func TestGetMap_CleaningRoomDerivesCleaningState(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "305", 0, 4, "cleaning")
+
+	dateFrom, _ := time.Parse("2006-01-02", time.Now().Format("2006-01-02"))
+	dateTo, _ := time.Parse("2006-01-02", time.Now().AddDate(0, 0, 1).Format("2006-01-02"))
+
+	res, err := inventorySvc.GetMap(ctx, models.MapAvailabilityRequest{
+		PropertyID: f.PropertyID,
+		DateFrom:   dateFrom,
+		DateTo:     dateTo,
+	})
+	if err != nil {
+		t.Fatalf("GetMap failed: %v", err)
+	}
+
+	var found *models.RoomMap
+	for _, fl := range res.Floors {
+		for _, rm := range fl.Rooms {
+			if rm.ID == roomID {
+				found = rm
+				break
+			}
+		}
+	}
+	if found == nil {
+		t.Fatal("cleaning room not found in map response")
+	}
+	if found.Availability != "cleaning" {
+		t.Fatalf("expected derived availability 'cleaning', got '%s'", found.Availability)
+	}
+}
+
+func TestIsRoomAvailableForBooking_BlocksWhenCleaning(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "306", 0, 5, "cleaning")
+
+	tomorrow := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
+	dayAfter := tomorrow.Add(24 * time.Hour)
+
+	ok, err := inventorySvc.IsRoomAvailableForBooking(ctx, roomID, tomorrow, dayAfter)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Fatal("expected room in cleaning state to NOT be available for booking")
+	}
+}
+
+// ==========================================
+// 1.5 Checked-in overrides date range (BT-17)
+// ==========================================
+//
+// Domain rule: a `checked_in` booking is the CURRENT operational state of the
+// room (guest is physically inside). It must override the date range filter:
+// the floor map must show the room as `occupied` even if the booking's
+// planned check_in/check_out do NOT overlap the queried range.
+//
+// Regression context: before this fix, the `b_in` JOIN in
+// room_repository.GetMapWithAvailability had `b_in.check_in < $2 AND
+// b_in.check_out > $1`, which made a checked-in booking invisible to
+// queries outside its date range. The user observed room 102 stay
+// green/available after checking in Maria Garcia for a 2-4 jun booking
+// while querying the map for 19-20 jun.
+
+func TestGetMap_CheckedInOverridesDateRange(t *testing.T) {
+	ctx := context.Background()
+	db, inventorySvc, _ := setupTestDB(t)
+	f := createTestFixture(ctx, t, db)
+	roomID := createTestRoom(ctx, t, db, f, "401", 0, 0, "active")
+
+	// Create a checked_in booking with dates FAR outside the query range.
+	bookingID := uuid.New()
+	_, err := db.Exec(ctx, `
+		INSERT INTO bookings (id, property_id, room_id, guest_id, created_by,
+		                      check_in, check_out, total_amount, source, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 100000, 'booking_com', 'checked_in')
+	`, bookingID, f.PropertyID, roomID, f.GuestID, f.UserID,
+		time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 5, 3, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("failed to create checked_in booking: %v", err)
+	}
+
+	// Query the map for a date range that does NOT overlap the booking.
+	queryFrom := time.Date(2026, 6, 19, 0, 0, 0, 0, time.UTC)
+	queryTo := time.Date(2026, 6, 20, 0, 0, 0, 0, time.UTC)
+
+	res, err := inventorySvc.GetMap(ctx, models.MapAvailabilityRequest{
+		PropertyID: f.PropertyID,
+		DateFrom:   queryFrom,
+		DateTo:     queryTo,
+	})
+	if err != nil {
+		t.Fatalf("GetMap failed: %v", err)
+	}
+
+	// Find our room in the response
+	var found *models.RoomMap
+	for _, fl := range res.Floors {
+		for _, rm := range fl.Rooms {
+			if rm.ID == roomID {
+				found = rm
+				break
+			}
+		}
+	}
+	if found == nil {
+		t.Fatal("room not found in map response")
+	}
+
+	// The room MUST show as 'occupied' — the guest is currently checked in,
+	// even though the query range is months away from the booking dates.
+	if found.Availability != "occupied" {
+		t.Fatalf("expected availability 'occupied' (checked-in overrides date range), got '%s'", found.Availability)
+	}
+	if found.ActiveBookingID == nil || *found.ActiveBookingID != bookingID {
+		t.Fatalf("expected active booking %v, got %v", bookingID, found.ActiveBookingID)
+	}
+}

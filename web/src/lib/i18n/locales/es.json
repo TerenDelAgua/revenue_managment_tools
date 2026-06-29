@@ -1,47 +1,60 @@
 {
   "nav": {
-    "dashboard": "Dasbor",
-    "floorMap": "Peta Lantai",
-    "bookings": "Pemesanan",
-    "guests": "Tamu",
-    "settings": "Pengaturan"
+    "dashboard": "Panel",
+    "floorMap": "Mapa de Plantas",
+    "bookings": "Reservas",
+    "invoices": "Facturas",
+    "guests": "Huéspedes",
+    "reports": "Informes",
+    "settings": "Configuración"
   },
   "header": {
-    "subtitle": "Hotel · Manajemen Pendapatan",
-    "properties": "Properti",
-    "hotelOwner": "Pemilik Hotel"
+    "subtitle": "Hotel · Gestión de Ingresos",
+    "properties": "Propiedades",
+    "hotelOwner": "Propietario del Hotel"
+  },
+  "theme": {
+    "toggle": {
+      "label": "Cambiar tema",
+      "light": "Tema claro",
+      "dark": "Tema oscuro",
+      "system": "Seguir el tema del sistema"
+    }
   },
   "roomTypes": {
-    "Standard Room": "Kamar Standar",
-    "Superior Room": "Kamar Superior",
-    "Deluxe Room": "Kamar Deluxe",
-    "Suite": "Kamar Suite"
+    "Standard Room": "Habitación Estándar",
+    "Superior Room": "Habitación Superior",
+    "Deluxe Room": "Habitación Deluxe",
+    "Suite": "Suite"
   },
   "status": {
-    "available": "Tersedia",
-    "occupied": "Terisi",
-    "pending": "Tertunda (Check-in)",
-    "blocked": "Diblokir",
-    "inactive": "Tidak Aktif"
+    "available": "Disponible",
+    "occupied": "Ocupada",
+    "pending": "Pendiente (Check-in)",
+    "blocked": "Bloqueada",
+    "cleaning": "Limpieza",
+    "inactive": "Inactiva"
   },
   "drawer": {
-    "details": "Detail",
-    "type": "Tipe",
+    "details": "Detalles",
+    "type": "Tipo",
     "ref": "Ref",
-    "pendingBookings": "Pemesanan Tertunda",
-    "cancel": "Batal",
-    "noPending": "Tidak ada pemesanan tertunda untuk periode ini.",
+    "pendingBookings": "Reservas pendientes",
+    "cancel": "Cancelar",
+    "noPending": "No hay reservas pendientes para este período.",
     "pax": "pax",
-    "blockRoom": "Blokir Kamar",
-    "maintenance": "Pemeliharaan",
-    "ownerUse": "Penggunaan Pemilik",
-    "outOfService": "Di Luar Layanan",
-    "confirmBlock": "Konfirmasi Blokir",
-    "checkIn": "Check In",
-    "checkOut": "Check Out",
-    "removeBlock": "Hapus Blokir",
-    "assignBooking": "Tetapkan Pemesanan",
-    "availableTypes": "Tipe Tersedia"
+    "blockRoom": "Bloquear habitación",
+    "maintenance": "Mantenimiento",
+    "ownerUse": "Uso del propietario",
+    "outOfService": "Fuera de servicio",
+    "confirmBlock": "Confirmar bloqueo",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "markCleaning": "Marcar en limpieza",
+    "cleaningDone": "Limpieza completada",
+    "removeBlock": "Quitar bloqueo",
+    "assignBooking": "Asignar reserva",
+    "availableTypes": "Tipos disponibles"
   },
   "bookingsForm": {
     "title": "Terminal de Reservas",
@@ -140,7 +153,258 @@
       "assignError": "Error al asignar habitación.",
       "cancelMissingReason": "Por favor indica un motivo para la cancelación.",
       "cancelSuccess": "Reserva cancelada correctamente.",
-      "cancelError": "Error al cancelar la reserva."
+      "cancelError": "Error al cancelar reserva."
+    }
+  },
+  "invoiceWidget": {
+    "title": "Factura",
+    "loading": "Cargando factura…",
+    "loadError": "No se pudo cargar la factura.",
+    "noInvoice": "Aún no hay factura para esta reserva.",
+    "invoiceNumber": "Factura {number}",
+    "issuedAt": "Emitida el {date}",
+    "status": {
+      "paid": "Pagada",
+      "partial": "Parcial",
+      "unpaid": "Pendiente",
+      "overpaid": "Sobrepagada",
+      "void": "Anulada"
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "tax": "Impuesto (PPN {rate}%)",
+      "total": "Total",
+      "paid": "Pagado",
+      "balance": "Saldo",
+      "refunded": "Reembolsado"
+    },
+    "actions": {
+      "openPdf": "Abrir PDF",
+      "regeneratePdf": "Regenerar PDF",
+      "registerPayment": "Registrar pago",
+      "refund": "Reembolsar",
+      "void": "Anular factura",
+      "viewAll": "Ver todas las facturas"
+    },
+    "void": {
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "¿Por qué se anula esta factura?",
+      "confirm": "Anular factura",
+      "cancel": "Cancelar",
+      "missingReason": "Por favor indica un motivo."
+    },
+    "payments": {
+      "title": "Pagos",
+      "none": "Aún no hay pagos registrados.",
+      "count": "{count, plural, =0 {Sin pagos} =1 {1 pago} other {# pagos}}",
+      "method": {
+        "cash": "Efectivo",
+        "bank_transfer": "Transferencia",
+        "qris": "QRIS",
+        "card": "Tarjeta"
+      },
+      "refund": "Reembolso"
+    },
+    "toasts": {
+      "regenerateSuccess": "PDF regenerado.",
+      "regenerateError": "No se pudo regenerar el PDF.",
+      "voidSuccess": "Factura anulada.",
+      "voidError": "No se pudo anular la factura."
+    }
+  },
+  "paymentForm": {
+    "amountLabel": "Importe",
+    "balanceHint": "Saldo pendiente: {balance}",
+    "methodLabel": "Método",
+    "referenceLabel": "Referencia",
+    "referencePlaceholder": "ID de transacción, últimos 4 de tarjeta…",
+    "referenceHint": "Obligatoria para métodos no efectivo (BR-INV-005).",
+    "notesLabel": "Notas",
+    "notesPlaceholder": "Contexto opcional…",
+    "maxButton": "Total",
+    "submit": "Registrar pago",
+    "submitting": "Registrando…",
+    "cancel": "Cancelar",
+    "errors": {
+      "amountRequired": "Introduce un importe.",
+      "amountPositive": "El importe debe ser mayor que cero.",
+      "amountExceeds": "El importe supera el saldo pendiente.",
+      "generic": "No se pudo registrar el pago."
+    },
+    "toasts": {
+      "success": "Pago registrado.",
+      "refundSuccess": "Reembolso emitido."
+    },
+    "refund": {
+      "banner": "Reembolso",
+      "amountLabel": "Importe del reembolso",
+      "maxButton": "Todo",
+      "capHint": "Máximo reembolsable: {cap}",
+      "referenceLabel": "Referencia del reembolso",
+      "referencePlaceholder": "ID de la transacción original, número de recibo…",
+      "referenceHint": "Los reembolsos deben ser siempre trazables a una transacción.",
+      "notesLabel": "Motivo del reembolso",
+      "notesPlaceholder": "¿Por qué se emite este reembolso?",
+      "submit": "Emitir reembolso",
+      "errors": {
+        "amountRequired": "Introduce un importe de reembolso.",
+        "amountPositive": "El importe del reembolso debe ser mayor que cero.",
+        "exceedsPaid": "El reembolso no puede superar el total cobrado.",
+        "noChargeToReverse": "No hay ningún cobro a reembolsar en esta factura."
+      }
+    }
+  },
+  "reports": {
+    "title": "Informes",
+    "subtitle": "Cierre diario de caja e informes mensuales de impuestos.",
+    "loading": "Cargando…",
+    "errors": {
+      "loadFailed": "No se pudo cargar el informe."
+    },
+    "toasts": {
+      "exported": "Informe exportado."
+    },
+    "tabs": {
+      "daily": "Cierre diario de caja",
+      "tax": "Impuestos mensuales"
+    },
+    "daily": {
+      "title": "Cierre diario de caja",
+      "subtitle": "Facturas y pagos del día seleccionado.",
+      "dateLabel": "Fecha",
+      "export": "Exportar CSV",
+      "noPayments": "No hay pagos registrados este día.",
+      "noStaff": "No hay pagos por personal.",
+      "byMethod": "Por método de pago",
+      "byStaff": "Por personal",
+      "counts": {
+        "issued": "Emitidas",
+        "paid": "Pagadas",
+        "partial": "Parciales",
+        "unpaid": "Pendientes",
+        "overpaid": "Sobrepagadas",
+        "void": "Anuladas"
+      },
+      "financials": {
+        "collected": "Total cobrado",
+        "refunded": "Total reembolsado",
+        "pending": "Total pendiente",
+        "tax": "Impuestos cobrados"
+      },
+      "csv": {
+        "metric": "Métrica",
+        "value": "Valor",
+        "invoicesIssued": "Facturas emitidas",
+        "invoicesPaid": "Facturas pagadas",
+        "invoicesPartial": "Facturas parciales",
+        "invoicesUnpaid": "Facturas pendientes",
+        "invoicesOverpaid": "Facturas sobrepagadas",
+        "invoicesVoid": "Facturas anuladas",
+        "totalRevenue": "Ingresos totales",
+        "totalCollected": "Total cobrado",
+        "totalRefunded": "Total reembolsado",
+        "totalPending": "Total pendiente",
+        "taxCollected": "Impuestos cobrados",
+        "methodHeader": "Por método de pago",
+        "method": "Método",
+        "amount": "Importe",
+        "staffHeader": "Por personal",
+        "staffName": "Personal",
+        "paymentsCount": "Pagos",
+        "amountCollected": "Importe cobrado"
+      }
+    },
+    "tax": {
+      "title": "Impuestos mensuales (PPN)",
+      "subtitle": "Impuesto agregado del período seleccionado.",
+      "yearLabel": "Año",
+      "monthLabel": "Mes",
+      "wholeYear": "Año completo",
+      "export": "Exportar CSV",
+      "metrics": {
+        "invoicesCount": "Facturas",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Impuesto (PPN)",
+        "refundsTotal": "Reembolsos",
+        "voidCount": "Anuladas",
+        "netTax": "Impuesto neto"
+      },
+      "csv": {
+        "metric": "Métrica",
+        "value": "Valor",
+        "period": "Período",
+        "invoicesCount": "Facturas",
+        "totalSubtotal": "Subtotal",
+        "totalTax": "Impuesto",
+        "refundsTotal": "Reembolsos",
+        "voidCount": "Anuladas",
+        "netTaxCollected": "Impuesto neto"
+      }
+    }
+  },
+  "invoicesPage": {
+    "title": "Facturas",
+    "subtitle": "Todas las facturas emitidas en esta propiedad."
+  },
+  "invoicesList": {
+    "searchLabel": "Buscar",
+    "searchPlaceholder": "Número, huésped o habitación…",
+    "statusLabel": "Estado",
+    "statusAll": "Todas",
+    "statusPaid": "Pagadas",
+    "statusPartial": "Parciales",
+    "statusUnpaid": "Pendientes",
+    "statusOverpaid": "Sobrepagadas",
+    "statusVoid": "Anuladas",
+    "fromLabel": "Desde",
+    "toLabel": "Hasta",
+    "clearFilters": "Limpiar",
+    "export": "Exportar",
+    "loading": "Cargando facturas…",
+    "errors": {
+      "loadFailed": "No se pudo cargar la lista de facturas.",
+      "exportFailed": "No se pudo exportar la lista de facturas."
+    },
+    "empty": {
+      "title": "Sin facturas",
+      "hint": "Prueba cambiando los filtros o registra una reserva."
+    },
+    "columns": {
+      "number": "Número",
+      "guest": "Huésped",
+      "room": "Habitación",
+      "total": "Total",
+      "balance": "Saldo",
+      "status": "Estado",
+      "issued": "Emitida"
+    },
+    "pagination": {
+      "summary": "{from}–{to} de {total}",
+      "prev": "Ant.",
+      "next": "Sig."
+    },
+    "toasts": {
+      "exported": "Exportadas {count} factura(s).",
+      "exportEmpty": "Ninguna factura coincide con los filtros actuales."
+    }
+  },
+  "invoiceDrawer": {
+    "title": "Detalle de factura",
+    "close": "Cerrar panel",
+    "loading": "Cargando factura…",
+    "loadError": "No se pudo cargar esta factura.",
+    "fields": {
+      "id": "ID",
+      "copy": "Copiar",
+      "booking": "Reserva",
+      "created": "Creada",
+      "paidAt": "Pagada el",
+      "voidedAt": "Anulada el",
+      "total": "Total"
+    },
+    "toasts": {
+      "copied": "ID copiada al portapapeles.",
+      "copyFailed": "No se pudo copiar el ID."
     }
   }
 }

@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -138,10 +137,14 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 			r.id AS room_id, r.number, r.pos_x, r.pos_y, r.status AS room_status,
 			rt.id AS room_type_id, rt.name AS room_type_name,
 			CASE
+				-- Jerarquía de prioridad: inactive > occupied > blocked > pending >
+				-- cleaning > available. "cleaning" es estado operacional de la
+				-- habitación (housekeeping en curso); no debe ser vendible.
 				WHEN r.status = 'inactive' THEN 'inactive'
 				WHEN b_in.id IS NOT NULL THEN 'occupied'
 				WHEN rb.id IS NOT NULL THEN 'blocked'
 				WHEN b_conf.id IS NOT NULL THEN 'pending'
+				WHEN r.status = 'cleaning' THEN 'cleaning'
 				ELSE 'available'
 			END AS availability_state,
 			(SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = r.id)) AS has_bookings,
@@ -167,8 +170,14 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		FROM rooms r
 		JOIN floors f ON r.floor_id = f.id
 		JOIN room_types rt ON r.room_type_id = rt.id
+		-- room_blocks: date-bound (mantaintenance/owner use son rangos planificados)
 		LEFT JOIN room_blocks rb ON rb.room_id = r.id AND rb.start_date < $2 AND rb.end_date > $1
-		LEFT JOIN bookings b_in ON b_in.room_id = r.id AND b_in.status = 'checked_in' AND b_in.check_in < $2 AND b_in.check_out > $1
+		-- b_in (checked_in): estado operacional ACTUAL. NO se filtra por fechas: un
+		-- huésped físicamente en la habitación ocupa el room sea cual sea el rango
+		-- consultado. Una reserva con check-in el 2 jun debe verse como occupied
+		-- aunque consultemos el mapa para 19-20 jun (BT-17).
+		LEFT JOIN bookings b_in ON b_in.room_id = r.id AND b_in.status = 'checked_in'
+		-- b_conf (confirmed): pendientes de check-in, sí filtran por fecha (plan futuro)
 		LEFT JOIN bookings b_conf ON b_conf.room_id = r.id AND b_conf.status = 'confirmed' AND b_conf.check_in < $2 AND b_conf.check_out > $1
 		LEFT JOIN guests g_in ON g_in.id = b_in.guest_id
 		LEFT JOIN guests g_conf ON g_conf.id = b_conf.guest_id
@@ -217,7 +226,7 @@ func (r *RoomRepository) GetMapWithAvailability(ctx context.Context, req models.
 		if _, exists := roomMap[rID]; !exists {
 			roomMap[rID] = &models.RoomMap{
 				ID: rID, Number: rNum, PosX: posX, PosY: posY,
-				RoomType: models.RoomTypeRef{ID: rtID, Name: rtName},
+				RoomType:    models.RoomTypeRef{ID: rtID, Name: rtName},
 				HasBookings: hasBookings,
 			}
 			floorMap[fID].Rooms = append(floorMap[fID].Rooms, roomMap[rID])
@@ -287,6 +296,10 @@ func (r *RoomRepository) BatchUpdatePositions(ctx context.Context, updates []mod
 	return len(updates), tx.Commit(ctx)
 }
 
+// Update - Actualización parcial de un room. Acepta cualquier subconjunto de los
+// campos editables de models.UpdateRoomRequest. Se usa desde el InventoryService
+// para transicionar el estado operacional (cleaning → active, etc.) sin tener
+// que conocer el SQL de UPDATE directamente.
 func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, req *models.UpdateRoomRequest) (*models.Room, error) {
 	query := "UPDATE rooms SET "
 	args := []interface{}{}
@@ -322,13 +335,13 @@ func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, req *models.U
 		return r.GetByID(ctx, id)
 	}
 
-	query += fmt.Sprintf("updated_at = NOW() WHERE id = $%d RETURNING id, floor_id, property_id, room_type_id, number, status, pos_x, pos_y, (SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $%d)) AS has_bookings, created_at, updated_at", idx, idx)
+	query += fmt.Sprintf("updated_at = NOW() WHERE id = $%d RETURNING id, floor_id, room_type_id, number, status, pos_x, pos_y, created_at, updated_at", idx)
 	args = append(args, id)
 
 	var room models.Room
 	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&room.ID, &room.FloorID, &room.PropertyID, &room.RoomTypeID, &room.Number, &room.Status,
-		&room.PosX, &room.PosY, &room.HasBookings, &room.CreatedAt, &room.UpdatedAt,
+		&room.ID, &room.FloorID, &room.RoomTypeID, &room.Number, &room.Status,
+		&room.PosX, &room.PosY, &room.CreatedAt, &room.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -338,34 +351,56 @@ func (r *RoomRepository) Update(ctx context.Context, id uuid.UUID, req *models.U
 
 func (r *RoomRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	var hasBookings bool
-	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $1)`, id).Scan(&hasBookings)
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM bookings WHERE room_id = $1)
+	`, id).Scan(&hasBookings)
 	if err != nil {
 		return err
 	}
+
 	if hasBookings {
-		return errors.New("cannot delete room with booking history")
+		return fmt.Errorf("cannot delete room with booking history")
 	}
 
-	_, err = r.db.Exec(ctx, `DELETE FROM rooms WHERE id = $1`, id)
-	return err
+	commandTag, err := r.db.Exec(ctx, `DELETE FROM rooms WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+
+	if commandTag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
 }
 
 func (r *RoomRepository) ListRoomTypes(ctx context.Context, propertyID uuid.UUID) ([]*models.RoomType, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, property_id, name, max_occupancy, created_at, updated_at 
-		FROM room_types WHERE property_id = $1 ORDER BY name ASC`, propertyID)
+		SELECT id, property_id, name, max_occupancy, created_at, updated_at
+		FROM room_types
+		WHERE property_id = $1
+		ORDER BY name ASC
+	`, propertyID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var roomTypes []*models.RoomType
+	roomTypes := make([]*models.RoomType, 0)
 	for rows.Next() {
-		var rt models.RoomType
-		if err := rows.Scan(&rt.ID, &rt.PropertyID, &rt.Name, &rt.MaxOccupancy, &rt.CreatedAt, &rt.UpdatedAt); err != nil {
+		var roomType models.RoomType
+		if err := rows.Scan(
+			&roomType.ID,
+			&roomType.PropertyID,
+			&roomType.Name,
+			&roomType.MaxOccupancy,
+			&roomType.CreatedAt,
+			&roomType.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
-		roomTypes = append(roomTypes, &rt)
+		roomTypes = append(roomTypes, &roomType)
 	}
+
 	return roomTypes, rows.Err()
 }

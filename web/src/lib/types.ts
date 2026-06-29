@@ -1,7 +1,13 @@
 // src/lib/types.ts
 // Alineado con models/map.go y Spec FMB-001
 
-export type RoomAvailability = 'available' | 'occupied' | 'pending' | 'blocked' | 'inactive';
+export type RoomAvailability =
+    | 'available'
+    | 'occupied'
+    | 'pending'
+    | 'blocked'
+    | 'cleaning'
+    | 'inactive';
 export type AppMode = 'setup' | 'ops';
 export type BlockReason = 'maintenance' | 'owner_use' | 'out_of_service';
 
@@ -220,4 +226,239 @@ export interface BookingDetail extends Booking {
 export interface CreateBookingResponse {
     booking: Booking;
     guest_reused: boolean;
+}
+
+// === Invoicing & Payments ===
+// Spec ref: Docs/Features/TEREN_Hotels_Invoicing_Spec_v1.1.md §4
+
+export type InvoiceStatus = 'active' | 'void' | 'refunded';
+export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'void' | 'refunded';
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'qris' | 'card';
+
+export interface InvoiceLineItem {
+    id: string;
+    invoice_id: string;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+    sort_order: number;
+    created_at: string;
+}
+
+export interface Payment {
+    id: string;
+    invoice_id: string;
+    property_id: string;
+    method: PaymentMethod;
+    amount: number; // > 0 = cobro, < 0 = refund
+    original_currency: string;
+    exchange_rate: number;
+    reference: string | null;
+    notes: string | null;
+    is_reversal: boolean;
+    reversal_of: string | null;
+    received_by: string;
+    received_at: string;
+    created_at: string;
+    /**
+     * v1.2 (R-07): amount still available to refund on this payment row.
+     * Present only for positive (non-reversal) payments in the invoice
+     * detail response; null for reversal rows. Computed server-side as
+     * `target.amount - SUM(refund rows WHERE reversal_of = target AND
+     * invalidated_at IS NULL)`.
+     */
+    remaining_reverseable?: number | null;
+    /**
+     * v1.2 (R-09 Q2): when set, the row is excluded from total_paid /
+     * total_refunded / effective_status. Used to retire legacy bad data
+     * without losing audit trail.
+     */
+    invalidated_at?: string | null;
+    invalidated_by?: string | null;
+    invalidated_reason?: string | null;
+}
+
+export interface Invoice {
+    id: string;
+    property_id: string;
+    booking_id: string;
+    invoice_number: string;
+    subtotal: number;
+    tax_amount: number;
+    ppn_rate_snapshot: number; // e.g. 0.11 for 11% PPN
+    total: number;
+    original_currency: string;
+    exchange_rate: number;
+    status: InvoiceStatus;
+    issued_at: string;
+    paid_at: string | null;
+    voided_at: string | null;
+    voided_by: string | null;
+    void_reason: string | null;
+    created_by: string;
+    pdf_url: string | null;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface InvoiceDetail extends Invoice {
+    line_items: InvoiceLineItem[];
+    payments: Payment[];
+    total_paid: number;
+    total_refunded: number;
+    balance: number;
+    /**
+     * v1.2 (R-08, R-09 Q2): server-side flag set when valid refunds
+     * exceed the original charge (legacy drift). Surfaced as a ⚠
+     * glyph on the status pill so the owner can review.
+     */
+    needs_review?: boolean;
+    effective_status: PaymentStatus;
+}
+
+export interface InvoiceSummary {
+    id: string;
+    invoice_number: string;
+    booking_id: string;
+    subtotal: number;
+    tax_amount: number;
+    total: number;
+    total_paid: number;
+    /**
+     * v1.2 (R-08): positive sum of non-invalidated refund rows on this
+     * invoice. Frontend uses it for KPI cards + the "Refunded" column.
+     */
+    total_refunded?: number;
+    balance: number;
+    status: InvoiceStatus;
+    effective_status: PaymentStatus;
+    /**
+     * v1.2 (R-08, R-09 Q2): server-side flag for invoices where the
+     * sum of valid refunds exceeds the original charge. Frontend shows
+     * a ⚠ glyph next to the status pill.
+     */
+    needs_review?: boolean;
+    issued_at: string;
+    paid_at: string | null;
+    voided_at: string | null;
+    guest_name: string | null;
+    room_number: string | null;
+}
+
+export interface InvoiceListResponse {
+    invoices: InvoiceSummary[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+    };
+}
+
+export interface ListInvoicesFilter {
+    property_id: string;
+    status?: PaymentStatus;
+    date_from?: string;
+    date_to?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+}
+
+export interface RegisterPaymentPayload {
+    method: PaymentMethod;
+    amount: number;
+    reference?: string;
+    notes?: string;
+    is_reversal?: boolean;
+    reversal_of?: string;
+    /**
+     * R-07 / R-02: when refunding, the user may change the refund method
+     * away from the original payment method. This requires a destructive
+     * confirmation (ConfirmDestructive) and the backend prepends an
+     * "[OVERRIDE] method changed from {X} to {Y} by {user}" note to the
+     * audit trail. Forced to owner-only on the server side.
+     */
+    force_override?: boolean;
+}
+
+/**
+ * v1.2 (Block 10): response from POST /invoices/{id}/refund-all.
+ * Mirrors the server shape: one batch row + N individual refund rows.
+ * The batch is the audit anchor; the individual rows replicate what a
+ * hand-rolled refund would have produced but in a single atomic tx.
+ */
+export interface RefundAllResponse {
+    batch: Payment;
+    refunds: Payment[];
+    refunded_count: number;
+    refunded_total: number;
+}
+
+export interface DailySummary {
+    date: string;
+    property_id: string;
+    invoices_issued: number;
+    invoices_paid: number;
+    invoices_partial: number;
+    invoices_unpaid: number;
+    invoices_void: number;
+    invoices_overpaid: number;
+    /**
+     * v1.2 (R-08): count of invoices issued today whose lifecycle
+     * flipped to 'refunded' (i.e. total_refunded >= total at some
+     * point during the day). Displayed as a separate KPI in the
+     * daily report (matches the dedicated Refunded column on the
+     * invoice list).
+     */
+    invoices_refunded: number;
+    /**
+     * v1.2 (R-09 Q2): count of invoices flagged needs_review=TRUE
+     * today. Surfaced as a warning banner on the daily report so
+     * the owner knows there's data drift to resolve before the
+     * daily close is accurate.
+     */
+    needs_review_count: number;
+    total_revenue: number;
+    total_collected: number;
+    total_refunded: number;
+    /**
+     * v1.2 (R-08): informational. total_collected - total_refunded
+     * for the day. Useful as a single "what actually stayed in the
+     * bank" number; tax report uses its own net_tax formula.
+     */
+    net_revenue: number;
+    total_pending: number;
+    by_method: Partial<Record<PaymentMethod, number>>;
+    tax_collected: number;
+    staff_breakdown: Array<{
+        user_id: string;
+        user_name: string;
+        payments_count: number;
+        amount_collected: number;
+    }>;
+}
+
+export interface MonthlyTaxReport {
+    property_id: string;
+    year: number;
+    month?: number;
+    total_subtotal: number;
+    total_tax: number;
+    invoices_count: number;
+    void_count: number;
+    refunds_total: number;
+    /**
+     * v1.2 (R-08): count of fully-refunded invoices in the period
+     * (status='refunded'). Useful KPI alongside the monetary total.
+     */
+    refunded_count: number;
+    /**
+     * v1.2 (R-09 Q2): count of invoices flagged needs_review=TRUE
+     * in the period. Surfaced as a warning banner (same UX as the
+     * daily summary).
+     */
+    needs_review_count: number;
+    net_tax_collected: number;
 }

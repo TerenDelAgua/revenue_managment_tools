@@ -71,6 +71,8 @@ func (s *InventoryService) RemoveBlock(ctx context.Context, blockID uuid.UUID) e
 }
 
 // IsRoomAvailableForBooking helper para BR-04 (Booking Service futuro).
+// Reglas: un room NO es reservable si (a) tiene un room_block solapando, (b) tiene
+// un booking checked_in solapando, o (c) está en estado persistente "cleaning".
 func (s *InventoryService) IsRoomAvailableForBooking(ctx context.Context, roomID uuid.UUID, start, end time.Time) (bool, error) {
 	hasBlock, err := s.hasBlockingOverlap(ctx, roomID, start, end)
 	if err != nil || hasBlock {
@@ -80,7 +82,50 @@ func (s *InventoryService) IsRoomAvailableForBooking(ctx context.Context, roomID
 	if err != nil {
 		return false, err
 	}
-	return !hasActive, nil
+	if hasActive {
+		return false, nil
+	}
+	// Estado persistente: housekeeping en curso. No vendible.
+	cleaning, err := s.isRoomCleaning(ctx, roomID)
+	if err != nil {
+		return false, err
+	}
+	return !cleaning, nil
+}
+
+// SetRoomCleaning marca/desmarca el estado operacional "cleaning" de una habitación.
+// Reglas de dominio:
+//   - No se puede limpiar una habitación "inactive" (devuelve BusinessError).
+//   - Idempotente: aplicar el mismo estado dos veces es no-op.
+//   - Al terminar la limpieza, el estado vuelve a "active" (vendible de nuevo).
+func (s *InventoryService) SetRoomCleaning(ctx context.Context, roomID uuid.UUID, isCleaning bool) (*models.Room, error) {
+	room, err := s.roomRepo.GetByID(ctx, roomID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load room: %w", err)
+	}
+	if room == nil {
+		return nil, &BusinessError{Code: "ROOM_NOT_FOUND", Message: "Room not found."}
+	}
+	if room.Status == "inactive" {
+		return nil, &BusinessError{
+			Code:    "ROOM_INACTIVE",
+			Message: "An inactive room cannot be marked as cleaning. Reactivate it first.",
+		}
+	}
+
+	target := "active"
+	if isCleaning {
+		target = "cleaning"
+		if room.Status == "cleaning" {
+			return room, nil // idempotente
+		}
+	} else {
+		if room.Status != "cleaning" {
+			return room, nil // ya estaba en estado vendible
+		}
+	}
+
+	return s.roomRepo.Update(ctx, roomID, &models.UpdateRoomRequest{Status: &target})
 }
 
 // === Consultas de conflicto (BR-03 / BR-04) ===
@@ -104,4 +149,13 @@ func (s *InventoryService) hasBlockingOverlap(ctx context.Context, roomID uuid.U
 		WHERE room_id = $1 AND start_date < $3 AND end_date > $2
 	`, roomID, start, end).Scan(&count)
 	return count > 0, err
+}
+
+func (s *InventoryService) isRoomCleaning(ctx context.Context, roomID uuid.UUID) (bool, error) {
+	var status string
+	err := s.db.QueryRow(ctx, `SELECT status FROM rooms WHERE id = $1`, roomID).Scan(&status)
+	if err != nil {
+		return false, err
+	}
+	return status == "cleaning", nil
 }

@@ -88,14 +88,27 @@ func (h *BookingHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	status := r.URL.Query().Get("status")
 	search := r.URL.Query().Get("search")
-	
+
+	// Optional room_id filter. The frontend uses this to scope the
+	// bookings list to a single room when the user drills in from the
+	// floor map (e.g. clicking a room cell). An empty / invalid UUID
+	// falls through to "all rooms in the property".
+	var roomIDPtr *uuid.UUID
+	if roomIDStr := r.URL.Query().Get("room_id"); roomIDStr != "" {
+		parsed, err := uuid.Parse(roomIDStr)
+		if err != nil {
+			api.BadRequest(w, "Invalid room_id")
+			return
+		}
+		roomIDPtr = &parsed
+	}
+
 	page := 1
 	if pStr := r.URL.Query().Get("page"); pStr != "" {
 		if p, err := strconv.Atoi(pStr); err == nil && p > 0 {
 			page = p
 		}
 	}
-	
 	limit := 50
 	if lStr := r.URL.Query().Get("limit"); lStr != "" {
 		if l, err := strconv.Atoi(lStr); err == nil && l > 0 {
@@ -103,7 +116,7 @@ func (h *BookingHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	bookings, total, err := h.svc.ListBookings(r.Context(), propertyID, status, search, page, limit)
+	bookings, total, err := h.svc.ListBookings(r.Context(), propertyID, status, search, roomIDPtr, page, limit)
 	if err != nil {
 		api.InternalServerError(w, "Failed to list bookings")
 		return

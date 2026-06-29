@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/terendelagua/teren-hotels-backend/internal/models"
@@ -89,4 +90,50 @@ func (h *InventoryHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.JSON(w, http.StatusOK, mapData)
+}
+
+// SetCleaning - POST /api/v1/rooms/{id}/cleaning
+// Marca la habitación como "cleaning" (housekeeping en curso).
+// Es idempotente: aplicarlo dos veces no rompe nada.
+func (h *InventoryHandler) SetCleaning(w http.ResponseWriter, r *http.Request) {
+	room, err := h.transitionCleaning(r, true)
+	if err != nil {
+		h.writeCleaningErr(w, err)
+		return
+	}
+	api.JSON(w, http.StatusOK, room)
+}
+
+// ClearCleaning - DELETE /api/v1/rooms/{id}/cleaning
+// Marca la habitación como disponible de nuevo (sale del estado cleaning).
+// Es idempotente.
+func (h *InventoryHandler) ClearCleaning(w http.ResponseWriter, r *http.Request) {
+	room, err := h.transitionCleaning(r, false)
+	if err != nil {
+		h.writeCleaningErr(w, err)
+		return
+	}
+	api.JSON(w, http.StatusOK, room)
+}
+
+func (h *InventoryHandler) transitionCleaning(r *http.Request, isCleaning bool) (*models.Room, error) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		return nil, &service.BusinessError{Code: "INVALID_ID", Message: "Invalid room ID."}
+	}
+	return h.svc.SetRoomCleaning(r.Context(), id, isCleaning)
+}
+
+func (h *InventoryHandler) writeCleaningErr(w http.ResponseWriter, err error) {
+	var bizErr *service.BusinessError
+	if errors.As(err, &bizErr) {
+		status := http.StatusConflict
+		if bizErr.Code == "ROOM_NOT_FOUND" || bizErr.Code == "INVALID_ID" {
+			status = http.StatusNotFound
+		}
+		api.JSON(w, status, api.Error{Code: bizErr.Code, Message: bizErr.Message})
+		return
+	}
+	log.Printf("cleaning transition error: %v", err)
+	api.InternalServerError(w, "Failed to update room cleaning state")
 }

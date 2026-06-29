@@ -125,24 +125,24 @@ func (r *ReportRepository) GetDailyBreakdown(ctx context.Context, req models.Rep
 		)
 		SELECT 
 			ds.date,
-			COALESCE(ds.occupied_rooms, 0) AS occupied_rooms,
-			$4 - COALESCE(ds.occupied_rooms, 0) AS available_rooms,
+			COALESCE(ds2.occupied_rooms, 0) AS occupied_rooms,
+			$4 - COALESCE(ds2.occupied_rooms, 0) AS available_rooms,
 			$4 AS total_rooms,
 			CASE 
 				WHEN $4 > 0 
-				THEN ROUND((COALESCE(ds.occupied_rooms, 0)::numeric / $4::numeric) * 100, 2)
+				THEN ROUND((COALESCE(ds2.occupied_rooms, 0)::numeric / $4::numeric) * 100, 2)
 				ELSE 0 
 			END AS occupancy_rate,
-			COALESCE(ds.daily_revenue, 0) AS daily_revenue,
+			COALESCE(ds2.daily_revenue, 0) AS daily_revenue,
 			CASE 
-				WHEN COALESCE(ds.occupied_rooms, 0) > 0 
-				THEN ROUND(ds.daily_revenue / ds.occupied_rooms::numeric, 2)
-				ELSE 0 
+				WHEN COALESCE(ds2.occupied_rooms, 0) > 0 
+				THEN ROUND(ds2.daily_revenue / ds2.occupied_rooms::numeric, 2)
+				ELSE 0
 			END AS adr,
 			CASE 
 				WHEN $4 > 0 
-				THEN ROUND(ds.daily_revenue / $4::numeric, 2)
-				ELSE 0 
+				THEN ROUND(ds2.daily_revenue / $4::numeric, 2)
+				ELSE 0
 			END AS revpar
 		FROM date_series ds
 		LEFT JOIN daily_stats ds2 ON ds.date = ds2.date

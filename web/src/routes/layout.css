@@ -1,20 +1,214 @@
 @import 'tailwindcss';
 
-@theme {
-	--color-teren-background-base: #F5F4F1;
-	--color-teren-surface-base: #FCFBFA;
-	--color-teren-primary: #FF8C42;
-	--color-teren-primary-hover: #E06B20;
-	--color-teren-primary-subtle: #FFF7ED;
-	--color-teren-text-main: #1C1917;
-	--color-teren-text-muted: #57534E;
-	--color-teren-border-subtle: #E7E5E4;
+/*
+ * TEREN Design System v1.1.0 — Token Infrastructure
+ *
+ * Architecture:
+ *   1. Light values declared in :root (CSS variables).
+ *   2. Dark values override the same variables inside `.dark`.
+ *   3. `@theme inline` registers those variables as Tailwind colors so
+ *      utilities like `bg-teren-background-base` resolve at runtime to
+ *      the active mode without rebuilding the stylesheet.
+ *   4. `@custom-variant dark` enables explicit `dark:` variants when
+ *      a component needs mode-specific overrides beyond the token swap.
+ *   5. `@media (prefers-color-scheme: dark)` provides a default when
+ *      the user has not made an explicit choice. The `:not(.light)`
+ *      guard ensures explicit light override always wins.
+ *   6. `color-scheme` drives native form controls + scrollbars (DS §2.1.1).
+ *   7. `prefers-reduced-motion` is honored globally (DS motion rules).
+ */
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ */
+/* Light tokens (default)                                              */
+/* ------------------------------------------------------------------ */
+:root {
+	color-scheme: light;
+
+	/* Core */
+	--color-teren-background-base: #f5f4f1;
+	--color-teren-surface-base: #fcfbfa;
+	--color-teren-text-main: #1c1917;
+	--color-teren-text-muted: #57534e;
+	--color-teren-border-subtle: #e7e5e4;
+
+	/* Brand */
+	--color-teren-primary: #ff8c42;
+	--color-teren-primary-hover: #e06b20;
+	--color-teren-primary-subtle: #fff7ed;
+
+	/* Semantic — Error (DS v1.1 §2.1) */
+	--color-teren-error-base: #dc2626;
+	--color-teren-error-subtle: #fef2f2;
+	--color-teren-error-hover: #b91c1c;
+
+	/* Semantic — Success (NUEVO DS v1.1) */
+	--color-teren-success-base: #16a34a;
+	--color-teren-success-subtle: #dcfce7;
+	--color-teren-success-hover: #15803d;
+
+	/* Semantic — Warning (NUEVO DS v1.1) */
+	--color-teren-warning-base: #d97706;
+	--color-teren-warning-subtle: #fef3c7;
+	--color-teren-warning-hover: #b45309;
+
+	/*
+	 * Semantic — Info (DS follow-up candidate for v1.2).
+	 * Used for non-actionable notifications and the "cleaning in progress"
+	 * badge state. Distinct from primary (action) and warning (attention).
+	 */
+	--color-teren-info-base: #0284c7;
+	--color-teren-info-subtle: #f0f9ff;
+	--color-teren-info-hover: #e0f2fe;
+
+	/*
+	 * Sidebar surface (DS follow-up candidate for v1.2).
+	 * The sidebar is an intentionally inverted surface — it stays dark in
+	 * both light and dark modes for high-contrast navigation. These tokens
+	 * intentionally do NOT swap with the theme.
+	 */
+	--color-teren-sidebar-bg: #1c1917;
+	--color-teren-sidebar-fg: #fcfbfa;
+	--color-teren-sidebar-muted: #a8a29e;
+	--color-teren-sidebar-border: #3f3d38;
+	--color-teren-sidebar-hover: #3f3d38;
+	--color-teren-sidebar-footer-bg: #141211;
+
+	/* Typography */
 	--font-sans: 'Inter', 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
 }
 
+/* ------------------------------------------------------------------ */
+/* Dark tokens (DS v1.1 §2.1.1)                                       */
+/* ------------------------------------------------------------------ */
+.dark {
+	color-scheme: dark;
+
+	--color-teren-background-base: #0f0e0c;
+	--color-teren-surface-base: #1c1a17;
+	--color-teren-text-main: #f5f4f1;
+	--color-teren-text-muted: #a8a29e;
+	--color-teren-border-subtle: #3f3d38;
+
+	--color-teren-primary: #ff8c42;
+	--color-teren-primary-hover: #ffaa6b;
+	--color-teren-primary-subtle: #2c1f10;
+
+	--color-teren-error-base: #f87171;
+	--color-teren-error-subtle: #2c1212;
+	--color-teren-error-hover: #fca5a5;
+
+	--color-teren-success-base: #4ade80;
+	--color-teren-success-subtle: #14532d;
+	--color-teren-success-hover: #22c55e;
+
+	--color-teren-warning-base: #fbbf24;
+	--color-teren-warning-subtle: #78350f;
+	--color-teren-warning-hover: #f59e0b;
+
+	--color-teren-info-base: #38bdf8;
+	--color-teren-info-subtle: #082f49;
+	--color-teren-info-hover: #075985;
+}
+
+/* ------------------------------------------------------------------ */
+/* System preference fallback (only when user has not chosen explicit) */
+/* ------------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+	:root:not(.light) {
+		color-scheme: dark;
+
+		--color-teren-background-base: #0f0e0c;
+		--color-teren-surface-base: #1c1a17;
+		--color-teren-text-main: #f5f4f1;
+		--color-teren-text-muted: #a8a29e;
+		--color-teren-border-subtle: #3f3d38;
+
+		--color-teren-primary: #ff8c42;
+		--color-teren-primary-hover: #ffaa6b;
+		--color-teren-primary-subtle: #2c1f10;
+
+		--color-teren-error-base: #f87171;
+		--color-teren-error-subtle: #2c1212;
+		--color-teren-error-hover: #fca5a5;
+
+		--color-teren-success-base: #4ade80;
+		--color-teren-success-subtle: #14532d;
+		--color-teren-success-hover: #22c55e;
+
+		--color-teren-warning-base: #fbbf24;
+		--color-teren-warning-subtle: #78350f;
+		--color-teren-warning-hover: #f59e0b;
+
+		--color-teren-info-base: #38bdf8;
+		--color-teren-info-subtle: #082f49;
+		--color-teren-info-hover: #075985;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Tailwind v4 token registration                                      */
+/* `inline` reads the CSS variable at runtime so utilities resolve    */
+/* to the active mode without rebuilds.                               */
+/* ------------------------------------------------------------------ */
+@theme inline {
+	--color-teren-background-base: var(--color-teren-background-base);
+	--color-teren-surface-base: var(--color-teren-surface-base);
+	--color-teren-text-main: var(--color-teren-text-main);
+	--color-teren-text-muted: var(--color-teren-text-muted);
+	--color-teren-border-subtle: var(--color-teren-border-subtle);
+
+	--color-teren-primary: var(--color-teren-primary);
+	--color-teren-primary-hover: var(--color-teren-primary-hover);
+	--color-teren-primary-subtle: var(--color-teren-primary-subtle);
+
+	--color-teren-error-base: var(--color-teren-error-base);
+	--color-teren-error-subtle: var(--color-teren-error-subtle);
+	--color-teren-error-hover: var(--color-teren-error-hover);
+
+	--color-teren-success-base: var(--color-teren-success-base);
+	--color-teren-success-subtle: var(--color-teren-success-subtle);
+	--color-teren-success-hover: var(--color-teren-success-hover);
+
+	--color-teren-warning-base: var(--color-teren-warning-base);
+	--color-teren-warning-subtle: var(--color-teren-warning-subtle);
+	--color-teren-warning-hover: var(--color-teren-warning-hover);
+
+	--color-teren-info-base: var(--color-teren-info-base);
+	--color-teren-info-subtle: var(--color-teren-info-subtle);
+	--color-teren-info-hover: var(--color-teren-info-hover);
+
+	--color-teren-sidebar-bg: var(--color-teren-sidebar-bg);
+	--color-teren-sidebar-fg: var(--color-teren-sidebar-fg);
+	--color-teren-sidebar-muted: var(--color-teren-sidebar-muted);
+	--color-teren-sidebar-border: var(--color-teren-sidebar-border);
+	--color-teren-sidebar-hover: var(--color-teren-sidebar-hover);
+	--color-teren-sidebar-footer-bg: var(--color-teren-sidebar-footer-bg);
+
+	--font-sans: var(--font-sans);
+}
+
+/* ------------------------------------------------------------------ */
+/* Base layer                                                          */
+/* ------------------------------------------------------------------ */
 @layer base {
 	body {
-		@apply bg-teren-background-base text-teren-text-main font-sans min-h-screen p-6;
+		@apply bg-teren-background-base text-teren-text-main font-sans min-h-screen p-6 transition-colors duration-200;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Global motion rule: respect prefers-reduced-motion                 */
+/* DS §3.5 — animations are decorative, not functional.                */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
 	}
 }

@@ -21,6 +21,9 @@
 			pattern:
 				'bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(255,255,255,0.1)_4px,rgba(255,255,255,0.1)_8px)]'
 		},
+		// Estado operacional: housekeeping en curso. Sky-600 contrasta con el verde
+		// de "available" y se lee como "en proceso" (frío/agua vs caliente/ocupado).
+		cleaning: { bg: 'bg-[#0284C7]', text: 'text-white', icon: '🧹', pattern: '' },
 		inactive: { bg: 'bg-[#A8A29E]', text: 'text-[#1C1917]', icon: '', pattern: 'opacity-60' }
 	};
 

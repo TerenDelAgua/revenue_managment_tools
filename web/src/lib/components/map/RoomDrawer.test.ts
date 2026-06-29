@@ -1,9 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { render } from '@testing-library/svelte';
+import { locale } from 'svelte-i18n';
 import RoomDrawer from './RoomDrawer.svelte';
 import type { RoomMap } from '$lib/types';
 
 describe('RoomDrawer Component', () => {
+	// The component is asserted against Spanish translations (status + button
+	// labels), matching the es.json locale. The setupTests.ts registers all
+	// locales; here we just activate the one this suite targets.
+	beforeAll(() => {
+		locale.set('es');
+	});
+
 	const mockRoom = (availability: RoomMap['availability']): RoomMap => ({
 		id: 'test-room-uuid-long-enough',
 		number: '101',
@@ -17,7 +25,7 @@ describe('RoomDrawer Component', () => {
 		block: null
 	});
 
-	it('FT-05: opens drawer for occupied room and renders "Check Out" primary action button', () => {
+	it('FT-05: opens drawer for occupied room and renders "Check-out" primary action button', () => {
 		const room = mockRoom('occupied');
 		const { container } = render(RoomDrawer, {
 			props: {
@@ -29,24 +37,24 @@ describe('RoomDrawer Component', () => {
 			}
 		});
 
-		// Render details header & status
+		// Render details header & status (es locale)
 		expect(container).toHaveTextContent('101');
 		expect(container).toHaveTextContent('Standard Suite · Ocupada');
 
-		// The footer button must be present and display "Check Out"
+		// The footer button must be present and display "Check-out" (es)
 		const buttons = container.querySelectorAll('button');
 		let primaryButton: HTMLButtonElement | null = null;
 		buttons.forEach((btn) => {
-			if (btn.textContent?.trim() === 'Check Out') {
+			if (btn.textContent?.includes('Check-out')) {
 				primaryButton = btn;
 			}
 		});
 
 		expect(primaryButton).toBeInTheDocument();
-		expect(primaryButton).toHaveClass('bg-[#1C1917]'); // Spec styling color for checkout
+		expect(primaryButton).toHaveClass('bg-teren-text-main');
 	});
 
-	it('FT-06: opens drawer for available room and renders "Assign Booking" primary action button', () => {
+	it('FT-06: opens drawer for available room and renders "Asignar reserva" primary action button', () => {
 		const room = mockRoom('available');
 		const { container } = render(RoomDrawer, {
 			props: {
@@ -63,12 +71,13 @@ describe('RoomDrawer Component', () => {
 		const buttons = container.querySelectorAll('button');
 		let primaryButton: HTMLButtonElement | null = null;
 		buttons.forEach((btn) => {
-			if (btn.textContent?.trim() === 'Assign Booking') {
+			// es.json → "Asignar reserva"
+			if (btn.textContent?.includes('Asignar reserva')) {
 				primaryButton = btn;
 			}
 		});
 
 		expect(primaryButton).toBeInTheDocument();
-		expect(primaryButton).toHaveClass('bg-[#FF8C42]'); // Spec styling color for assign
+		expect(primaryButton).toHaveClass('bg-teren-primary');
 	});
 });
