@@ -3,6 +3,8 @@
 -- Spec ref: Docs/Features/TEREN_Hotels_Invoicing_Spec_v1.2.md
 -- Ratified: R-07 (refund 1:1) + R-08 (refunded status) + R-09 (UX details)
 --
+-- requires: invoices.status, payments.id, users.id, properties.id
+--
 -- Resumen del cambio:
 --   1. Extiende invoices.status CHECK para incluir 'refunded'.
 --   2. Añade invoices.needs_review (data integrity flag).
@@ -15,7 +17,42 @@
 --      flippa invoices ya totalmente refunded, y marca over-refunds.
 
 -- =============================================================================
+-- 0. Guard schema — verify the columns/tables this migration touches exist.
+--    Tables may be absent on a legacy production DB; sections 3-6 already
+--    use IF NOT EXISTS / OR REPLACE so they self-heal, but this guard makes
+--    the precondition explicit and easy to debug from logs.
+-- =============================================================================
+DO $$
+DECLARE
+    v_missing TEXT;
+BEGIN
+    SELECT string_agg(col, ', ' ORDER BY col)
+      INTO v_missing
+      FROM (
+        VALUES
+            ('invoices.status'),
+            ('payments.id'),
+            ('users.id'),
+            ('properties.id')
+      ) AS required(col)
+     WHERE NOT EXISTS (
+            SELECT 1
+              FROM information_schema.columns
+             WHERE table_name = split_part(required.col, '.', 1)
+               AND column_name = split_part(required.col, '.', 2)
+     );
+
+    IF v_missing IS NOT NULL THEN
+        RAISE NOTICE '008 guard schema: missing prerequisites: %', v_missing;
+    ELSE
+        RAISE NOTICE '008 guard schema: all prerequisites present';
+    END IF;
+END$$;
+
+-- =============================================================================
 -- 1. invoices.status CHECK constraint
+--    Idempotent across re-applies: drop the existing constraint by name
+--    (no-op if absent), then recreate it with the extended domain.
 -- =============================================================================
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
 ALTER TABLE invoices ADD CONSTRAINT invoices_status_check
@@ -134,10 +171,11 @@ COMMENT ON FUNCTION trg_invoice_status_update() IS
 
 -- 6.1 Invalidate the 2 legacy rows from MVP testing on INV-2026-0002
 --     (R-09 Q2: confirmed by owner — retire without losing audit).
+--     Idempotent: re-applying keeps the original `invalidated_at` timestamp.
 UPDATE payments
-   SET invalidated_at = NOW(),
-       invalidated_by = (SELECT id FROM users WHERE role = 'owner' LIMIT 1),
-       invalidated_reason = 'INVALIDATED - manual split required'
+   SET invalidated_at = COALESCE(invalidated_at, NOW()),
+       invalidated_by = COALESCE(invalidated_by, (SELECT id FROM users WHERE role = 'owner' LIMIT 1)),
+       invalidated_reason = COALESCE(invalidated_reason, 'INVALIDATED - manual split required')
  WHERE id IN (
      'a94e74eb-e039-4876-9b7c-845d35e48ffc',  -- -100000 SLIP-R-001 (smoke test)
      '0ac15330-fdfd-43a5-9ecf-5505bd6c0d75'   -- -666000 TRF-DEV-002 (manual refund)
@@ -161,6 +199,7 @@ UPDATE invoices i
    ), 0) >= i.total;
 
 -- 6.3 Flag over-refunded invoices for manual review (R-08, BR-INV-011).
+--     Idempotent: skip rows already flagged.
 UPDATE invoices i
    SET needs_review = TRUE
  WHERE i.status IN ('active','refunded')
@@ -170,4 +209,5 @@ UPDATE invoices i
         WHERE p.invoice_id = i.id
           AND p.amount < 0
           AND p.invalidated_at IS NULL
-   ), 0) > i.total + 0.01;
+   ), 0) > i.total + 0.01
+   AND i.needs_review = FALSE;

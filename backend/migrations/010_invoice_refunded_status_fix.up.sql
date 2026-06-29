@@ -3,6 +3,11 @@
 -- Spec ref: Docs/Features/TEREN_Hotels_Invoicing_Spec_v1.2.md
 -- Ratified: R-07 (refund 1:1) + R-08 (refunded status) + R-09 (UX details)
 --
+-- requires: schema_migrations.version
+-- (This migration may be the first file the runner applies against a
+--  legacy schema_migrations table, so we only require the version column
+--  that the runner always creates via CREATE TABLE IF NOT EXISTS.)
+--
 -- Context:
 --   008_invoice_refunded_status.up.sql failed in production with:
 --       ERROR: column "status" does not exist (SQLSTATE 42703)

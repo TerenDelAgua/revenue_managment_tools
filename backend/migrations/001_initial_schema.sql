@@ -1,8 +1,14 @@
--- Enable UUID extension
+-- 001_initial_schema.sql
+-- Initial schema for TEREN Hotels. Idempotent: re-apply is a no-op.
+-- Note: the legacy `invoices` table created here is replaced in 006 by
+-- the v1.1 invoicing schema. The table name and columns are kept here
+-- only to support greenfield installations that never reached v1.1.
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create tables
-CREATE TABLE properties (
+-- Core domain tables. IF NOT EXISTS makes every CREATE idempotent so the
+-- runner can safely re-apply this file (e.g. after a partial failure).
+CREATE TABLE IF NOT EXISTS properties (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
@@ -13,7 +19,7 @@ CREATE TABLE properties (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -24,7 +30,7 @@ CREATE TABLE users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE floors (
+CREATE TABLE IF NOT EXISTS floors (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
     floor_number INTEGER NOT NULL,
@@ -35,7 +41,7 @@ CREATE TABLE floors (
     UNIQUE(property_id, floor_number)
 );
 
-CREATE TABLE room_types (
+CREATE TABLE IF NOT EXISTS room_types (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -44,7 +50,7 @@ CREATE TABLE room_types (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE rooms (
+CREATE TABLE IF NOT EXISTS rooms (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     floor_id UUID NOT NULL REFERENCES floors(id) ON DELETE CASCADE,
     room_type_id UUID NOT NULL REFERENCES room_types(id) ON DELETE CASCADE,
@@ -57,7 +63,7 @@ CREATE TABLE rooms (
     UNIQUE(floor_id, number)
 );
 
-CREATE TABLE rate_rules (
+CREATE TABLE IF NOT EXISTS rate_rules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     room_type_id UUID NOT NULL REFERENCES room_types(id) ON DELETE CASCADE,
     base_rate NUMERIC(10, 2) NOT NULL,
@@ -70,7 +76,7 @@ CREATE TABLE rate_rules (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE room_blocks (
+CREATE TABLE IF NOT EXISTS room_blocks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     created_by UUID NOT NULL REFERENCES users(id),
@@ -82,7 +88,7 @@ CREATE TABLE room_blocks (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE guests (
+CREATE TABLE IF NOT EXISTS guests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
     full_name TEXT NOT NULL,
@@ -93,7 +99,7 @@ CREATE TABLE guests (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE bookings (
+CREATE TABLE IF NOT EXISTS bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
     room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -109,7 +115,9 @@ CREATE TABLE bookings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE invoices (
+-- Legacy invoicing table (MVP only). Replaced in 006 by the v1.1 schema.
+-- Kept idempotent so re-applying the migration does not break.
+CREATE TABLE IF NOT EXISTS invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
     invoice_number TEXT NOT NULL UNIQUE,
@@ -124,18 +132,18 @@ CREATE TABLE invoices (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create indexes
-CREATE INDEX idx_users_property_id ON users(property_id);
-CREATE INDEX idx_floors_property_id ON floors(property_id);
-CREATE INDEX idx_room_types_property_id ON room_types(property_id);
-CREATE INDEX idx_rooms_floor_id ON rooms(floor_id);
-CREATE INDEX idx_rooms_room_type_id ON rooms(room_type_id);
-CREATE INDEX idx_rate_rules_room_type_id ON rate_rules(room_type_id);
-CREATE INDEX idx_room_blocks_room_id ON room_blocks(room_id);
-CREATE INDEX idx_room_blocks_created_by ON room_blocks(created_by);
-CREATE INDEX idx_guests_property_id ON guests(property_id);
-CREATE INDEX idx_bookings_property_id ON bookings(property_id);
-CREATE INDEX idx_bookings_room_id ON bookings(room_id);
-CREATE INDEX idx_bookings_guest_id ON bookings(guest_id);
-CREATE INDEX idx_bookings_created_by ON bookings(created_by);
-CREATE INDEX idx_invoices_booking_id ON invoices(booking_id);
+-- Indexes (IF NOT EXISTS makes re-apply safe).
+CREATE INDEX IF NOT EXISTS idx_users_property_id ON users(property_id);
+CREATE INDEX IF NOT EXISTS idx_floors_property_id ON floors(property_id);
+CREATE INDEX IF NOT EXISTS idx_room_types_property_id ON room_types(property_id);
+CREATE INDEX IF NOT EXISTS idx_rooms_floor_id ON rooms(floor_id);
+CREATE INDEX IF NOT EXISTS idx_rooms_room_type_id ON rooms(room_type_id);
+CREATE INDEX IF NOT EXISTS idx_rate_rules_room_type_id ON rate_rules(room_type_id);
+CREATE INDEX IF NOT EXISTS idx_room_blocks_room_id ON room_blocks(room_id);
+CREATE INDEX IF NOT EXISTS idx_room_blocks_created_by ON room_blocks(created_by);
+CREATE INDEX IF NOT EXISTS idx_guests_property_id ON guests(property_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_property_id ON bookings(property_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_room_id ON bookings(room_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_guest_id ON bookings(guest_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_created_by ON bookings(created_by);
+CREATE INDEX IF NOT EXISTS idx_invoices_booking_id ON invoices(booking_id);
