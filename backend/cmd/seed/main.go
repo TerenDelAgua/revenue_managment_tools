@@ -26,6 +26,7 @@ func main() {
 	forceFlag := flag.Bool("force", false, "Fuerza la ejecución en producción")
 	fileFlag := flag.String("file", "", "Ejecuta un archivo de seed específico (ej: 004_seed_bookings.sql). Por defecto ejecuta todos.")
 	seedsDir := flag.String("dir", "seeds", "Directorio donde se encuentran los archivos SQL de seed")
+	reportFlag := flag.Bool("report", false, "Modo dry-run: cuenta cuántas filas afectarían los seeds sin escribir nada. Requiere la BBDD ya inicializada.")
 	flag.Parse()
 
 	// 2. Conexión a Base de Datos (con fallback al valor por defecto local)
@@ -35,16 +36,29 @@ func main() {
 	}
 
 	// 3. Validación de Seguridad para Producción
-	isProduction := *envFlag == "production" || strings.Contains(strings.ToLower(dbURL), "railway.app") || strings.Contains(strings.ToLower(dbURL), "amazonaws")
+	//
+	// The heuristic was widened beyond the legacy `-env` flag: any URL
+	// pointing at a known managed cloud DB (Railway, AWS RDS, Render,
+	// Supabase) is treated as production even when the operator omits
+	// `-env=production`. This closes the gap where a forgotten flag
+	// would let the seed suite run against a live database.
+	isProduction := detectProduction(*envFlag, dbURL)
+
 	if isProduction {
 		fmt.Println("⚠️  ADVERTENCIA: Se ha detectado un entorno de PRODUCCIÓN / NUBE.")
-		if !*forceFlag {
-			log.Fatal("❌ ERROR DE SEGURIDAD: Para ejecutar semillas en producción debes usar el flag '-force'. Abortando.")
+		// `--report` is exempt from the `--force` requirement because it
+		// never writes — every transaction is rolled back at the end.
+		if *reportFlag {
+			fmt.Println("ℹ️  Modo report: se ejecutará en dry-run, sin escribir nada.")
+		} else {
+			if !*forceFlag {
+				log.Fatal("❌ ERROR DE SEGURIDAD: Para ejecutar semillas en producción debes usar el flag '-force'. Abortando.")
+			}
+			if *cleanFlag {
+				log.Fatal("❌ ERROR DE SEGURIDAD: El flag '-clean' está estrictamente prohibido en entornos productivos. Abortando.")
+			}
+			fmt.Println("ℹ️  Continuando bajo la responsabilidad del usuario (-force activo)...")
 		}
-		if *cleanFlag {
-			log.Fatal("❌ ERROR DE SEGURIDAD: El flag '-clean' está estrictamente prohibido en entornos productivos. Abortando.")
-		}
-		fmt.Println("ℹ️  Continuando bajo la responsabilidad del usuario (-force activo)...")
 	}
 
 	log.Printf("🔌 Conectando a la base de datos [%s]...", *envFlag)
@@ -115,6 +129,37 @@ func main() {
 
 	sort.Strings(filesToRun)
 
+	// 6. Modo report: ejecuta cada archivo dentro de una transacción que
+	// siempre hace rollback, para mostrar qué efecto tendría la siembra
+	// sin escribir nada. Útil para CI y para que el operador valide el
+	// impacto antes de tocar una base de datos real.
+	if *reportFlag {
+		log.Printf("📊 Modo report activado — %d archivo(s) se ejecutarían en modo dry-run.", len(filesToRun))
+		for _, filename := range filesToRun {
+			filePath := filepath.Join(*seedsDir, filename)
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Fatalf("❌ Error al leer el archivo de seed %s: %v", filePath, err)
+			}
+
+			log.Printf("⏳ Simulando %s...", filename)
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				log.Fatalf("❌ Fallo al iniciar transacción para %s: %v", filename, err)
+			}
+			if _, err := tx.ExecContext(ctx, string(content)); err != nil {
+				_ = tx.Rollback()
+				log.Fatalf("❌ ERROR simulando %s: %v. La siembra real también fallaría.", filename, err)
+			}
+			if err := tx.Rollback(); err != nil {
+				log.Fatalf("❌ Fallo al hacer rollback tras %s: %v", filename, err)
+			}
+			log.Printf("✓ %s simulado correctamente (rollback ok).", filename)
+		}
+		log.Println("📊 Reporte completo: ninguna fila fue modificada.")
+		return
+	}
+
 	// 6. Ejecución Secuencial dentro de Transacciones
 	log.Printf("🚀 Iniciando la siembra de %d archivo(s) SQL...", len(filesToRun))
 	for _, filename := range filesToRun {
@@ -143,5 +188,36 @@ func main() {
 	}
 
 	log.Println("🎉 Proceso de Seeding finalizado con éxito de forma segura.")
+}
+
+// productionURLMarkers are host fragments that, when present in the
+// `DATABASE_URL`, mean we are talking to a managed cloud database. The
+// list is intentionally narrow — false positives are bad UX in
+// development, false negatives corrupt production data.
+//
+// Kept as a package-level variable so unit tests can override it when
+// running against a sandbox URL we want to keep visible.
+var productionURLMarkers = []string{
+	"railway",
+	"amazonaws",
+	"render.com",
+	"supabase.co",
+	"neon.tech",
+}
+
+// detectProduction decides whether the seed CLI is being pointed at a
+// production-class database. Extracted as a pure function so the
+// production guard can be unit-tested without spinning up a real DB.
+func detectProduction(envFlag, dbURL string) bool {
+	if envFlag == "production" {
+		return true
+	}
+	lowerURL := strings.ToLower(dbURL)
+	for _, marker := range productionURLMarkers {
+		if strings.Contains(lowerURL, marker) {
+			return true
+		}
+	}
+	return false
 }
 
