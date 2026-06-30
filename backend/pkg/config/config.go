@@ -24,10 +24,26 @@ type Config struct {
 
 	LocalPDFDir string // used when R2Endpoint is empty
 
+	// PublicBaseURL is the externally-reachable origin where this API
+	// is served (scheme + host, no trailing slash). It is used to build
+	// absolute URLs to local PDFs when no R2 bucket is configured.
+	//
+	// Resolution order (highest priority first):
+	//   1. PUBLIC_BASE_URL env var (explicit override).
+	//   2. RAILWAY_PUBLIC_DOMAIN — auto-set by Railway for every
+	//      deployed service. We prepend "https://" so it matches the
+	//      format of (1) without manual config.
+	//   3. "" (empty) — the PDF store falls back to PDFBaseURL, which
+	//      itself defaults to http://localhost:8080/api/v1/pdfs.
+	PublicBaseURL string
+
 	// PDFBaseURL is the public HTTP base from which local PDFs are
 	// served. The dev PDF handler exposes them at
-	// {PDFBaseURL}/{object-key}. Default points at the local API on 8080.
-	// In production (R2), this field is ignored — R2 has its own CDN.
+	// {PDFBaseURL}/{object-key}. In production (R2), this field is
+	// ignored — R2 has its own CDN.
+	//
+	// Defaults to {PublicBaseURL}/api/v1/pdfs when PublicBaseURL is
+	// resolved, falling back to http://localhost:8080/api/v1/pdfs.
 	PDFBaseURL string
 }
 
@@ -35,6 +51,17 @@ type Config struct {
 // defaults for local development.
 func Load() (*Config, error) {
 	_ = godotenv.Overload()
+
+	publicBase := resolvePublicBaseURL()
+
+	pdfBase := strings.TrimRight(getEnv("PDF_BASE_URL", ""), "/")
+	if pdfBase == "" {
+		if publicBase != "" {
+			pdfBase = publicBase + "/api/v1/pdfs"
+		} else {
+			pdfBase = "http://localhost:8080/api/v1/pdfs"
+		}
+	}
 
 	return &Config{
 		Port:        getEnv("PORT", "8080"),
@@ -46,9 +73,22 @@ func Load() (*Config, error) {
 		R2Bucket:    getEnv("R2_BUCKET", ""),
 		R2PublicURL: strings.TrimRight(getEnv("R2_PUBLIC_URL", ""), "/"),
 
-		LocalPDFDir: getEnv("LOCAL_PDF_DIR", "./tmp/pdfs"),
-		PDFBaseURL:  strings.TrimRight(getEnv("PDF_BASE_URL", "http://localhost:8080/api/v1/pdfs"), "/"),
+		LocalPDFDir:   getEnv("LOCAL_PDF_DIR", "./tmp/pdfs"),
+		PublicBaseURL: publicBase,
+		PDFBaseURL:    pdfBase,
 	}, nil
+}
+
+// resolvePublicBaseURL picks the externally-reachable origin of the
+// API from the environment. See PublicBaseURL for precedence.
+func resolvePublicBaseURL() string {
+	if v := strings.TrimSpace(getEnv("PUBLIC_BASE_URL", "")); v != "" {
+		return strings.TrimRight(v, "/")
+	}
+	if v := strings.TrimSpace(getEnv("RAILWAY_PUBLIC_DOMAIN", "")); v != "" {
+		return "https://" + strings.TrimRight(v, "/")
+	}
+	return ""
 }
 
 // UseR2 reports whether R2 credentials are configured. The PDF store

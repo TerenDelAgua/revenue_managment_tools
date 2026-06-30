@@ -55,13 +55,21 @@ func NewLocalStore(cfg *config.Config) (*LocalStore, error) {
 		return nil, fmt.Errorf("create local pdf dir: %w", err)
 	}
 	// publicURL is the HTTP base where the API serves local PDFs from.
-	// Default (when the env var isn't set) points at the bundled dev
-	// handler: http://localhost:8080/api/v1/pdfs.
 	// We never return file:// URLs — browsers block them from JS and
 	// the SPA needs to fetch the PDF as a normal same-origin resource.
+	//
+	// Precedence:
+	//   1. cfg.PDFBaseURL — explicit override via PDF_BASE_URL.
+	//   2. cfg.PublicBaseURL + "/api/v1/pdfs" — auto-detected from
+	//      PUBLIC_BASE_URL or RAILWAY_PUBLIC_DOMAIN by config.Load.
+	//   3. http://localhost:8080/api/v1/pdfs — local dev fallback.
 	publicURL := cfg.PDFBaseURL
 	if publicURL == "" {
-		publicURL = "http://localhost:8080/api/v1/pdfs"
+		if cfg.PublicBaseURL != "" {
+			publicURL = cfg.PublicBaseURL + "/api/v1/pdfs"
+		} else {
+			publicURL = "http://localhost:8080/api/v1/pdfs"
+		}
 	}
 	return &LocalStore{dir: cfg.LocalPDFDir, publicURL: publicURL}, nil
 }
